@@ -5,8 +5,9 @@ name = "pypi"
 
 [packages]
 requests = "*"
-pystac = "1.0.0b1"
-pystac-client = "*"
+pystac = "*"
+"pystac[validation]" = "*"
+pystac-client = "0.1.1"
 
 [dev-packages]
 autopep8 = "*"
