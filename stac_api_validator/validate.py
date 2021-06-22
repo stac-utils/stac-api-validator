@@ -3,7 +3,7 @@ import logging
 import sys
 import os
 from validations import validate_api
-
+import traceback
 
 def parse_args(args):
     parser = argparse.ArgumentParser(description='STAC API Validation Suite')
@@ -24,10 +24,27 @@ def main():
     if args.root is None:
         raise RuntimeError('No STAC API root URI provided')
 
-    (warnings, errors) = validate_api(args.root)
+    print(f"Validating {args.root} ...", flush=True)
 
-    print(f"warnings: {warnings}")
-    print(f"errors: {errors}")
+    try:
+        (warnings, errors) = validate_api(args.root)
+    except Exception as e:
+        print(f"fail.\nError {args.root}: {type(e)} {str(e)}")
+        traceback.print_exc()
+
+    if warnings:
+        print("warnings:")
+    else:
+        print("warnings: none")
+    for warning in warnings:
+        print(f"- {warning}")
+
+    if errors:
+        print("errors:")
+    else:
+        print("errors: none")
+    for error in errors:
+        print(f"- {error}")
 
     if errors:
         return 1

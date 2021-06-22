@@ -274,15 +274,18 @@ def validate_search(catalog: Client, warnings: List[str],
     mysearch = catalog.search(max_items=1)
     mysearch.items_as_collection
 
+    # validate_search_limit()
+    validate_search_bbox(search.get_absolute_href(), warnings, errors)
     validate_search_datetime(search.get_absolute_href(), warnings, errors)
-
+    # validate_search_intersects()
+    # validate_search_ids()
+    # validate_search_collections(search.get_absolute_href(), warnings, errors)
 
 def validate_search_datetime(
     search_url: str,
     warnings: List[str],
     errors: List[str] = []
 ):
-
     # find an Item and try to use its datetime value in a query
     r = requests.get(search_url)
     dt = r.json()["features"][0]["properties"]["datetime"]
@@ -312,6 +315,106 @@ def validate_search_datetime(
             errors.append(
                 f"Search with datetime={dt} returned status code {r.status_code} instead of 400")
             continue
+
+
+def validate_search_bbox(
+    search_url: str,
+    warnings: List[str],
+    errors: List[str] = []
+):
+    # Valid GET query
+    param = "100.0, 0.0, 105.0, 1.0"
+    r = requests.get(search_url, params={"bbox": param })
+    if r.status_code != 200:
+        errors.append(
+            f"GET Search with bbox={param} returned status code {r.status_code}")
+    else:
+        try:
+            r.json()
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"GET Search with bbox={param} returned non-json response: {r.text}")
+
+    # Valid POST query
+    param = [100.0, 0.0, 105.0, 1.0]
+    r = requests.post(search_url, json={"bbox": param})
+    if r.status_code != 200:
+        errors.append(
+            f"POST Search with bbox:{param} returned status code {r.status_code}")
+    else: 
+        try:
+            r.json()
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"POST Search with bbox:{param} returned non-json response: {r.text}")
+
+    # Valid 3D GET query
+    param = "100.0,0.0,0.0,105.0,1.0,1.0"
+    r = requests.get(search_url, params={"bbox": param})
+    if r.status_code != 200:
+        errors.append(
+            f"GET Search with bbox={param} returned status code {r.status_code}")
+    else:        
+        try:
+            r.json()
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"GET with bbox={param} returned non-json response: {r.text}")
+
+    # Valid 3D POST query
+    param = [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]
+    r = requests.post(search_url, json={"bbox": param})
+    if r.status_code != 200:
+        errors.append(
+            f"POST Search with bbox:{param} returned status code {r.status_code}")
+    else:
+        try:
+            r.json()
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"POST with bbox:{param} returned non-json response: {r.text}")
+
+    # Invalid GET query with coordinates in brackets
+    param = "[100.0, 0.0, 105.0, 1.0]"
+    r = requests.get(search_url, params={"bbox": param})
+    if r.status_code != 400:
+        errors.append(
+            f"GET Search with bbox={param} returned status code {r.status_code}, instead of 400")
+
+    # Invalid POST query with CSV string of coordinates
+    param = "100.0, 0.0, 105.0, 1.0"
+    r = requests.post(search_url, json={"bbox": param})
+    if r.status_code != 400:
+        errors.append(
+            f"POST Search with bbox:\"{param}\" returned status code {r.status_code}, instead of 400")
+
+    # Invalid bbox - lat 1 > lat 2
+    param = "100.0, 1.0, 105.0, 0.0"
+    r = requests.get(search_url, params={"bbox": param})
+    if r.status_code != 400:
+        errors.append(
+            f"GET Search with bbox=param (lat 1 > lat 2) returned status code {r.status_code}, instead of 400")
+
+    param = [100.0, 1.0, 105.0, 0.0]
+    r = requests.post(search_url, json={"bbox": param})
+    if r.status_code != 400:
+        errors.append(
+            f"POST Search with bbox: {param} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400")
+
+    # Invalid bbox - 1, 2, 3, 5, and 7 element array
+    bboxes = [ [0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1] ]
+
+    for bbox in bboxes:
+        param = ",".join((str(c) for c in bbox))
+        r = requests.get(search_url, params={"bbox": param })
+        if r.status_code != 400:
+            errors.append(
+                f"GET Search with bbox={param} returned status code {r.status_code}, instead of 400")
+
+        r = requests.post(search_url, json={"bbox": bbox})
+        if r.status_code != 400:
+            errors.append(
+                f"POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400")
 
 
 def validate(error_str: str, p: Callable[[], bool]) -> List[str]:

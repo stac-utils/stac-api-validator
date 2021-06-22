@@ -15,23 +15,55 @@ The link relations define how to navigate a STAC catalog through parent-child li
 
 ## Running
 
-`validate.py` expects a single argument pointing to the root of a STAC API.
+Install dependencies:
 
-`validate_all.py` runs validation against several public STAC API endpoints.
+```
+pip install -e . 
+```
+
+Run:
+
+```
+python stac_api_validator/validate.py --root https://cmr.earthdata.nasa.gov/stac/LARC_ASDC 
+```
+
+Example output:
+
+```
+Validating https://cmr.earthdata.nasa.gov/stac/LARC_ASDC ...
+STAC API - Core conformance class found.
+STAC API - Item Search conformance class found.
+warnings: none
+errors:
+- service-desc (https://api.stacspec.org/v1.0.0-beta.1/openapi.yaml): should have content-type header 'application/vnd.oai.openapi+json;version=3.0'', actually 'text/yaml'
+- service-desc (https://api.stacspec.org/v1.0.0-beta.1/openapi.yaml): should return JSON, instead got non-JSON text
+- GET Search with bbox=100.0, 0.0, 105.0, 1.0 returned status code 400
+- POST Search with bbox:[100.0, 0.0, 105.0, 1.0] returned status code 502
+- GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 400
+- POST Search with bbox:[100.0, 0.0, 0.0, 105.0, 1.0, 1.0] returned status code 400
+```
 
 ## List of Public STAC API URLs
 
-* https://earth-search.aws.element84.com/v0
-* https://planetarycomputer.microsoft.com/api/stac/v1/
-* https://eod-catalog-svc-prod.astraea.earth/
-* https://services.sentinel-hub.com/api/v1/catalog/
-* https://api.radiant.earth/mlhub/v1/
-* https://earthengine.openeo.org/v1.0
-* https://cmr.earthdata.nasa.gov/stac -- a catalog that links to other STAC API roots
-* https://cmr.earthdata.nasa.gov/stac/LARC_ASDC
-* https://franklin.nasa-hsi.azavea.com/
-* https://tamn.snapplanet.io/
-* https://data.geo.admin.ch/api/stac/v0.9/
+### 1.0.0
+
+- https://planetarycomputer.microsoft.com/api/stac/v1/
+- https://franklin.nasa-hsi.azavea.com/
+- https://tamn.snapplanet.io/
+- https://cmr.earthdata.nasa.gov/stac/LARC_ASDC (https://cmr.earthdata.nasa.gov/stac as links to other STAC API roots)
+
+Non-compilant with 1.0.0:
+
+-  https://eod-catalog-svc-prod.astraea.earth/ -- incorrect conformance classes
+
+### 0.9
+
+- https://earth-search.aws.element84.com/v0
+- https://services.sentinel-hub.com/api/v1/catalog/
+- https://earthengine.openeo.org/v1.0
+- https://api.radiant.earth/mlhub/v1/
+- https://data.geo.admin.ch/api/stac/v0.9/
+
 
 ## Common Mistakes
 
