@@ -1,17 +1,23 @@
 # STAC API Validator
 
+**Work in Progress -- this currently only validates a subset of behavior, notably conformance classes, links, 
+and datetime and bbox parameters**
+
 This validation suite focuses on validating STAC API interactions.  Tools such as pystac and stac4s do a 
 good job of validating STAC objects (Catalog, Collection, Item). This suite focuses on the API aspects. 
 
-The two key concepts within a STAC API are:
+The three key concepts within a STAC API are:
 1. Conformance classes defining the capabilities of the API
 2. Link relations between resources within the API
+3. Parameters that filter results
 
 The conformance classes, as defined in the `conformsTo` field of the Landing Page (root, `/`), advertise to 
 clients which capabilities are available in the API. Without this field, a client would not even be able to tell that a
 root URI was a STAC API. 
 
 The link relations define how to navigate a STAC catalog through parent-child links and find resources such as the OpenAPI specification. While many OGC API and STAC API endpoint have a fixed value (e.g., `/collections`), it is preferable for clients discover the paths via hypermedia. 
+
+The parameters that filter results apply to the Items resource and Item Search endpoints.
 
 ## Running
 
