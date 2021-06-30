@@ -19,12 +19,36 @@ The link relations define how to navigate a STAC catalog through parent-child li
 
 The parameters that filter results apply to the Items resource and Item Search endpoints.
 
+## OGC API Features - Part 1 validation
+
+A STAC API that conforms to the "STAC API - Features" conformance class will also be a valid implementation 
+of OGC API Features - Part 1. In general, this validator focuses on those aspects of API behavior that are
+different between STAC and OGC. It is recommended that implementers also use the [OGC API Features - Part 1 
+validation test suite](https://cite.opengeospatial.org/teamengine/about/ogcapi-features-1.0/1.0/site/) to
+validate conformance. 
+
+Full instructions are available at the link above, but the simplest way to run this is with:
+
+```
+docker run -p 8081:8080 ogccite/ets-ogcapi-features10
+```
+
+Then, open [http://localhost:8081/teamengine/](http://localhost:8081/teamengine/) and login with the 
+username and password `ogctest`, `Create a new session`, with Organization `OGC`, Specification `OGC API - Features`, `Start a new test session`, input he root URL for the service, and `Start`.
+
 ## Running
+
+Create new venv:
+
+```
+python3 -m venv venv
+source ./venv/bin/activate
+```
 
 Install dependencies:
 
 ```
-pip install -e . 
+pip install -r requirements.txt
 ```
 
 Run:
