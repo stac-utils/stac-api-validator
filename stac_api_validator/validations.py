@@ -1,6 +1,7 @@
 from typing import List, Tuple
 from pystac.link import Link
-from pystac_client import Client
+from pystac_client import Client 
+from pystac_client.exceptions import ConformanceError
 import logging
 import requests
 from typing import Callable
@@ -80,15 +81,19 @@ def validate_api(root_uri: str) -> Tuple[List[str], List[str]]:
     warnings: List[str] = []
     errors: List[str] = []
 
-    catalog: Client = Client.open(root_uri)
+    catalog = None
+    try:
+        catalog: Client = Client.open(root_uri)
+    except ConformanceError as e:
+        errors.append(str(e))
 
-    if not catalog.conformance:
+    if catalog and not catalog.conformance:
         errors.append("/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0.")
 
-    if not catalog.links:
+    if catalog and not catalog.links:
         errors.append("/ : 'links' field must be defined and non-empty.")
 
-    if catalog.conformance and \
+    if catalog and catalog.conformance and \
        not any(core_cc_regex.match(x) for x in catalog.conformance) and \
        not any(oaf_cc_regex.match(x) for x in catalog.conformance) and \
        not any(search_cc_regex.match(x) for x in catalog.conformance):
@@ -98,11 +103,6 @@ def validate_api(root_uri: str) -> Tuple[List[str], List[str]]:
     # fail fast if there are errors with conformance or links so far
     if errors:
         return (warnings, errors)
-
-    # todo: option to force validation and warn about non-existence of CC
-    # todo: allow deprecated conformance classes, and warn
-    # http://stacspec.org/spec/api/1.0.0-beta.1/core
-    # http://stacspec.org/spec/api/1.0.0-beta.1/req/stac-search
 
     if any(core_cc_regex.match(x) for x in catalog.conformance):
         print("STAC API - Core conformance class found.")

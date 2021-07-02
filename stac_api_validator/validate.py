@@ -6,12 +6,12 @@ from validations import validate_api
 import traceback
 
 def parse_args(args):
-    parser = argparse.ArgumentParser(description='STAC API Validation Suite')
+    parser = argparse.ArgumentParser(description="STAC API Validation Suite")
     # todo: validate logging is one of these values
-    parser.add_argument('--logging', default='INFO',
-                        help='DEBUG, INFO, WARN, ERROR, CRITICAL')
-    parser.add_argument('--root', help='Landing Page URI',
-                        default=os.getenv('STAC_API_ROOT_URI', None))
+    parser.add_argument("--logging", default="INFO",
+                        help="DEBUG, INFO, WARN, ERROR, CRITICAL")
+    parser.add_argument("--root", help="Root / Landing Page URL",
+                        default=os.getenv("STAC_API_ROOT_URL", None))
 
     return parser.parse_args(args)
 
@@ -22,15 +22,16 @@ def main():
     logging.basicConfig(stream=sys.stdout, level=args.logging)
 
     if args.root is None:
-        raise RuntimeError('No STAC API root URI provided')
+        raise RuntimeError("No STAC API root URI provided")
 
-    print(f"Validating {args.root} ...", flush=True)
+    print(f"Validating {args.root}", flush=True)
 
     try:
         (warnings, errors) = validate_api(args.root)
     except Exception as e:
-        print(f"fail.\nError {args.root}: {type(e)} {str(e)}")
+        print(f"Failed.\nError {args.root}: {type(e)} {str(e)}")
         traceback.print_exc()
+        return
 
     if warnings:
         print("warnings:")
