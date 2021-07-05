@@ -102,11 +102,40 @@ Date: 2-Jul-2021
 Output
 ```
 Validating https://tamn.snapplanet.io/
+STAC API - Core conformance class found.
+STAC API - Features conformance class found.
+STAC API - Item Search conformance class found.
 warnings: none
 errors:
-- API does not conform to {ConformanceClasses.STAC_API_CORE}. Must contain one of the following URIs to conform (preferably the first):
-        https://api.stacspec.org/v1.0.0-beta.1/core
-        http://stacspec.org/spec/api/1.0.0-beta.1/core.
+- service-desc ({'rel': 'service-desc', 'type': 'application/vnd.oai.openapi+json;version=3.0', 'title': 'OpenAPI 3.0 definition endpoint', 'href': 'https://tamn.snapplanet.io/api'}): should have content-type header 'application/vnd.oai.openapi+json;version=3.0'', actually 'application/json'
+- Search (https://tamn.snapplanet.io/search): should have content-type header 'application/geo+json'', actually 'application/json'
+- GET Search with bbox=100.0, 0.0, 105.0, 1.0 returned status code 400
+- POST Search with bbox:[100.0, 0.0, 105.0, 1.0] returned status code 405
+- GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 400
+- POST Search with bbox:[100.0, 0.0, 0.0, 105.0, 1.0, 1.0] returned status code 405
+- POST Search with bbox:"100.0, 0.0, 105.0, 1.0" returned status code 405, instead of 400
+- POST Search with bbox: [100.0, 1.0, 105.0, 0.0] (lat 1 > lat 2) returned status code 405, instead of 400
+- POST Search with bbox:[0] returned status code 405, instead of 400
+- POST Search with bbox:[0, 0] returned status code 405, instead of 400
+- POST Search with bbox:[0, 0, 0] returned status code 405, instead of 400
+- POST Search with bbox:[0, 0, 0, 1, 1] returned status code 405, instead of 400
+- POST Search with bbox:[0, 0, 0, 1, 1, 1, 1] returned status code 405, instead of 400
+- Search with datetime=1985-04-12T23:20:50,52Z returned status code 400
+- Search with datetime=1996-12-19T16:39:57+00:00 returned status code 400
+- Search with datetime=1996-12-19T16:39:57+08:00 returned status code 400
+- Search with datetime=../1985-04-12T23:20:50.52Z returned status code 400
+- Search with datetime=1985-04-12T23:20:50.52Z/.. returned status code 400
+- Search with datetime=1985-04-12T23:20:50.52+01:00/1986-04-12T23:20:50.52Z+01:00 returned status code 400
+- Search with datetime=1985-04-12T23:20:50.52-01:00/1986-04-12T23:20:50.52Z-01:00 returned status code 400
+- Search with datetime=1937-01-01T12:00:27.87+01:00 returned status code 400
+- Search with datetime=1937-01-01T12:00:27.8710+01:00 returned status code 400
+- Search with datetime=1937-01-01T12:00:27.8+01:00 returned status code 400
+- Search with datetime=2020-07-23T00:00:00.000+03:00 returned status code 400
+- Search with datetime=2020-07-23T00:00:00+03:00 returned status code 400
+- Search with datetime=1985-04-12t23:20:50.000z returned status code 400
+- Search with datetime=1985-04-12 returned status code 200 instead of 400
+- Search with datetime=1985-12-12T23:20:50.52 returned status code 200 instead of 400
+- Search with datetime=1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z returned status code 200 instead of 400.
 ```
 
 # Franklin
