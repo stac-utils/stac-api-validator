@@ -1,12 +1,13 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from pystac.link import Link
-from pystac_client import Client 
+from pystac_client import Client
 from pystac_client.exceptions import ConformanceError
 import logging
 import requests
 from typing import Callable
 import re
 import json
+import itertools
 
 # https://github.com/stac-utils/pystac/blob/4c7c775a6d0ca49d83dbec714855a189be759c8a/docs/concepts.rst#using-your-own-validator
 
@@ -22,81 +23,88 @@ geojson_mt = 'application/geo+json'
 geojson_charset_mt = 'application/geo+json; charset=utf-8'
 
 valid_datetimes = [
-        "1985-04-12T23:20:50.52Z",
-        "1985-04-12T23:20:50,52Z",
-        "1996-12-19T16:39:57-00:00",
-        "1996-12-19T16:39:57+00:00",
-        "1996-12-19T16:39:57-08:00",
-        "1996-12-19T16:39:57+08:00",
-        "../1985-04-12T23:20:50.52Z",
-        "1985-04-12T23:20:50.52Z/..",
-        "/1985-04-12T23:20:50.52Z",
-        "1985-04-12T23:20:50.52Z/",
-        "1985-04-12T23:20:50.52Z/1986-04-12T23:20:50.52Z",
-        "1985-04-12T23:20:50.52+01:00/1986-04-12T23:20:50.52Z+01:00",
-        "1985-04-12T23:20:50.52-01:00/1986-04-12T23:20:50.52Z-01:00",
+    "1985-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50,52Z",
+    "1996-12-19T16:39:57-00:00",
+    "1996-12-19T16:39:57+00:00",
+    "1996-12-19T16:39:57-08:00",
+    "1996-12-19T16:39:57+08:00",
+    "../1985-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50.52Z/..",
+    "/1985-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50.52Z/",
+    "1985-04-12T23:20:50.52Z/1986-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50.52+01:00/1986-04-12T23:20:50.52+01:00",
+    "1985-04-12T23:20:50.52-01:00/1986-04-12T23:20:50.52-01:00",
 
-        "1937-01-01T12:00:27.87+01:00",
-        "1985-04-12T23:20:50.52Z",
-        "1937-01-01T12:00:27.8710+01:00",
-        "1937-01-01T12:00:27.8+01:00",
-        "1937-01-01T12:00:27.8Z",
+    "1937-01-01T12:00:27.87+01:00",
+    "1985-04-12T23:20:50.52Z",
+    "1937-01-01T12:00:27.8710+01:00",
+    "1937-01-01T12:00:27.8+01:00",
+    "1937-01-01T12:00:27.8Z",
 
-        "2020-07-23T00:00:00.000+03:00",
-        "2020-07-23T00:00:00+03:00",
-        "1985-04-12t23:20:50.000z",
+    "2020-07-23T00:00:00.000+03:00",
+    "2020-07-23T00:00:00+03:00",
+    "1985-04-12t23:20:50.000z",
 
-        "2020-07-23T00:00:00Z",
-        "2020-07-23T00:00:00.0Z",
-        "2020-07-23T00:00:00.01Z",
-        "2020-07-23T00:00:00.012Z",
-        "2020-07-23T00:00:00.0123Z",
-        "2020-07-23T00:00:00.01234Z",
-        "2020-07-23T00:00:00.012345Z",
-        "2020-07-23T00:00:00.0123456Z",
-        "2020-07-23T00:00:00.01234567Z",
-        "2020-07-23T00:00:00.012345678Z",
-    ]
+    "2020-07-23T00:00:00Z",
+    "2020-07-23T00:00:00.0Z",
+    "2020-07-23T00:00:00.01Z",
+    "2020-07-23T00:00:00.012Z",
+    "2020-07-23T00:00:00.0123Z",
+    "2020-07-23T00:00:00.01234Z",
+    "2020-07-23T00:00:00.012345Z",
+    "2020-07-23T00:00:00.0123456Z",
+    "2020-07-23T00:00:00.01234567Z",
+    "2020-07-23T00:00:00.012345678Z",
+]
 
 invalid_datetimes = [
-        "1985-04-12",  # date only
-        "1937-01-01T12:00:27.87+0100",  # invalid TZ format, no sep :
-        "37-01-01T12:00:27.87Z",  # invalid year, must be 4 digits
-        "1985-12-12T23:20:50.52",  # no TZ
-        "21985-12-12T23:20:50.52Z",  # year must be 4 digits
-        "1985-13-12T23:20:50.52Z",  # month > 12
-        "1985-12-32T23:20:50.52Z",  # day > 31
-        "1985-12-01T25:20:50.52Z",  # hour > 24
-        "1985-12-01T00:60:50.52Z",  # minute > 59
-        "1985-12-01T00:06:61.52Z",  # second > 60
-        "1985-04-12T23:20:50.Z",  # fractional sec . but no frac secs
-        "1985-04-12T23:20:50,Z",  # fractional sec , but no frac secs
-        "1990-12-31T23:59:61Z",  # second > 60 w/o fractional seconds
-        "1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z",
-    ]
+    "1985-04-12",  # date only
+    "1937-01-01T12:00:27.87+0100",  # invalid TZ format, no sep :
+    "37-01-01T12:00:27.87Z",  # invalid year, must be 4 digits
+    "1985-12-12T23:20:50.52",  # no TZ
+    "21985-12-12T23:20:50.52Z",  # year must be 4 digits
+    "1985-13-12T23:20:50.52Z",  # month > 12
+    "1985-12-32T23:20:50.52Z",  # day > 31
+    "1985-12-01T25:20:50.52Z",  # hour > 24
+    "1985-12-01T00:60:50.52Z",  # minute > 59
+    "1985-12-01T00:06:61.52Z",  # second > 60
+    "1985-04-12T23:20:50.Z",  # fractional sec . but no frac secs
+    "1985-04-12T23:20:50,Z",  # fractional sec , but no frac secs
+    "1990-12-31T23:59:61Z",  # second > 60 w/o fractional seconds
+    "1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z",
+]
 
-def validate_api(root_uri: str) -> Tuple[List[str], List[str]]:
+
+def validate_api(root_url: str) -> Tuple[List[str], List[str]]:
     logger = logging.getLogger(__name__)
 
     warnings: List[str] = []
     errors: List[str] = []
 
-    catalog = None
-    try:
-        catalog: Client = Client.open(root_uri)
-    except ConformanceError as e:
-        errors.append(str(e))
+    root = requests.get(root_url)
 
-    if catalog and not catalog.conformance:
-        errors.append("/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0.")
+    # todo: handle connection exception, etc.
+    if root.status_code != 200:
+        errors.append(
+            f"root URL {root_url} returned status code {root.status_code}")
+        return (warnings, errors)
 
-    if catalog and not catalog.links:
+    root_body = root.json()
+
+    conforms_to = root_body.get("conformsTo")
+    if not conforms_to:
+        errors.append(
+            "/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0.")
+
+    if not root_body.get("links"):
         errors.append("/ : 'links' field must be defined and non-empty.")
 
-    if catalog and catalog.conformance and \
-       not any(core_cc_regex.match(x) for x in catalog.conformance) and \
-       not any(oaf_cc_regex.match(x) for x in catalog.conformance) and \
-       not any(search_cc_regex.match(x) for x in catalog.conformance):
+    if not root_body.get("conformsTo") and \
+       not any(core_cc_regex.match(x) for x in conforms_to) and \
+       not any(oaf_cc_regex.match(x) for x in conforms_to) and \
+       not any(search_cc_regex.match(x) for x in conforms_to):
         errors.append(
             "/ : 'conformsTo' must contain at least one STAC API conformance class.")
 
@@ -104,57 +112,70 @@ def validate_api(root_uri: str) -> Tuple[List[str], List[str]]:
     if errors:
         return (warnings, errors)
 
-    if any(core_cc_regex.match(x) for x in catalog.conformance):
+    if any(core_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Core conformance class found.")
-        validate_core(catalog, warnings, errors)
+        validate_core(root_body, warnings, errors)
     else:
         errors.append(
             "/ : 'conformsTo' must contain STAC API - Core conformance class.")
 
-    if any(oaf_cc_regex.match(x) for x in catalog.conformance):
+    if any(oaf_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Features conformance class found.")
-        validate_oaf(catalog, warnings, errors)
+        validate_oaf(root_body, warnings, errors)
 
-    if any(search_cc_regex.match(x) for x in catalog.conformance):
+    # todo: check if /collections exists and warn about not implementing having OAF CC and rel=data
+
+    if any(search_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Item Search conformance class found.")
-        validate_search(catalog, warnings, errors)
+        validate_search(root_body, warnings, errors)
 
-    catalog.validate()
-    for collection in catalog.get_children():
-        collection.validate()
+    if not errors:
+        try:
+            catalog = Client.open(root_url)
+            catalog.validate()
+            for collection in catalog.get_children():
+                collection.validate()
+        except ConformanceError as e:
+            errors.append(str(e))
 
     return (warnings, errors)
 
 
-def validate_core(catalog: Client, warnings: List[str],
+def href_for(links: List, key: str) -> Dict[str, str]:
+    return next((link for link in links if link.get("rel") == key), None)
+
+
+def validate_core(root_body: Dict, warnings: List[str],
                   errors: List[str]) -> int:
 
+    links = root_body.get("links")
+
     # Link rel=root
-    root: Link = catalog.get_single_link('root')
+    root = href_for(links, "root")
     if root is not None:
-        if root.media_type != "application/json":
+        if root.get("type") != "application/json":
             errors.append("root type is not application/json")
     else:
-        warnings.append("root link missing")
+        warnings.append("/ : Link[rel=root] should exist")
 
-    # Link rel=link
-    _self: Link = catalog.get_single_link('self')
+    # Link rel=self
+    _self = href_for(links, "self")
     if _self is not None:
-        if _self.media_type != "application/json":
+        if _self.get("type") != "application/json":
             errors.append("self type is not application/json")
     else:
-        warnings.append("self link missing")
+        warnings.append("/ : Link[rel=self] should exist")
 
     # Link rel=service-desc
-    service_desc: Link = catalog.get_single_link('service-desc')
+    service_desc = href_for(links, "service-desc")
     if not service_desc:
         warnings.append("/ : Link[rel=service-desc] should exist")
     else:
-        if service_desc.media_type != openapi_media_type:
+        if service_desc.get("type") != openapi_media_type:
             errors.append(
                 f"/ : Link[rel=service-desc] should have media_type '{openapi_media_type}'', actually '{service_desc.media_type}'")
 
-        r_service_desc = requests.get(service_desc.get_absolute_href())
+        r_service_desc = requests.get(service_desc["href"])
 
         errors += validate(
             "/ : Link[service-desc] must return 200",
@@ -164,23 +185,23 @@ def validate_core(catalog: Client, warnings: List[str],
             pass
         else:
             errors.append(
-                f"service-desc ({service_desc.get_absolute_href()}): should have content-type header '{openapi_media_type}'', actually '{ct}'")
+                f"service-desc ({service_desc}): should have content-type header '{openapi_media_type}'', actually '{ct}'")
 
         try:
             r_service_desc.json()
         except json.decoder.JSONDecodeError as e:
             errors.append(
-                f"service-desc ({service_desc.get_absolute_href()}): should return JSON, instead got non-JSON text")
+                f"service-desc ({service_desc}): should return JSON, instead got non-JSON text")
 
     # Link rel=service-doc
-    service_doc: Link = catalog.get_single_link('service-doc')
+    service_doc = href_for(links, "service-doc")
     if not service_doc:
         warnings.append("/ : Link[rel=service-doc] should exist")
     else:
-        if service_doc.media_type != "text/html":
+        if service_doc.get("type") != "text/html":
             errors.append("service-doc type is not text/html")
 
-        r_service_doc = requests.get(service_doc.get_absolute_href())
+        r_service_doc = requests.get(service_doc["href"])
 
         errors += validate(
             "/ : Link[service-doc] must return 200",
@@ -190,26 +211,26 @@ def validate_core(catalog: Client, warnings: List[str],
             pass
         else:
             errors.append(
-                f"service-doc ({service_doc.get_absolute_href()}): should have content-type header 'text/html', actually '{ct}'")
+                f"service-doc ({service_doc}): should have content-type header 'text/html', actually '{ct}'")
 
     # try:
     #     r_service_doc.html()
     # except json.decoder.JSONDecodeError as e:
     #     errors.append(
-    #         f"service-doc ({service_doc.get_absolute_href()}): should return JSON, instead got non-JSON text")
+    #         f"service-doc ({service_doc}): should return JSON, instead got non-JSON text")
 
 
-def validate_oaf(catalog: Client, warnings: List[str],
+def validate_oaf(root_body: Dict, warnings: List[str],
                  errors: List[str]) -> int:
 
-    conformance = catalog.get_single_link('conformance')
+    links = root_body.get("links")
+    conformance = href_for(links, "conformance")
     errors += validate(
         "/ Link[rel=conformance] should href /conformance",
-        lambda: conformance and conformance.target.endswith("/conformance")
+        lambda: conformance and conformance["href"].endswith("/conformance")
     )
 
-    r_conformance = requests.get(conformance.get_absolute_href())
-
+    r_conformance = requests.get(conformance["href"])
     errors += validate(
         "conformance must return 200",
         lambda: r_conformance.status_code == 200)
@@ -218,49 +239,53 @@ def validate_oaf(catalog: Client, warnings: List[str],
         pass
     else:
         errors.append(
-            f"conformance ({conformance.get_absolute_href()}): should have content-type header 'application/json', actually '{ct}'")
+            f"conformance ({conformance}): should have content-type header 'application/json', actually '{ct}'")
 
-    # todo: validate conformance link is properly-formed.
-    # currently fails due to a bug in pystac
-    # conformance = catalog.get_stac_objects('conformance')
     try:
         conformance_json = r_conformance.json()
         warnings += validate(
             "Landing Page conforms to and conformance conformsTo should be the same",
-            lambda: catalog.conformance == conformance_json['conformsTo'])
+            lambda: root_body.get("conformsTo") == conformance_json['conformsTo'])
     except json.decoder.JSONDecodeError as e:
         errors.append(
-            f"service-desc ({conformance.get_absolute_href()}): should return JSON, instead got non-JSON text")
+            f"service-desc ({conformance}): should return JSON, instead got non-JSON text")
 
     errors += validate(
         "/ Link[rel=data] should href /collections",
-        lambda: catalog.get_single_link('data')
+        lambda: href_for(links, "data")
     )
 
     # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
     # backwards-compat reasons
     warnings += validate(
         "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]",
-        lambda: not catalog.get_single_link('collections')
+        lambda: not href_for(links, "collections")
     )
 
-# todo: child and children?
 
-
-def validate_search(catalog: Client, warnings: List[str],
+def validate_search(root_body: Dict, warnings: List[str],
                     errors: List[str]) -> int:
 
-    search: Link = catalog.get_single_link('search')
-    r = requests.get(search.get_absolute_href())
+    links = root_body.get("links")
+    root = href_for(links, "self")["href"]
+    search = href_for(links, "search")
+    collections = href_for(links, "data")
+    if collections:
+        collections_url = collections.get("href") 
+    else:
+        collections_url = f"{root}/collections"
+
+    search_url = search["href"]
+    r = requests.get(search_url)
     content_type: str = r.headers.get('content-type')
     if (content_type == geojson_mt or content_type == geojson_charset_mt):
         pass
     else:
         errors.append(
-            f"Search ({search.get_absolute_href()}): should have content-type header '{geojson_mt}'', actually '{content_type}'")
+            f"Search ({search_url}): should have content-type header '{geojson_mt}'', actually '{content_type}'")
 
     errors += validate(
-        f"Search({search.get_absolute_href()}): should return 200",
+        f"Search({search_url}): should return 200",
         lambda: r.status_code == 200)
 
     # todo: validate geojson, not just json
@@ -268,18 +293,15 @@ def validate_search(catalog: Client, warnings: List[str],
         r.json()
     except json.decoder.JSONDecodeError as e:
         errors.append(
-            f"Service Description({search.get_absolute_href()}): should return JSON, instead got non-JSON text")
+            f"Search ({search_url}): should return JSON, instead got non-JSON text")
 
-    # todo: run a real query
-    mysearch = catalog.search(max_items=1)
-    mysearch.items_as_collection
+    validate_search_limit(search_url, warnings, errors)
+    validate_search_bbox(search_url, warnings, errors)
+    validate_search_datetime(search_url, warnings, errors)
+    validate_search_ids(search_url, warnings, errors)
+    validate_search_collections(search_url, collections_url, warnings, errors)
+    # validate_search_intersects(search_url, warnings, errors)
 
-    # validate_search_limit()
-    validate_search_bbox(search.get_absolute_href(), warnings, errors)
-    validate_search_datetime(search.get_absolute_href(), warnings, errors)
-    # validate_search_intersects()
-    # validate_search_ids()
-    # validate_search_collections(search.get_absolute_href(), warnings, errors)
 
 def validate_search_datetime(
     search_url: str,
@@ -308,7 +330,7 @@ def validate_search_datetime(
         except json.decoder.JSONDecodeError:
             errors.append(
                 f"Search with datetime={dt} returned non-json response")
-    
+
     for dt in invalid_datetimes:
         r = requests.get(search_url, params={"datetime": dt})
         if r.status_code != 400:
@@ -324,7 +346,7 @@ def validate_search_bbox(
 ):
     # Valid GET query
     param = "100.0, 0.0, 105.0, 1.0"
-    r = requests.get(search_url, params={"bbox": param })
+    r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 200:
         errors.append(
             f"GET Search with bbox={param} returned status code {r.status_code}")
@@ -341,7 +363,7 @@ def validate_search_bbox(
     if r.status_code != 200:
         errors.append(
             f"POST Search with bbox:{param} returned status code {r.status_code}")
-    else: 
+    else:
         try:
             r.json()
         except json.decoder.JSONDecodeError:
@@ -354,7 +376,7 @@ def validate_search_bbox(
     if r.status_code != 200:
         errors.append(
             f"GET Search with bbox={param} returned status code {r.status_code}")
-    else:        
+    else:
         try:
             r.json()
         except json.decoder.JSONDecodeError:
@@ -402,11 +424,11 @@ def validate_search_bbox(
             f"POST Search with bbox: {param} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400")
 
     # Invalid bbox - 1, 2, 3, 5, and 7 element array
-    bboxes = [ [0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1] ]
+    bboxes = [[0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1]]
 
     for bbox in bboxes:
         param = ",".join((str(c) for c in bbox))
-        r = requests.get(search_url, params={"bbox": param })
+        r = requests.get(search_url, params={"bbox": param})
         if r.status_code != 400:
             errors.append(
                 f"GET Search with bbox={param} returned status code {r.status_code}, instead of 400")
@@ -415,6 +437,188 @@ def validate_search_bbox(
         if r.status_code != 400:
             errors.append(
                 f"POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400")
+
+# todo: pull the advertised limits from the service description or use 1-10000 as defaults
+
+
+def validate_search_limit(
+    search_url: str,
+    warnings: List[str],
+    errors: List[str] = []
+):
+    valid_limits = [1, 2, 10, 10000]
+    for limit in valid_limits:
+        # Valid GET query
+        params = {"limit": limit}
+        r = requests.get(search_url, params=params)
+        if r.status_code != 200:
+            errors.append(
+                f"GET Search with {params} returned status code {r.status_code}")
+        else:
+            try:
+                body = r.json()
+                items = body.get("items")
+                if items and len(items) <= 1:
+                    errors.append(
+                        f"POST Search with {params} returned fewer than 1 result")
+
+            except json.decoder.JSONDecodeError:
+                errors.append(
+                    f"GET Search with {params} returned non-json response: {r.text}")
+
+        # Valid POST query
+        r = requests.post(search_url, json=params)
+        if r.status_code != 200:
+            errors.append(
+                f"POST Search with {params} returned status code {r.status_code}")
+        else:
+            try:
+                items = body.get("items")
+                if items and len(items) <= 1:
+                    errors.append(
+                        f"POST Search with {params} returned fewer than 1 result")
+            except json.decoder.JSONDecodeError:
+                errors.append(
+                    f"POST Search with {params} returned non-json response: {r.text}")
+
+    invalid_limits = [-1, 0, 10001]
+    for limit in invalid_limits:
+        # Valid GET query
+        params = {"limit": limit}
+        r = requests.get(search_url, params=params)
+        if r.status_code != 400:
+            errors.append(
+                f"GET Search with {params} returned status code {r.status_code}, should be 400")
+
+        # Valid POST query
+        r = requests.post(search_url, json=params)
+        if r.status_code != 400:
+            errors.append(
+                f"POST Search with {params} returned status code {r.status_code}, should be 400")
+
+def _validate_search_ids_request(
+    r,
+    item_ids: List[str],
+    method: str,
+    params: Dict,
+    errors: List[str]
+):
+    if r.status_code != 200:
+        errors.append(
+            f"{method} Search with {params} returned status code {r.status_code}")
+    else:
+        try:
+            items = r.json().get("features")
+            if len(items) != len(list(filter(lambda x: x.get("id") in item_ids, items))):
+                errors.append(
+                    f"{method} Search with {params} returned items with ids other than specified one")
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"{method} Search with {params} returned non-json response: {r.text}")
+
+
+def _validate_search_ids_with_ids(
+    search_url,
+    item_ids: List[str],
+    errors: List[str]
+): 
+    get_params = {"ids": ",".join(item_ids)}
+
+    _validate_search_ids_request(
+        requests.get(search_url, params=get_params),
+            item_ids=item_ids,
+            method="GET",
+        params=get_params,
+            errors=errors
+        )
+
+    post_params = {"ids": item_ids}
+    _validate_search_ids_request(
+        requests.post(search_url, json=post_params),
+            item_ids=item_ids,
+            method="POST",
+        params=post_params,
+            errors=errors
+        )
+
+def validate_search_ids(
+    search_url: str,
+    warnings: List[str],
+    errors: List[str]
+):
+    r = requests.get(f"{search_url}?limit=10")
+    items = r.json().get("features")
+    if items:
+        _validate_search_ids_with_ids(search_url, [items[0].get("id")], errors)
+        _validate_search_ids_with_ids(search_url, [items[0].get("id"), items[1].get("id")], errors)
+        _validate_search_ids_with_ids(search_url, [i["id"] for i in items], errors)
+    else:
+        warnings.append(f"Get Search with no parameters returned zero results")
+
+
+def _validate_search_collections_request(
+    r,
+    coll_ids: List[str],
+    method: str,
+    params: Dict,
+    errors: List[str]
+):
+    if r.status_code != 200:
+        errors.append(
+            f"{method} Search with {params} returned status code {r.status_code}")
+    else:
+        try:
+            items = r.json().get("features")
+            if len(items) != len(list(filter(lambda x: x.get("collection") in coll_ids, items))):
+                errors.append(
+                    f"{method} Search with {params} returned items with ids other than specified one")
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"{method} Search with {params} returned non-json response: {r.text}")
+
+
+def _validate_search_collections_with_ids(
+    search_url,
+    coll_ids: List[str],
+    errors: List[str]
+):
+    get_params = {"collections": ",".join(coll_ids)}
+    _validate_search_collections_request(
+        requests.get(search_url, params=get_params),
+        coll_ids=coll_ids,
+        method="GET",
+        params=get_params,
+        errors=errors
+    )
+
+    post_params = {"collections": coll_ids}
+    _validate_search_collections_request(
+        requests.post(search_url, json=post_params),
+        coll_ids=coll_ids,
+        method="POST",
+        params=post_params,
+        errors=errors
+    )
+
+
+def validate_search_collections(
+    search_url: str,
+    collections_url: str,
+    warnings: List[str],
+    errors: List[str]
+):
+    _collections = requests.get(collections_url).json()["collections"]
+    collection_ids = [ x["id"] for x in _collections ]
+
+    _validate_search_collections_with_ids(
+            search_url, collection_ids, errors)
+
+    for cid in collection_ids: 
+        _validate_search_collections_with_ids(
+            search_url, [cid], errors)
+
+    _validate_search_collections_with_ids(
+        search_url, list(itertools.islice(collection_ids, 3)), errors)
 
 
 def validate(error_str: str, p: Callable[[], bool]) -> List[str]:
