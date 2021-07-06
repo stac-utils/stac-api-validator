@@ -123,6 +123,8 @@ def validate_api(root_url: str) -> Tuple[List[str], List[str]]:
         print("STAC API - Features conformance class found.")
         validate_oaf(root_body, warnings, errors)
 
+    # todo: check if /collections exists and warn about not implementing having OAF CC and rel=data
+
     if any(search_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Item Search conformance class found.")
         validate_search(root_body, warnings, errors)
