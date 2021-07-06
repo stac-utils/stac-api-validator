@@ -1,6 +1,6 @@
 from typing import List, Tuple, Dict
 from pystac.link import Link
-from pystac_client import Client 
+from pystac_client import Client
 from pystac_client.exceptions import ConformanceError
 import logging
 import requests
@@ -22,58 +22,59 @@ geojson_mt = 'application/geo+json'
 geojson_charset_mt = 'application/geo+json; charset=utf-8'
 
 valid_datetimes = [
-        "1985-04-12T23:20:50.52Z",
-        "1985-04-12T23:20:50,52Z",
-        "1996-12-19T16:39:57-00:00",
-        "1996-12-19T16:39:57+00:00",
-        "1996-12-19T16:39:57-08:00",
-        "1996-12-19T16:39:57+08:00",
-        "../1985-04-12T23:20:50.52Z",
-        "1985-04-12T23:20:50.52Z/..",
-        "/1985-04-12T23:20:50.52Z",
-        "1985-04-12T23:20:50.52Z/",
-        "1985-04-12T23:20:50.52Z/1986-04-12T23:20:50.52Z",
-        "1985-04-12T23:20:50.52+01:00/1986-04-12T23:20:50.52Z+01:00",
-        "1985-04-12T23:20:50.52-01:00/1986-04-12T23:20:50.52Z-01:00",
+    "1985-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50,52Z",
+    "1996-12-19T16:39:57-00:00",
+    "1996-12-19T16:39:57+00:00",
+    "1996-12-19T16:39:57-08:00",
+    "1996-12-19T16:39:57+08:00",
+    "../1985-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50.52Z/..",
+    "/1985-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50.52Z/",
+    "1985-04-12T23:20:50.52Z/1986-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50.52+01:00/1986-04-12T23:20:50.52+01:00",
+    "1985-04-12T23:20:50.52-01:00/1986-04-12T23:20:50.52-01:00",
 
-        "1937-01-01T12:00:27.87+01:00",
-        "1985-04-12T23:20:50.52Z",
-        "1937-01-01T12:00:27.8710+01:00",
-        "1937-01-01T12:00:27.8+01:00",
-        "1937-01-01T12:00:27.8Z",
+    "1937-01-01T12:00:27.87+01:00",
+    "1985-04-12T23:20:50.52Z",
+    "1937-01-01T12:00:27.8710+01:00",
+    "1937-01-01T12:00:27.8+01:00",
+    "1937-01-01T12:00:27.8Z",
 
-        "2020-07-23T00:00:00.000+03:00",
-        "2020-07-23T00:00:00+03:00",
-        "1985-04-12t23:20:50.000z",
+    "2020-07-23T00:00:00.000+03:00",
+    "2020-07-23T00:00:00+03:00",
+    "1985-04-12t23:20:50.000z",
 
-        "2020-07-23T00:00:00Z",
-        "2020-07-23T00:00:00.0Z",
-        "2020-07-23T00:00:00.01Z",
-        "2020-07-23T00:00:00.012Z",
-        "2020-07-23T00:00:00.0123Z",
-        "2020-07-23T00:00:00.01234Z",
-        "2020-07-23T00:00:00.012345Z",
-        "2020-07-23T00:00:00.0123456Z",
-        "2020-07-23T00:00:00.01234567Z",
-        "2020-07-23T00:00:00.012345678Z",
-    ]
+    "2020-07-23T00:00:00Z",
+    "2020-07-23T00:00:00.0Z",
+    "2020-07-23T00:00:00.01Z",
+    "2020-07-23T00:00:00.012Z",
+    "2020-07-23T00:00:00.0123Z",
+    "2020-07-23T00:00:00.01234Z",
+    "2020-07-23T00:00:00.012345Z",
+    "2020-07-23T00:00:00.0123456Z",
+    "2020-07-23T00:00:00.01234567Z",
+    "2020-07-23T00:00:00.012345678Z",
+]
 
 invalid_datetimes = [
-        "1985-04-12",  # date only
-        "1937-01-01T12:00:27.87+0100",  # invalid TZ format, no sep :
-        "37-01-01T12:00:27.87Z",  # invalid year, must be 4 digits
-        "1985-12-12T23:20:50.52",  # no TZ
-        "21985-12-12T23:20:50.52Z",  # year must be 4 digits
-        "1985-13-12T23:20:50.52Z",  # month > 12
-        "1985-12-32T23:20:50.52Z",  # day > 31
-        "1985-12-01T25:20:50.52Z",  # hour > 24
-        "1985-12-01T00:60:50.52Z",  # minute > 59
-        "1985-12-01T00:06:61.52Z",  # second > 60
-        "1985-04-12T23:20:50.Z",  # fractional sec . but no frac secs
-        "1985-04-12T23:20:50,Z",  # fractional sec , but no frac secs
-        "1990-12-31T23:59:61Z",  # second > 60 w/o fractional seconds
-        "1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z",
-    ]
+    "1985-04-12",  # date only
+    "1937-01-01T12:00:27.87+0100",  # invalid TZ format, no sep :
+    "37-01-01T12:00:27.87Z",  # invalid year, must be 4 digits
+    "1985-12-12T23:20:50.52",  # no TZ
+    "21985-12-12T23:20:50.52Z",  # year must be 4 digits
+    "1985-13-12T23:20:50.52Z",  # month > 12
+    "1985-12-32T23:20:50.52Z",  # day > 31
+    "1985-12-01T25:20:50.52Z",  # hour > 24
+    "1985-12-01T00:60:50.52Z",  # minute > 59
+    "1985-12-01T00:06:61.52Z",  # second > 60
+    "1985-04-12T23:20:50.Z",  # fractional sec . but no frac secs
+    "1985-04-12T23:20:50,Z",  # fractional sec , but no frac secs
+    "1990-12-31T23:59:61Z",  # second > 60 w/o fractional seconds
+    "1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z",
+]
+
 
 def validate_api(root_url: str) -> Tuple[List[str], List[str]]:
     logger = logging.getLogger(__name__)
@@ -85,14 +86,16 @@ def validate_api(root_url: str) -> Tuple[List[str], List[str]]:
 
     # todo: handle connection exception, etc.
     if root.status_code != 200:
-        errors.append(f"root URL {root_url} returned status code {root.status_code}") 
+        errors.append(
+            f"root URL {root_url} returned status code {root.status_code}")
         return (warnings, errors)
 
-    root_body = root.json()   
+    root_body = root.json()
 
     conforms_to = root_body.get("conformsTo")
     if not conforms_to:
-        errors.append("/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0.")
+        errors.append(
+            "/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0.")
 
     if not root_body.get("links"):
         errors.append("/ : 'links' field must be defined and non-empty.")
@@ -131,12 +134,13 @@ def validate_api(root_url: str) -> Tuple[List[str], List[str]]:
                 collection.validate()
         except ConformanceError as e:
             errors.append(str(e))
-    
+
     return (warnings, errors)
 
 
 def href_for(links: List, key: str) -> Dict[str, str]:
     return next((link for link in links if link.get("rel") == key), None)
+
 
 def validate_core(root_body: Dict, warnings: List[str],
                   errors: List[str]) -> int:
@@ -144,7 +148,7 @@ def validate_core(root_body: Dict, warnings: List[str],
     links = root_body.get("links")
 
     # Link rel=root
-    root = href_for(links, "root") 
+    root = href_for(links, "root")
     if root is not None:
         if root.get("type") != "application/json":
             errors.append("root type is not application/json")
@@ -255,6 +259,7 @@ def validate_oaf(root_body: Dict, warnings: List[str],
         lambda: not href_for(links, "collections")
     )
 
+
 def validate_search(root_body: Dict, warnings: List[str],
                     errors: List[str]) -> int:
 
@@ -281,12 +286,13 @@ def validate_search(root_body: Dict, warnings: List[str],
         errors.append(
             f"Service Description({search_url}): should return JSON, instead got non-JSON text")
 
-    validate_search_limit(search_url, warnings, errors)
+    # validate_search_limit(search_url, warnings, errors)
     # validate_search_bbox(search_url, warnings, errors)
     # validate_search_datetime(search_url, warnings, errors)
-    # validate_search_ids(search_url, warnings, errors)
+    validate_search_ids(search_url, warnings, errors)
     # validate_search_collections(search_url, warnings, errors)
     # validate_search_intersects(search_url, warnings, errors)
+
 
 def validate_search_datetime(
     search_url: str,
@@ -315,7 +321,7 @@ def validate_search_datetime(
         except json.decoder.JSONDecodeError:
             errors.append(
                 f"Search with datetime={dt} returned non-json response")
-    
+
     for dt in invalid_datetimes:
         r = requests.get(search_url, params={"datetime": dt})
         if r.status_code != 400:
@@ -331,7 +337,7 @@ def validate_search_bbox(
 ):
     # Valid GET query
     param = "100.0, 0.0, 105.0, 1.0"
-    r = requests.get(search_url, params={"bbox": param })
+    r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 200:
         errors.append(
             f"GET Search with bbox={param} returned status code {r.status_code}")
@@ -348,7 +354,7 @@ def validate_search_bbox(
     if r.status_code != 200:
         errors.append(
             f"POST Search with bbox:{param} returned status code {r.status_code}")
-    else: 
+    else:
         try:
             r.json()
         except json.decoder.JSONDecodeError:
@@ -361,7 +367,7 @@ def validate_search_bbox(
     if r.status_code != 200:
         errors.append(
             f"GET Search with bbox={param} returned status code {r.status_code}")
-    else:        
+    else:
         try:
             r.json()
         except json.decoder.JSONDecodeError:
@@ -409,11 +415,11 @@ def validate_search_bbox(
             f"POST Search with bbox: {param} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400")
 
     # Invalid bbox - 1, 2, 3, 5, and 7 element array
-    bboxes = [ [0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1] ]
+    bboxes = [[0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1]]
 
     for bbox in bboxes:
         param = ",".join((str(c) for c in bbox))
-        r = requests.get(search_url, params={"bbox": param })
+        r = requests.get(search_url, params={"bbox": param})
         if r.status_code != 400:
             errors.append(
                 f"GET Search with bbox={param} returned status code {r.status_code}, instead of 400")
@@ -422,6 +428,8 @@ def validate_search_bbox(
         if r.status_code != 400:
             errors.append(
                 f"POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400")
+
+# todo: pull the advertised limits from the service description or use 1-10000 as defaults
 
 
 def validate_search_limit(
@@ -432,7 +440,7 @@ def validate_search_limit(
     valid_limits = [1, 2, 10, 10000]
     for limit in valid_limits:
         # Valid GET query
-        params = { "limit": limit } 
+        params = {"limit": limit}
         r = requests.get(search_url, params=params)
         if r.status_code != 200:
             errors.append(
@@ -442,14 +450,14 @@ def validate_search_limit(
                 body = r.json()
                 items = body.get("items")
                 if items and len(items) <= 1:
-                    errors.append(f"POST Search with {params} returned fewer than 1 result")
-    
+                    errors.append(
+                        f"POST Search with {params} returned fewer than 1 result")
+
             except json.decoder.JSONDecodeError:
                 errors.append(
                     f"GET Search with {params} returned non-json response: {r.text}")
 
         # Valid POST query
-        params = { "limit": limit }     
         r = requests.post(search_url, json=params)
         if r.status_code != 200:
             errors.append(
@@ -458,7 +466,8 @@ def validate_search_limit(
             try:
                 items = body.get("items")
                 if items and len(items) <= 1:
-                    errors.append(f"POST Search with {params} returned fewer than 1 result")
+                    errors.append(
+                        f"POST Search with {params} returned fewer than 1 result")
             except json.decoder.JSONDecodeError:
                 errors.append(
                     f"POST Search with {params} returned non-json response: {r.text}")
@@ -473,11 +482,60 @@ def validate_search_limit(
                 f"GET Search with {params} returned status code {r.status_code}, should be 400")
 
         # Valid POST query
-        params = {"limit": limit}
         r = requests.post(search_url, json=params)
         if r.status_code != 400:
             errors.append(
                 f"POST Search with {params} returned status code {r.status_code}, should be 400")
+
+def _validate_search_ids_request(
+    r,
+    item_ids: List[str],
+    method: str,
+    params: Dict,
+    errors: List[str]
+):
+    if r.status_code != 200:
+        errors.append(
+            f"{method} Search with {params} returned status code {r.status_code}")
+    else:
+        try:
+            items = r.json().get("items")
+            if len(items) != len(filter(lambda x: x.get("id") in item_ids, items)):
+                errors.append(
+                    f"{method} Search with {params} returned items with ids other than specified one")
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"{method} Search with {params} returned non-json response: {r.text}")
+
+
+def validate_search_ids(
+    search_url: str,
+    warnings: List[str],
+    errors: List[str]
+):
+    r = requests.get(search_url)
+    items = r.json().get("items")
+    if items:
+        item_id_0 = items[0].get("id")
+        item_ids = [item_id_0]
+
+        params = {"ids": item_ids}
+
+        _validate_search_ids_request(
+            requests.get(search_url, params=params),
+            item_ids=item_ids,
+            method="GET",
+            params=params,
+            errors=errors
+        )
+
+        _validate_search_ids_request(
+            requests.post(search_url, json=params),
+            item_ids=item_ids,
+            method="POST",
+            params=params,
+            errors=errors
+        )
 
 def validate(error_str: str, p: Callable[[], bool]) -> List[str]:
     if not p():
