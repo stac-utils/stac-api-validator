@@ -7,6 +7,7 @@ import requests
 from typing import Callable
 import re
 import json
+import itertools
 
 # https://github.com/stac-utils/pystac/blob/4c7c775a6d0ca49d83dbec714855a189be759c8a/docs/concepts.rst#using-your-own-validator
 
@@ -264,7 +265,13 @@ def validate_search(root_body: Dict, warnings: List[str],
                     errors: List[str]) -> int:
 
     links = root_body.get("links")
+    root = href_for(links, "self")["href"]
     search = href_for(links, "search")
+    collections = href_for(links, "data")
+    if collections:
+        collections_url = collections.get("href") 
+    else:
+        collections_url = f"{root}/collections"
 
     search_url = search["href"]
     r = requests.get(search_url)
@@ -284,13 +291,13 @@ def validate_search(root_body: Dict, warnings: List[str],
         r.json()
     except json.decoder.JSONDecodeError as e:
         errors.append(
-            f"Service Description({search_url}): should return JSON, instead got non-JSON text")
+            f"Search ({search_url}): should return JSON, instead got non-JSON text")
 
-    # validate_search_limit(search_url, warnings, errors)
-    # validate_search_bbox(search_url, warnings, errors)
-    # validate_search_datetime(search_url, warnings, errors)
+    validate_search_limit(search_url, warnings, errors)
+    validate_search_bbox(search_url, warnings, errors)
+    validate_search_datetime(search_url, warnings, errors)
     validate_search_ids(search_url, warnings, errors)
-    # validate_search_collections(search_url, warnings, errors)
+    validate_search_collections(search_url, collections_url, warnings, errors)
     # validate_search_intersects(search_url, warnings, errors)
 
 
@@ -499,8 +506,8 @@ def _validate_search_ids_request(
             f"{method} Search with {params} returned status code {r.status_code}")
     else:
         try:
-            items = r.json().get("items")
-            if len(items) != len(filter(lambda x: x.get("id") in item_ids, items)):
+            items = r.json().get("features")
+            if len(items) != len(list(filter(lambda x: x.get("id") in item_ids, items))):
                 errors.append(
                     f"{method} Search with {params} returned items with ids other than specified one")
         except json.decoder.JSONDecodeError:
@@ -508,34 +515,109 @@ def _validate_search_ids_request(
                 f"{method} Search with {params} returned non-json response: {r.text}")
 
 
+def _validate_search_ids_with_ids(
+    search_url,
+    item_ids: List[str],
+    errors: List[str]
+): 
+    get_params = {"ids": ",".join(item_ids)}
+
+    _validate_search_ids_request(
+        requests.get(search_url, params=get_params),
+            item_ids=item_ids,
+            method="GET",
+        params=get_params,
+            errors=errors
+        )
+
+    post_params = {"ids": item_ids}
+    _validate_search_ids_request(
+        requests.post(search_url, json=post_params),
+            item_ids=item_ids,
+            method="POST",
+        params=post_params,
+            errors=errors
+        )
+
 def validate_search_ids(
     search_url: str,
     warnings: List[str],
     errors: List[str]
 ):
-    r = requests.get(search_url)
-    items = r.json().get("items")
+    r = requests.get(f"{search_url}?limit=10")
+    items = r.json().get("features")
     if items:
-        item_id_0 = items[0].get("id")
-        item_ids = [item_id_0]
+        _validate_search_ids_with_ids(search_url, [items[0].get("id")], errors)
+        _validate_search_ids_with_ids(search_url, [items[0].get("id"), items[1].get("id")], errors)
+        _validate_search_ids_with_ids(search_url, [i["id"] for i in items], errors)
+    else:
+        warnings.append(f"Get Search with no parameters returned zero results")
 
-        params = {"ids": item_ids}
 
-        _validate_search_ids_request(
-            requests.get(search_url, params=params),
-            item_ids=item_ids,
-            method="GET",
-            params=params,
-            errors=errors
-        )
+def _validate_search_collections_request(
+    r,
+    coll_ids: List[str],
+    method: str,
+    params: Dict,
+    errors: List[str]
+):
+    if r.status_code != 200:
+        errors.append(
+            f"{method} Search with {params} returned status code {r.status_code}")
+    else:
+        try:
+            items = r.json().get("features")
+            if len(items) != len(list(filter(lambda x: x.get("collection") in coll_ids, items))):
+                errors.append(
+                    f"{method} Search with {params} returned items with ids other than specified one")
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"{method} Search with {params} returned non-json response: {r.text}")
 
-        _validate_search_ids_request(
-            requests.post(search_url, json=params),
-            item_ids=item_ids,
-            method="POST",
-            params=params,
-            errors=errors
-        )
+
+def _validate_search_collections_with_ids(
+    search_url,
+    coll_ids: List[str],
+    errors: List[str]
+):
+    get_params = {"collections": ",".join(coll_ids)}
+    _validate_search_collections_request(
+        requests.get(search_url, params=get_params),
+        coll_ids=coll_ids,
+        method="GET",
+        params=get_params,
+        errors=errors
+    )
+
+    post_params = {"collections": coll_ids}
+    _validate_search_collections_request(
+        requests.post(search_url, json=post_params),
+        coll_ids=coll_ids,
+        method="POST",
+        params=post_params,
+        errors=errors
+    )
+
+
+def validate_search_collections(
+    search_url: str,
+    collections_url: str,
+    warnings: List[str],
+    errors: List[str]
+):
+    _collections = requests.get(collections_url).json()["collections"]
+    collection_ids = [ x["id"] for x in _collections ]
+
+    _validate_search_collections_with_ids(
+            search_url, collection_ids, errors)
+
+    for cid in collection_ids: 
+        _validate_search_collections_with_ids(
+            search_url, [cid], errors)
+
+    _validate_search_collections_with_ids(
+        search_url, list(itertools.islice(collection_ids, 3)), errors)
+
 
 def validate(error_str: str, p: Callable[[], bool]) -> List[str]:
     if not p():
