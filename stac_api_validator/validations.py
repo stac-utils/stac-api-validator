@@ -129,8 +129,6 @@ def validate_api(root_url: str) -> Tuple[List[str], List[str]]:
         print("STAC API - Features conformance class found.")
         validate_oaf(root_body, warnings, errors)
 
-    # todo: check if /collections exists and warn about not implementing having OAF CC and rel=data
-
     if any(search_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Item Search conformance class found.")
         validate_search(root_body, warnings, errors)
@@ -257,7 +255,7 @@ def validate_oaf(root_body: Dict, warnings: List[str],
             f"service-desc ({conformance}): should return JSON, instead got non-JSON text")
 
     errors += validate(
-        "/ Link[rel=data] should href /collections",
+        "/: Link[rel=data] should href /collections",
         lambda: href_for(links, "data")
     )
 
@@ -270,11 +268,16 @@ def validate_oaf(root_body: Dict, warnings: List[str],
 
 
 def validate_search(root_body: Dict, warnings: List[str],
-                    errors: List[str]) -> int:
+                    errors: List[str]) -> None:
 
     links = root_body.get("links")
     root = href_for(links, "self")["href"]
     search = href_for(links, "search")
+    if not search:
+        errors.append(
+            f"/: Link[rel=search] should exist when Item Search is implemented")
+        return
+
     collections = href_for(links, "data")
     if collections:
         collections_url = collections.get("href")
