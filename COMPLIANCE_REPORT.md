@@ -188,9 +188,7 @@ Output:
 Validating https://staccato.space/
 warnings: none
 errors:
-- API does not conform to {ConformanceClasses.STAC_API_CORE}. Must contain one of the following URIs to conform (preferably the first):
-        https://api.stacspec.org/v1.0.0-beta.1/core
-        http://stacspec.org/spec/api/1.0.0-beta.1/core.
+- / : 'conformsTo' must contain at least one STAC API conformance class.
 ```
 
 ## Proprietary

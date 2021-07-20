@@ -8,6 +8,7 @@ from typing import Callable
 import re
 import json
 import itertools
+from geometries import *
 
 # https://github.com/stac-utils/pystac/blob/4c7c775a6d0ca49d83dbec714855a189be759c8a/docs/concepts.rst#using-your-own-validator
 
@@ -101,7 +102,7 @@ def validate_api(root_url: str) -> Tuple[List[str], List[str]]:
     if not root_body.get("links"):
         errors.append("/ : 'links' field must be defined and non-empty.")
 
-    if not root_body.get("conformsTo") and \
+    if conforms_to and \
        not any(core_cc_regex.match(x) for x in conforms_to) and \
        not any(oaf_cc_regex.match(x) for x in conforms_to) and \
        not any(search_cc_regex.match(x) for x in conforms_to):
@@ -271,7 +272,7 @@ def validate_search(root_body: Dict, warnings: List[str],
     search = href_for(links, "search")
     collections = href_for(links, "data")
     if collections:
-        collections_url = collections.get("href") 
+        collections_url = collections.get("href")
     else:
         collections_url = f"{root}/collections"
 
@@ -300,7 +301,7 @@ def validate_search(root_body: Dict, warnings: List[str],
     validate_search_datetime(search_url, warnings, errors)
     validate_search_ids(search_url, warnings, errors)
     validate_search_collections(search_url, collections_url, warnings, errors)
-    # validate_search_intersects(search_url, warnings, errors)
+    validate_search_intersects(search_url, warnings, errors)
 
 
 def validate_search_datetime(
@@ -337,6 +338,40 @@ def validate_search_datetime(
             errors.append(
                 f"Search with datetime={dt} returned status code {r.status_code} instead of 400")
             continue
+
+
+def validate_search_intersects(
+    search_url: str,
+    warnings: List[str],
+    errors: List[str] = []
+):
+
+    intersects_params = [point, linestring, polygon, polygon_with_hole, multipoint,
+                      multilinestring, multipolygon, geometry_collection]
+
+    for param in intersects_params:
+        # Valid GET query
+        r = requests.get(search_url, params={"intersects": json.dumps(param)})
+        if r.status_code != 200:
+            errors.append(
+                f"GET Search with intersects={param} returned status code {r.status_code}")
+        else:
+            try:
+                r.json()
+            except json.decoder.JSONDecodeError:
+                errors.append(
+                    f"GET Search with intersects={param} returned non-json response: {r.text}")
+        # Valid POST query
+        r = requests.post(search_url, json={"intersects": param})
+        if r.status_code != 200:
+            errors.append(
+                f"POST Search with intersects:{param} returned status code {r.status_code}")
+        else:
+            try:
+                r.json()
+            except json.decoder.JSONDecodeError:
+                errors.append(
+                    f"POST Search with intersects:{param} returned non-json response: {r.text}")
 
 
 def validate_search_bbox(
@@ -438,8 +473,6 @@ def validate_search_bbox(
             errors.append(
                 f"POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400")
 
-# todo: pull the advertised limits from the service description or use 1-10000 as defaults
-
 
 def validate_search_limit(
     search_url: str,
@@ -496,6 +529,7 @@ def validate_search_limit(
             errors.append(
                 f"POST Search with {params} returned status code {r.status_code}, should be 400")
 
+
 def _validate_search_ids_request(
     r,
     item_ids: List[str],
@@ -521,25 +555,26 @@ def _validate_search_ids_with_ids(
     search_url,
     item_ids: List[str],
     errors: List[str]
-): 
+):
     get_params = {"ids": ",".join(item_ids)}
 
     _validate_search_ids_request(
         requests.get(search_url, params=get_params),
-            item_ids=item_ids,
-            method="GET",
+        item_ids=item_ids,
+        method="GET",
         params=get_params,
-            errors=errors
-        )
+        errors=errors
+    )
 
     post_params = {"ids": item_ids}
     _validate_search_ids_request(
         requests.post(search_url, json=post_params),
-            item_ids=item_ids,
-            method="POST",
+        item_ids=item_ids,
+        method="POST",
         params=post_params,
-            errors=errors
-        )
+        errors=errors
+    )
+
 
 def validate_search_ids(
     search_url: str,
@@ -550,8 +585,10 @@ def validate_search_ids(
     items = r.json().get("features")
     if items:
         _validate_search_ids_with_ids(search_url, [items[0].get("id")], errors)
-        _validate_search_ids_with_ids(search_url, [items[0].get("id"), items[1].get("id")], errors)
-        _validate_search_ids_with_ids(search_url, [i["id"] for i in items], errors)
+        _validate_search_ids_with_ids(
+            search_url, [items[0].get("id"), items[1].get("id")], errors)
+        _validate_search_ids_with_ids(
+            search_url, [i["id"] for i in items], errors)
     else:
         warnings.append(f"Get Search with no parameters returned zero results")
 
@@ -608,12 +645,12 @@ def validate_search_collections(
     errors: List[str]
 ):
     _collections = requests.get(collections_url).json()["collections"]
-    collection_ids = [ x["id"] for x in _collections ]
+    collection_ids = [x["id"] for x in _collections]
 
     _validate_search_collections_with_ids(
-            search_url, collection_ids, errors)
+        search_url, collection_ids, errors)
 
-    for cid in collection_ids: 
+    for cid in collection_ids:
         _validate_search_collections_with_ids(
             search_url, [cid], errors)
 
