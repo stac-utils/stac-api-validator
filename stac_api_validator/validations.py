@@ -109,6 +109,11 @@ def validate_api(root_url: str) -> Tuple[List[str], List[str]]:
         errors.append(
             "/ : 'conformsTo' must contain at least one STAC API conformance class.")
 
+    if conforms_to and \
+            (req_ccs := [x for x in conforms_to if x.startswith("http://www.opengis.net/spec/ogcapi-features-1/1.0/req/")]):
+        warnings.append(
+            f"/ : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}.")
+
     # fail fast if there are errors with conformance or links so far
     if errors:
         return (warnings, errors)
