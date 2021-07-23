@@ -41,7 +41,7 @@ errors:
 
 # stac-cmr
 
-URL: https://cmr.earthdata.nasa.gov/stac/USGS_EROS 
+URL: https://cmr.earthdata.nasa.gov/stac/USGS_EROS
 
 Date: 23-Jul-2021
 

@@ -1,0 +1,39 @@
+name: Validate
+on:
+  push:
+    branches:
+      - main
+      - post-option
+
+jobs:
+  deploy:
+    environment: default
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.9.x'
+
+      - name: Install python packages (pip)"
+        run: pip install -r requirements.txt
+      
+      - run: python stac_api_validator/validate.py --root https://tamn.snapplanet.io --no-post > results/resto.txt
+      - run: python stac_api_validator/validate.py --root https://planetarycomputer.microsoft.com/api/stac/v1 > results/stac-fastapi-pc.txt
+      - run: python stac_api_validator/validate.py --root https://cmr.earthdata.nasa.gov/stac/USGS_EROS > results/stac-cmr-earthdata.txt
+      - run: python stac_api_validator/validate.py --root https://franklin.nasa-hsi.azavea.com > results/franklin.txt
+      - run: python stac_api_validator/validate.py --root https://explorer.digitalearth.africa/stac/ > results/digitalearth_africa.txt
+      - run: python stac_api_validator/validate.py --root https://explorer.sandbox.dea.ga.gov.au/stac/ > results/digitalearth_australia.txt
+      - run: python stac_api_validator/validate.py --root https://staccato.space > results/staccato.txt
+      - run: python stac_api_validator/validate.py --root https://eod-catalog-svc-prod.astraea.earth > results/astraea.txt
+
+      - name: Archive validation results
+        uses: actions/upload-artifact@v2
+        with:
+          name: validation-results
+          path: |
+            results
+
+      - run: echo "Successfully run."

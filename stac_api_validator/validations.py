@@ -387,7 +387,7 @@ def validate_search_bbox(
     errors: List[str]
 ):
     # Valid GET query
-    param = "100.0,0.0,105.0,t 1.0"
+    param = "100.0,0.0,105.0,1.0"
     r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 200:
         errors.append(
