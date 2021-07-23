@@ -126,7 +126,7 @@ def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
 
     if any(oaf_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Features conformance class found.")
-        validate_oaf(root_body, post, warnings, errors)
+        validate_oaf(root_body, warnings, errors)
 
     if any(search_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Item Search conformance class found.")
@@ -223,7 +223,7 @@ def validate_core(root_body: Dict, warnings: List[str],
     #         f"service-doc ({service_doc}): should return JSON, instead got non-JSON text")
 
 
-def validate_oaf(root_body: Dict, methods: bool, warnings: List[str],
+def validate_oaf(root_body: Dict, warnings: List[str],
                  errors: List[str]) -> int:
 
     links = root_body.get("links")
