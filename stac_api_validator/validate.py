@@ -12,6 +12,8 @@ def parse_args(args):
                         help="DEBUG, INFO, WARN, ERROR, CRITICAL")
     parser.add_argument("--root", help="Root / Landing Page URL",
                         default=os.getenv("STAC_API_ROOT_URL", None))
+    parser.add_argument(
+        "--post", help="test POST also", action=argparse.BooleanOptionalAction, default=True)
 
     return parser.parse_args(args)
 
@@ -24,10 +26,12 @@ def main():
     if args.root is None:
         raise RuntimeError("No STAC API root URI provided")
 
+    post = args.post
+
     print(f"Validating {args.root}", flush=True)
 
     try:
-        (warnings, errors) = validate_api(args.root)
+        (warnings, errors) = validate_api(args.root, post)
     except Exception as e:
         print(f"Failed.\nError {args.root}: {type(e)} {str(e)}")
         traceback.print_exc()
