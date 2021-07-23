@@ -20,6 +20,8 @@ jobs:
       - name: Install python packages (pip)"
         run: pip install -r requirements.txt
       
+      - run: mkdir results
+
       - run: python stac_api_validator/validate.py --root https://tamn.snapplanet.io --no-post > results/resto.txt
       - run: python stac_api_validator/validate.py --root https://planetarycomputer.microsoft.com/api/stac/v1 > results/stac-fastapi-pc.txt
       - run: python stac_api_validator/validate.py --root https://cmr.earthdata.nasa.gov/stac/USGS_EROS > results/stac-cmr-earthdata.txt
