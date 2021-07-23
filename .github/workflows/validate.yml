@@ -6,7 +6,7 @@ on:
       - post-option
 
 jobs:
-  deploy:
+  validate:
     environment: default
     runs-on: ubuntu-latest
     steps:
