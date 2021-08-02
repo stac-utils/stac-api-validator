@@ -1,6 +1,5 @@
 from typing import List, Tuple, Dict, Set
 from pystac_client import Client
-from pystac_client.exceptions import ConformanceError
 import logging
 import requests
 from typing import Callable
@@ -138,7 +137,7 @@ def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
             catalog.validate()
             for collection in catalog.get_children():
                 collection.validate()
-        except ConformanceError as e:
+        except Exception as e:
             errors.append(str(e))
 
     return (warnings, errors)
