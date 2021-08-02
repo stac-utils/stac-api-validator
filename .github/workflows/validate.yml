@@ -27,7 +27,7 @@ jobs:
       - run: python stac_api_validator/validate.py --root https://cmr.earthdata.nasa.gov/stac/USGS_EROS > results/stac-cmr-earthdata.txt || true
       - run: python stac_api_validator/validate.py --root https://franklin.nasa-hsi.azavea.com > results/franklin.txt || true
       - run: python stac_api_validator/validate.py --root https://explorer.digitalearth.africa/stac/ > results/digitalearth_africa.txt || true
-      - run: python stac_api_validator/validate.py --root https://explorer.sandbox.dea.ga.gov.au/stac/ > results/digitalearth_australia.txt || true
+      # - run: python stac_api_validator/validate.py --root https://explorer.sandbox.dea.ga.gov.au/stac/ > results/digitalearth_australia.txt || true
       - run: python stac_api_validator/validate.py --root https://staccato.space > results/staccato.txt || true
       - run: python stac_api_validator/validate.py --root https://eod-catalog-svc-prod.astraea.earth > results/astraea.txt || true
 
