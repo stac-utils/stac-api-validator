@@ -23,10 +23,10 @@ The current validity status of several popular STAC API implementations can be f
 
 ## Validating STAC API conformance
 
-Create new venv:
+Create new venv with python >= 3.9:
 
 ```
-python -m venv --prompt stac-api-validator .venv
+python3.9 -m venv --prompt stac-api-validator .venv
 source ./.venv/bin/activate
 ```
 
