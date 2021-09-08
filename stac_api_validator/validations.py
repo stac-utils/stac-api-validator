@@ -23,7 +23,6 @@ geojson_charset_mt = 'application/geo+json; charset=utf-8'
 
 valid_datetimes = [
     "1985-04-12T23:20:50.52Z",
-    "1985-04-12T23:20:50,52Z",
     "1996-12-19T16:39:57-00:00",
     "1996-12-19T16:39:57+00:00",
     "1996-12-19T16:39:57-08:00",
@@ -73,6 +72,7 @@ invalid_datetimes = [
     "1985-04-12T23:20:50,Z",  # fractional sec , but no frac secs
     "1990-12-31T23:59:61Z",  # second > 60 w/o fractional seconds
     "1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z",
+    "1985-04-12T23:20:50,52Z", # comma as frac sec sep allowed in ISO8601 but not RFC3339
 ]
 
 
@@ -158,7 +158,7 @@ def validate_core(root_body: Dict, warnings: List[str],
         if root.get("type") != "application/json":
             errors.append("root type is not application/json")
     else:
-        warnings.append("/ : Link[rel=root] should exist")
+        errors.append("/ : Link[rel=root] should exist")
 
     # Link rel=self
     _self = href_for(links, "self")
@@ -171,7 +171,7 @@ def validate_core(root_body: Dict, warnings: List[str],
     # Link rel=service-desc
     service_desc = href_for(links, "service-desc")
     if not service_desc:
-        warnings.append("/ : Link[rel=service-desc] should exist")
+        errors.append("/ : Link[rel=service-desc] should exist")
     else:
         if service_desc.get("type") != openapi_media_type:
             errors.append(
@@ -247,7 +247,7 @@ def validate_oaf(root_body: Dict, warnings: List[str],
         conformance_json = r_conformance.json()
         warnings += validate(
             "Landing Page conforms to and conformance conformsTo should be the same",
-            lambda: root_body.get("conformsTo") == conformance_json['conformsTo'])
+            lambda: set(root_body.get("conformsTo")) == set(conformance_json['conformsTo']))
     except json.decoder.JSONDecodeError as e:
         errors.append(
             f"service-desc ({conformance}): should return JSON, instead got non-JSON text")
@@ -304,7 +304,7 @@ def validate_search(root_body: Dict, post: bool, warnings: List[str],
 
     validate_search_limit(search_url, post, errors)
     validate_search_bbox(search_url, post, errors)
-    validate_search_datetime(search_url, errors)
+    validate_search_datetime(search_url, warnings, errors)
     validate_search_ids(search_url, post, warnings, errors)
     validate_search_collections(search_url, collections_url, post, errors)
     validate_search_intersects(search_url, errors)
@@ -312,6 +312,7 @@ def validate_search(root_body: Dict, post: bool, warnings: List[str],
 
 def validate_search_datetime(
     search_url: str,
+    warnings: List[str],
     errors: List[str]
 ):
     # find an Item and try to use its datetime value in a query
@@ -340,7 +341,7 @@ def validate_search_datetime(
     for dt in invalid_datetimes:
         r = requests.get(search_url, params={"datetime": dt})
         if r.status_code != 400:
-            errors.append(
+            warnings.append(
                 f"Search with datetime={dt} returned status code {r.status_code} instead of 400")
             continue
 
@@ -661,8 +662,16 @@ def validate_search_collections(
     post: bool,
     errors: List[str]
 ):
-    _collections = requests.get(collections_url).json()["collections"]
-    collection_ids = [x["id"] for x in _collections]
+    collections_entity = requests.get(collections_url).json()
+    if isinstance(collections_entity, List) :
+        errors.append("/collections entity is an array rather than an object")
+        return
+    collections = collections_entity.get("collections")
+    if not collections:
+        errors.append("/collections entity does not contain a \"collections\" attribute")
+        return
+
+    collection_ids = [x["id"] for x in collections]
 
     _validate_search_collections_with_ids(
         search_url, collection_ids, post, errors)
