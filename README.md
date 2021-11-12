@@ -1,15 +1,16 @@
 # STAC API Validator
 
-**Work in Progress** -- this currently only validates a subset of behavior, notably conformance classes, links, 
-and datetime and bbox parameters
+**Work in Progress** -- this currently only validates a subset of behavior
 
-This validation suite focuses on validating STAC API interactions.  Tools such as pystac and stac4s do a 
-good job of validating STAC objects (Catalog, Collection, Item). This suite focuses on the API aspects. 
+This validation suite focuses on validating STAC API interactions.  Tools such as
+[pystac](https://github.com/stac-utils/pystac) and [stac4s](https://github.com/azavea/stac4s) do a 
+good job of validating STAC objects (Catalog, Collection, Item). This suite focuses on the STAC API behavior
+validation.
 
 The three key concepts within a STAC API are:
-1. Conformance classes advertising the capabilities of the API
-2. Link relations between resources within the API (hypermedia)
-3. Parameters that filter search results
+1. *Conformance classes* advertising the capabilities of the API
+2. *Link relations* between resources within the web API (hypermedia)
+3. *Parameters* that filter search results
 
 The conformance classes, as defined in the `conformsTo` field of the Landing Page (root, `/`), advertise to 
 clients which capabilities are available in the API. Without this field, a client would not even be able to tell that a
@@ -21,11 +22,14 @@ The parameters that filter results apply to the Items resource and Item Search e
 
 The current validity status of several popular STAC API implementations can be found [here](COMPLIANCE_REPORT.md).
 
-## Validating STAC API conformance
+## Running the validator
+
+Running this requires Python 3.9.5.
 
 Create new venv:
 
 ```
+pyenv local 3.9.5
 python -m venv --prompt stac-api-validator .venv
 source ./.venv/bin/activate
 ```
@@ -56,6 +60,23 @@ errors:
 - POST Search with bbox:[100.0, 0.0, 105.0, 1.0] returned status code 502
 - GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 400
 - POST Search with bbox:[100.0, 0.0, 0.0, 105.0, 1.0, 1.0] returned status code 400
+```
+
+Additionally, the `--no-post` option can be specified to only test GET requests, instead of the default of using
+both GET and POST.
+
+Usage:
+
+```
+usage: validate.py [-h] [--logging LOGGING] [--root ROOT] [--post | --no-post]
+
+STAC API Validation Suite
+
+optional arguments:
+  -h, --help         show this help message and exit
+  --logging LOGGING  DEBUG, INFO, WARN, ERROR, CRITICAL
+  --root ROOT        STAC API Root / Landing Page URL
+  --post, --no-post  Also use POST method for requests (default: True)
 ```
 
 ## Validating OGC API Features - Part 1 compliance

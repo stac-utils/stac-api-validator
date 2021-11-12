@@ -13,9 +13,23 @@ from geometries import *
 # resolve_stac_object
 
 core_cc_regex = re.compile('https://api\.stacspec\.org/.+/core')
+
 oaf_cc_regex = re.compile(
     'https://api\.stacspec\.org/.+/ogcapi-features')
+oaf_transaction_cc_regex = re.compile(
+    'https://api\.stacspec\.org/.+/ogcapi-features/extensions/transaction')
+oaf_version_cc_regex = re.compile(
+    'https://api\.stacspec\.org/.+/ogcapi-features/extensions/version')
+
 search_cc_regex = re.compile('https://api\.stacspec\.org/.+/item-search')
+search_fields_cc_regex = re.compile(
+    'https://api\.stacspec\.org/.+/item-search#fields')
+search_contextsearch_fields_cc_regex_cc_regex = re.compile(
+    'https://api\.stacspec\.org/.+/item-search#context')
+search_sort_cc_regex = re.compile(
+    'https://api\.stacspec\.org/.+/item-search#sort')
+search_query_cc_regex = re.compile(
+    'https://api\.stacspec\.org/.+/item-search#query')
 
 openapi_media_type = "application/vnd.oai.openapi+json;version=3.0"
 geojson_mt = 'application/geo+json'
@@ -129,7 +143,7 @@ def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
 
     if any(search_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Item Search conformance class found.")
-        validate_search(root_body, post, warnings, errors)
+        validate_search(root_body, post, conforms_to, warnings, errors)
 
     if not errors:
         try:
@@ -175,7 +189,7 @@ def validate_core(root_body: Dict, warnings: List[str],
     else:
         if service_desc.get("type") != openapi_media_type:
             errors.append(
-                f"/ : Link[rel=service-desc] should have media_type '{openapi_media_type}'', actually '{service_desc.media_type}'")
+                f"/ : Link[rel=service-desc] should have media_type '{openapi_media_type}'', actually '{service_desc.get('type')}'")
 
         r_service_desc = requests.get(service_desc["href"])
 
@@ -265,8 +279,8 @@ def validate_oaf(root_body: Dict, warnings: List[str],
     )
 
 
-def validate_search(root_body: Dict, post: bool, warnings: List[str],
-                    errors: List[str]) -> None:
+def validate_search(root_body: Dict, post: bool, conforms_to: List, 
+                        warnings: List[str], errors: List[str]) -> None:
 
     links = root_body.get("links")
     root = href_for(links, "self")["href"]
@@ -301,6 +315,11 @@ def validate_search(root_body: Dict, post: bool, warnings: List[str],
     except json.decoder.JSONDecodeError as e:
         errors.append(
             f"Search ({search_url}): should return JSON, instead got non-JSON text")
+
+    if any(search_fields_cc_regex.match(x) for x in conforms_to):
+        print("STAC API - Item Search Fields extension conformance class found.")
+
+    context = r.json().get("context")
 
     validate_search_limit(search_url, post, errors)
     validate_search_bbox(search_url, post, errors)
@@ -340,8 +359,12 @@ def validate_search_datetime(
 
     for dt in invalid_datetimes:
         r = requests.get(search_url, params={"datetime": dt})
-        if r.status_code != 400:
+        if r.status_code == 200:
             warnings.append(
+                f"Search with datetime={dt} returned status code 200 instead of 400")
+            continue
+        if r.status_code != 400:
+            errors.append(
                 f"Search with datetime={dt} returned status code {r.status_code} instead of 400")
             continue
 
