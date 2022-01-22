@@ -172,7 +172,7 @@ def validate_core(root_body: Dict, warnings: List[str],
         if root.get("type") != "application/json":
             errors.append("root type is not application/json")
     else:
-        errors.append("/ : Link[rel=root] should exist")
+        errors.append("/ : Link[rel=root] must exist")
 
     # Link rel=self
     _self = href_for(links, "self")
@@ -180,39 +180,29 @@ def validate_core(root_body: Dict, warnings: List[str],
         if _self.get("type") != "application/json":
             errors.append("self type is not application/json")
     else:
-        warnings.append("/ : Link[rel=self] should exist")
+        warnings.append("/ : Link[rel=self] must exist")
 
     # Link rel=service-desc
     service_desc = href_for(links, "service-desc")
     if not service_desc:
-        errors.append("/ : Link[rel=service-desc] should exist")
+        errors.append("/ : Link[rel=service-desc] must exist")
     else:
-        if service_desc.get("type") != openapi_media_type:
-            errors.append(
-                f"/ : Link[rel=service-desc] should have media_type '{openapi_media_type}'', actually '{service_desc.get('type')}'")
-
         r_service_desc = requests.get(service_desc["href"])
 
         errors += validate(
             "/ : Link[service-desc] must return 200",
             lambda: r_service_desc.status_code == 200)
 
-        if (ct := r_service_desc.headers.get('content-type')) == openapi_media_type:
+        if (ct := r_service_desc.headers.get('content-type')) == service_desc.get("type"):
             pass
         else:
             errors.append(
-                f"service-desc ({service_desc}): should have content-type header '{openapi_media_type}'', actually '{ct}'")
-
-        try:
-            r_service_desc.json()
-        except json.decoder.JSONDecodeError as e:
-            errors.append(
-                f"service-desc ({service_desc}): should return JSON, instead got non-JSON text")
+                f'service-desc ({service_desc}): link must advertise same type as endpoint content-type header, advertised \'{service_desc.get("type")}\', actually \'{ct}\'')
 
     # Link rel=service-doc
     service_doc = href_for(links, "service-doc")
     if not service_doc:
-        warnings.append("/ : Link[rel=service-doc] should exist")
+        warnings.append("/ : Link[rel=service-doc] must exist")
     else:
         if service_doc.get("type") != "text/html":
             errors.append("service-doc type is not text/html")
@@ -227,13 +217,7 @@ def validate_core(root_body: Dict, warnings: List[str],
             pass
         else:
             errors.append(
-                f"service-doc ({service_doc}): should have content-type header 'text/html', actually '{ct}'")
-
-    # try:
-    #     r_service_doc.html()
-    # except json.decoder.JSONDecodeError as e:
-    #     errors.append(
-    #         f"service-doc ({service_doc}): should return JSON, instead got non-JSON text")
+                f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'")
 
 
 def validate_oaf(root_body: Dict, warnings: List[str],
@@ -242,7 +226,7 @@ def validate_oaf(root_body: Dict, warnings: List[str],
     links = root_body.get("links")
     conformance = href_for(links, "conformance")
     errors += validate(
-        "/ Link[rel=conformance] should href /conformance",
+        "/ Link[rel=conformance] must href /conformance",
         lambda: conformance and conformance["href"].endswith("/conformance")
     )
 
@@ -255,19 +239,19 @@ def validate_oaf(root_body: Dict, warnings: List[str],
         pass
     else:
         errors.append(
-            f"conformance ({conformance}): should have content-type header 'application/json', actually '{ct}'")
+            f"conformance ({conformance}): must have content-type header 'application/json', actually '{ct}'")
 
     try:
         conformance_json = r_conformance.json()
         warnings += validate(
-            "Landing Page conforms to and conformance conformsTo should be the same",
+            "Landing Page conforms to and conformance conformsTo must be the same",
             lambda: set(root_body.get("conformsTo")) == set(conformance_json['conformsTo']))
     except json.decoder.JSONDecodeError as e:
         errors.append(
-            f"service-desc ({conformance}): should return JSON, instead got non-JSON text")
+            f"service-desc ({conformance}): must return JSON, instead got non-JSON text")
 
     errors += validate(
-        "/: Link[rel=data] should href /collections",
+        "/: Link[rel=data] must href /collections",
         lambda: href_for(links, "data")
     )
 
@@ -287,7 +271,7 @@ def validate_search(root_body: Dict, post: bool, conforms_to: List,
     search = href_for(links, "search")
     if not search:
         errors.append(
-            f"/: Link[rel=search] should exist when Item Search is implemented")
+            f"/: Link[rel=search] must exist when Item Search is implemented")
         return
 
     collections = href_for(links, "data")
@@ -303,10 +287,10 @@ def validate_search(root_body: Dict, post: bool, conforms_to: List,
         pass
     else:
         errors.append(
-            f"Search ({search_url}): should have content-type header '{geojson_mt}'', actually '{content_type}'")
+            f"Search ({search_url}): must have content-type header '{geojson_mt}', actually '{content_type}'")
 
     errors += validate(
-        f"Search({search_url}): should return 200",
+        f"Search({search_url}): must return 200",
         lambda: r.status_code == 200)
 
     # todo: validate geojson, not just json
@@ -314,7 +298,7 @@ def validate_search(root_body: Dict, post: bool, conforms_to: List,
         r.json()
     except json.decoder.JSONDecodeError as e:
         errors.append(
-            f"Search ({search_url}): should return JSON, instead got non-JSON text")
+            f"Search ({search_url}): must return JSON, instead got non-JSON text")
 
     if any(search_fields_cc_regex.match(x) for x in conforms_to):
         print("STAC API - Item Search Fields extension conformance class found.")
@@ -336,7 +320,7 @@ def validate_search_datetime(
 ):
     # find an Item and try to use its datetime value in a query
     r = requests.get(search_url)
-    dt = r.json()["features"][0]["properties"]["datetime"]
+    dt = r.json()["features"][0]["properties"]["datetime"] # todo: if no results, fail
     r = requests.get(search_url, params={"datetime": dt})
     if r.status_code != 200:
         errors.append(
@@ -556,14 +540,14 @@ def validate_search_limit(
         r = requests.get(search_url, params=params)
         if r.status_code != 400:
             errors.append(
-                f"GET Search with {params} returned status code {r.status_code}, should be 400")
+                f"GET Search with {params} returned status code {r.status_code}, must be 400")
 
         if post:
             # Valid POST query
             r = requests.post(search_url, json=params)
             if r.status_code != 400:
                 errors.append(
-                    f"POST Search with {params} returned status code {r.status_code}, should be 400")
+                    f"POST Search with {params} returned status code {r.status_code}, must be 400")
 
 
 def _validate_search_ids_request(

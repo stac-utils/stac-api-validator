@@ -71,32 +71,18 @@ STAC API - Core conformance class found.
 STAC API - Features conformance class found.
 STAC API - Item Search conformance class found.
 warnings:
-- / : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': ['http://www.opengis.net/spec/ogcapi-features-1/1.0/req/oas30'].
-- / : Link[rel=service-doc] should exist
 - Search with datetime=1985-04-12 returned status code 200 instead of 400
 - Search with datetime=1937-01-01T12:00:27.87+0100 returned status code 200 instead of 400
 - Search with datetime=1985-12-12T23:20:50.52 returned status code 200 instead of 400
-- Search with datetime=21985-12-12T23:20:50.52Z returned status code 200 instead of 400
 - Search with datetime=1985-04-12T23:20:50,Z returned status code 200 instead of 400
 errors:
-- service-desc ({'rel': 'service-desc', 'type': 'application/vnd.oai.openapi+json;version=3.0', 'title': 'OpenAPI service description', 'href': 'https://planetarycomputer.microsoft.com/api/stac/v1/openapi.json'}): should have content-type header 'application/vnd.oai.openapi+json;version=3.0', actually 'application/json'
-- Search (https://planetarycomputer.microsoft.com/api/stac/v1/search): should have content-type header 'application/geo+json', actually 'application/json'
-- GET Search with {'limit': 10000} returned status code 500
-- POST Search with {'limit': 10000} returned status code 500
-- GET Search with {'limit': 0} returned status code 200, should be 400
-- POST Search with {'limit': 0} returned status code 200, should be 400
+- GET Search with {'limit': 10000} returned status code 400
+- POST Search with {'limit': 10000} returned status code 400
 - GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 500
 - POST Search with bbox:[100.0, 0.0, 0.0, 105.0, 1.0, 1.0] returned status code 500
 - Search with datetime=/1985-04-12T23:20:50.52Z returned status code 400
 - Search with datetime=1985-04-12T23:20:50.52Z/ returned status code 400
 - Search with datetime=37-01-01T12:00:27.87Z returned status code 500 instead of 400
-- Search with datetime=1985-13-12T23:20:50.52Z returned status code 500 instead of 400
-- Search with datetime=1985-12-32T23:20:50.52Z returned status code 500 instead of 400
-- Search with datetime=1985-12-01T25:20:50.52Z returned status code 500 instead of 400
-- Search with datetime=1985-12-01T00:60:50.52Z returned status code 500 instead of 400
-- Search with datetime=1985-12-01T00:06:61.52Z returned status code 500 instead of 400
-- Search with datetime=1990-12-31T23:59:61Z returned status code 500 instead of 400
-- Search with datetime=1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z returned status code 500 instead of 400
 ```
 
 # stac-cmr
