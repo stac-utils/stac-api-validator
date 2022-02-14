@@ -161,6 +161,73 @@ errors:
 - GET Search with {'limit': 10000} returned status code 400
 ```
 
+
+# Landsat Look
+
+URL: https://landsatlook.usgs.gov/stac-server
+
+Date: 14-Feb-2022
+
+```
+Validating https://landsatlook.usgs.gov/stac-server
+STAC API - Core conformance class found.
+STAC API - Item Search conformance class found.
+STAC API - Item Search Fields extension conformance class found.
+warnings:
+- / : Link[rel=service-doc] must exist
+- Search with datetime=1985-04-12 returned status code 200 instead of 400
+- Search with datetime=1937-01-01T12:00:27.87+0100 returned status code 200 instead of 400
+- Search with datetime=1985-12-12T23:20:50.52 returned status code 200 instead of 400
+- Search with datetime=1985-04-12T23:20:50.Z returned status code 200 instead of 400
+- Search with datetime=1985-04-12T23:20:50,Z returned status code 200 instead of 400
+- Search with datetime=1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z returned status code 200 instead of 400
+- Search with datetime=1985-04-12T23:20:50,52Z returned status code 200 instead of 400
+errors:
+- / : Link[rel=root] must exist
+- service-desc ({'rel': 'service-desc', 'type': 'application/vnd.oai.openapi+json;version=3.0', 'href': 'https://landsatlook.usgs.gov/stac-server/api'}): link must advertise same type as endpoint content-type header, advertised 'application/vnd.oai.openapi+json;version=3.0', actually 'application/json'
+- Search (https://landsatlook.usgs.gov/stac-server/search): must have content-type header 'application/geo+json', actually 'application/json'
+- POST Search with {'limit': 1} returned status code 403
+- POST Search with {'limit': 2} returned status code 403
+- POST Search with {'limit': 10} returned status code 403
+- GET Search with {'limit': 10000} returned status code 502
+- POST Search with {'limit': 10000} returned status code 403
+- GET Search with {'limit': -1} returned status code 200, must be 400
+- POST Search with {'limit': -1} returned status code 403, must be 400
+- GET Search with {'limit': 0} returned status code 200, must be 400
+- POST Search with {'limit': 0} returned status code 403, must be 400
+- GET Search with {'limit': 10001} returned status code 404, must be 400
+- POST Search with {'limit': 10001} returned status code 403, must be 400
+- GET Search with bbox=100.0,0.0,105.0,1.0 returned status code 404
+- GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 404
+- GET Search with bbox=[100.0, 0.0, 105.0, 1.0] returned status code 200, instead of 400
+- POST Search with bbox:"100.0, 0.0, 105.0, 1.0" returned status code 404, instead of 400
+- GET Search with bbox=param (lat 1 > lat 2) returned status code 404, instead of 400
+- POST Search with bbox: [100.0, 1.0, 105.0, 0.0] (lat 1 > lat 2) returned status code 200, instead of 400
+- GET Search with bbox=0 returned status code 200, instead of 400
+- POST Search with bbox:[0] returned status code 404, instead of 400
+- GET Search with bbox=0,0 returned status code 404, instead of 400
+- POST Search with bbox:[0, 0] returned status code 404, instead of 400
+- GET Search with bbox=0,0,0 returned status code 404, instead of 400
+- POST Search with bbox:[0, 0, 0] returned status code 404, instead of 400
+- GET Search with bbox=0,0,0,1,1 returned status code 404, instead of 400
+- POST Search with bbox:[0, 0, 0, 1, 1] returned status code 404, instead of 400
+- GET Search with bbox=0,0,0,1,1,1,1 returned status code 404, instead of 400
+- POST Search with bbox:[0, 0, 0, 1, 1, 1, 1] returned status code 404, instead of 400
+- Search with datetime=../1985-04-12T23:20:50.52Z returned status code 404
+- Search with datetime=1985-04-12T23:20:50.52Z/.. returned status code 404
+- Search with datetime=/1985-04-12T23:20:50.52Z returned status code 404
+- Search with datetime=1985-04-12T23:20:50.52Z/ returned status code 404
+- Search with datetime=1985-04-12t23:20:50.000z returned status code 404
+- Search with datetime=37-01-01T12:00:27.87Z returned status code 404 instead of 400
+- Search with datetime=21985-12-12T23:20:50.52Z returned status code 404 instead of 400
+- Search with datetime=1985-13-12T23:20:50.52Z returned status code 404 instead of 400
+- Search with datetime=1985-12-32T23:20:50.52Z returned status code 404 instead of 400
+- Search with datetime=1985-12-01T25:20:50.52Z returned status code 404 instead of 400
+- Search with datetime=1985-12-01T00:60:50.52Z returned status code 404 instead of 400
+- Search with datetime=1985-12-01T00:06:61.52Z returned status code 404 instead of 400
+- Search with datetime=1990-12-31T23:59:61Z returned status code 404 instead of 400
+```
+
 # Franklin
 
 URL: https://franklin.nasa-hsi.azavea.com/
