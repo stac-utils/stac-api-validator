@@ -1,19 +1,22 @@
 import argparse
 import logging
 import sys
-import os
 from validations import validate_api
 import traceback
+
 
 def parse_args(args):
     parser = argparse.ArgumentParser(description="STAC API Validation Suite")
     # todo: validate logging is one of these values
     parser.add_argument("--logging", default="INFO",
                         help="DEBUG, INFO, WARN, ERROR, CRITICAL")
-    parser.add_argument("--root", help="Root / Landing Page URL",
-                        default=os.getenv("STAC_API_ROOT_URL", None))
+    parser.add_argument("--root", help="STAC API Root / Landing Page URL")
     parser.add_argument(
-        "--post", help="test POST also", action=argparse.BooleanOptionalAction, default=True)
+        "--post",
+        help="Also use POST method for requests",
+        action=argparse.BooleanOptionalAction,
+        default=True
+    )
 
     return parser.parse_args(args)
 
