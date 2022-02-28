@@ -2,13 +2,13 @@
 
 This document shows how well several popular STAC API implementations conform to STAC API.
 
-Many (if not all) of these API are in production use, so the fact that they have validation problems 
+Many (if not all) of these APIs are in production use, so the fact that they have validation problems 
 should not be seen as a significant concern.  This validation suite is quite strict, so it finds 
 many obscure issues that can usually be worked around. Many of the defects are around the 
 correct advertisement of conformance classes and links to support hypermedia, and these more "advanced" 
 capabilities are only now starting to be fully used in tools like pystac-client. 
 
-## Open Source
+## Open Source Implementations
 
 ### stac-fastapi - sqlalchemy 
 
@@ -56,9 +56,31 @@ errors:
 - POST Search with {'ids': ['fe916452-ba6f-4631-9154-c249924a122d', 'f7f164c9-cfdf-436d-a3f0-69864c38ba2a']} returned items with ids other than specified one
 ```
 
-### stac-fastapi - Planetary Computer
+### stac-fastapi-elasticsearch
 
-based on stac-fastapi
+TBD.
+
+### Franklin
+
+TBD.
+
+### stac-server
+
+TBD.
+
+### resto
+
+TBD.
+
+### stac-cmr
+
+### staccato
+
+Non-compliant with 1.0.0-x
+
+## Server Instances
+
+### Microsoft Planetary Computer (stac-fastapi)
 
 URL: https://planetarycomputer.microsoft.com/api/stac/v1/
 
@@ -85,7 +107,26 @@ errors:
 - Search with datetime=37-01-01T12:00:27.87Z returned status code 500 instead of 400
 ```
 
-# stac-cmr
+
+### Snap Planet (resto)
+
+URL: https://tamn.snapplanet.io/
+
+Date: 19-Jan-2022
+
+Output
+```
+Validating https://tamn.snapplanet.io/
+STAC API - Core conformance class found.
+STAC API - Features conformance class found.
+STAC API - Item Search conformance class found.
+warnings:
+- Search with datetime=1985-04-12T23:20:50,52Z returned status code 200 instead of 400
+errors:
+- GET Search with {'limit': 10000} returned status code 400
+```
+
+### EarthData CMR (stac-cmr)
 
 URL: https://cmr.earthdata.nasa.gov/stac/USGS_EROS
 
@@ -143,26 +184,8 @@ errors:
 - Search with datetime=2020-07-23T00:00:00.012345678Z returned status code 400
 ```
 
-# resto
 
-URL: https://tamn.snapplanet.io/
-
-Date: 19-Jan-2022
-
-Output
-```
-Validating https://tamn.snapplanet.io/
-STAC API - Core conformance class found.
-STAC API - Features conformance class found.
-STAC API - Item Search conformance class found.
-warnings:
-- Search with datetime=1985-04-12T23:20:50,52Z returned status code 200 instead of 400
-errors:
-- GET Search with {'limit': 10000} returned status code 400
-```
-
-
-# Landsat Look
+### Landsat Look (stac-server)
 
 URL: https://landsatlook.usgs.gov/stac-server
 
@@ -228,7 +251,8 @@ errors:
 - Search with datetime=1990-12-31T23:59:61Z returned status code 404 instead of 400
 ```
 
-# Franklin
+
+### Franklin NASA HSI
 
 URL: https://franklin.nasa-hsi.azavea.com/
 
@@ -273,7 +297,7 @@ errors:
 - Search with datetime=2020-07-23T00:00:00+03:00 returned status code 400
 ```
 
-# Staccato
+### staccato.space
 
 URL: https://staccato.space/
 
@@ -287,9 +311,8 @@ errors:
 - / : 'conformsTo' must contain at least one STAC API conformance class.
 ```
 
-## Proprietary
 
-### Earth OnDemand 
+### EarthAI OnDemand 
 
 URL: https://eod-catalog-svc-prod.astraea.earth/
 
