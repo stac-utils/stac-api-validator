@@ -26,7 +26,7 @@ The current validity status of several popular STAC API implementations can be f
 
 Running this requires Python 3.9.5.
 
-Create new venv:
+Create new venv with python >= 3.9:
 
 ```
 pyenv local 3.9.5
