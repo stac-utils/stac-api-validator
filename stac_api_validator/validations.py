@@ -79,7 +79,7 @@ invalid_datetimes = [
     "../..",
     "/..",
     "../",
-    "1984-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z",
+    "/1984-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z",
     "1984-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z/",
     "/1984-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z/",
     "1985-04-12",  # date only
@@ -211,15 +211,13 @@ def validate_core(root_body: Dict, warnings: List[str], errors: List[str]) -> No
         )
 
         service_desc_type = service_desc.get("type")
-        if (ct := r_service_desc.headers.get("content-type")) == service_desc_type:
-            pass
-        elif (";" in ct or ";" in service_desc_type) and (
-            ct.split(";", 1)[0] == service_desc_type.split(";", 1)[0]
+        if (
+            (ct := r_service_desc.headers.get("content-type")) == service_desc_type
+        ) or (
+            (";" in ct or ";" in service_desc_type)
+            and (ct.split(";", 1)[0] == service_desc_type.split(";", 1)[0])
         ):
-            warnings.append(
-                f"service-desc ({service_desc}): link must advertise same type as endpoint content-type header, "
-                f"advertised '{service_desc_type}', actually '{ct}'"
-            )
+            pass
         else:
             errors.append(
                 f"service-desc ({service_desc}): link must advertise same type as endpoint content-type header, "
@@ -357,37 +355,39 @@ def validate_search_datetime(search_url: str, warnings: List[str], errors: List[
     r = requests.get(search_url, params={"datetime": dt})
     if r.status_code != 200:
         errors.append(
-            f"Search with datetime={dt} extracted from an Item returned status code {r.status_code}"
+            f"GET Search with datetime={dt} extracted from an Item returned status code {r.status_code}"
         )
     elif len(r.json()["features"]) == 0:
         errors.append(
-            f"Search with datetime={dt} extracted from an Item returned no results."
+            f"GET Search with datetime={dt} extracted from an Item returned no results."
         )
 
     for dt in valid_datetimes:
         r = requests.get(search_url, params={"datetime": dt})
         if r.status_code != 200:
             errors.append(
-                f"Search with datetime={dt} returned status code {r.status_code}"
+                f"GET Search with datetime={dt} returned status code {r.status_code}"
             )
             continue
         try:
             r.json()
         except json.decoder.JSONDecodeError:
-            errors.append(f"Search with datetime={dt} returned non-json response")
+            errors.append(f"GET Search with datetime={dt} returned non-json response")
 
     for dt in invalid_datetimes:
         r = requests.get(search_url, params={"datetime": dt})
         if r.status_code == 200:
             warnings.append(
-                f"Search with datetime={dt} returned status code 200 instead of 400"
+                f"GET Search with datetime={dt} returned status code 200 instead of 400"
             )
             continue
         if r.status_code != 400:
             errors.append(
-                f"Search with datetime={dt} returned status code {r.status_code} instead of 400"
+                f"GET Search with datetime={dt} returned status code {r.status_code} instead of 400"
             )
             continue
+
+    # todo: POST
 
 
 def validate_search_bbox_xor_intersects(search_url: str, post: bool, errors: List[str]):
