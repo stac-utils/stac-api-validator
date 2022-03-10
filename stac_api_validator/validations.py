@@ -1,5 +1,6 @@
 from typing import List, Tuple, Dict
 from pystac_client import Client
+from pystac import STACValidationError
 import requests
 from typing import Callable
 import re
@@ -169,8 +170,8 @@ def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
             catalog.validate()
             for collection in catalog.get_children():
                 collection.validate()
-        except Exception as e:
-            errors.append(str(e))
+        except STACValidationError as e:
+            errors.append(f"pystac error: {str(e)}")
 
     return warnings, errors
 

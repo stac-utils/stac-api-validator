@@ -1,4 +1,4 @@
-pystac-client==v0.3.0
+pystac-client==v0.3.2
 requests
 pystac
 pystac[validation]
