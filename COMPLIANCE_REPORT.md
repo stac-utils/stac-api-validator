@@ -10,7 +10,9 @@ capabilities are only now starting to be fully used in tools like pystac-client.
 
 ## Open Source Implementations
 
-### stac-fastapi - sqlalchemy 
+### stac-fastapi - sqlalchemy
+
+<https://github.com/stac-utils/stac-fastapi>
 
 URL: http://0.0.0.0:8081
 
@@ -31,7 +33,9 @@ errors:
 - Search with datetime=1985-04-12t23:20:50.000z returned status code 400
 ```
 
-### stac-fastapi - pgstac 
+### stac-fastapi - pgstac
+
+<https://github.com/stac-utils/stac-fastapi>
 
 URL: http://0.0.0.0:8082
 
@@ -58,21 +62,51 @@ errors:
 
 ### stac-fastapi-elasticsearch
 
+<https://github.com/stac-utils/stac-fastapi-elasticsearch>
+
+URL: http://localhost:8083
+
+Date: 17-Mar-2022
+
+Output:
+```
+Validating http://localhost:8083
+STAC API - Core conformance class found.
+STAC API - Features conformance class found.
+STAC API - Item Search conformance class found.
+warnings:
+- GET Search with datetime=../.. returned status code 200 instead of 400
+- GET Search with datetime=1937-01-01T12:00:27.87+0100 returned status code 200 instead of 400
+- GET Search with datetime=1985-12-12T23:20:50.52 returned status code 200 instead of 400
+errors:
+- GET Search with bbox and intersects returned status code 200
+- GET Search with datetime=/1985-04-12T23:20:50.52Z returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52Z/ returned status code 400
+- GET Search with datetime=1985-04-12t23:20:50.000z returned status code 400
+- POST Search with intersects:{'type': 'GeometryCollection', 'geometries': [{'type': 'Point', 'coordinates': [100.0, 0.0]}, {'type': 'LineString', 'coordinates': [[101.0, 0.0], [102.0, 1.0]]}]} returned status code 400
+```
+
+### stac-server
+
+Validating http://localhost:3000
+STAC API - Core conformance class found.
+STAC API - Features conformance class found.
+STAC API - Item Search conformance class found.
+STAC API - Item Search Fields extension conformance class found.
+warnings: none
+errors: none
+
+### resto
+
 TBD.
 
 ### Franklin
 
 TBD.
 
-### stac-server
-
-TBD.
-
-### resto
-
-TBD.
-
 ### stac-cmr
+
+TBD.
 
 ### staccato
 
@@ -107,12 +141,11 @@ errors:
 - Search with datetime=37-01-01T12:00:27.87Z returned status code 500 instead of 400
 ```
 
-
 ### Snap Planet (resto)
 
 URL: https://tamn.snapplanet.io/
 
-Date: 19-Jan-2022
+Date: 14-Mar-2022
 
 Output
 ```
@@ -120,10 +153,10 @@ Validating https://tamn.snapplanet.io/
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
 STAC API - Item Search conformance class found.
-warnings:
-- Search with datetime=1985-04-12T23:20:50,52Z returned status code 200 instead of 400
+warnings: none
 errors:
 - GET Search with {'limit': 10000} returned status code 400
+- GET Search with {'collections': 'L8'} returned status code 504
 ```
 
 ### EarthData CMR (stac-cmr)
