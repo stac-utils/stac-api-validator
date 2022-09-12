@@ -54,21 +54,22 @@ To learn more, see the [Contributor Guide].
 
 **Work in Progress** -- this currently only validates a subset of behavior
 
-This validation suite focuses on validating STAC API interactions.  Tools such as
-[pystac](https://github.com/stac-utils/pystac) and [stac4s](https://github.com/azavea/stac4s) do a 
+This validation suite focuses on validating STAC API interactions. Tools such as
+[pystac](https://github.com/stac-utils/pystac) and [stac4s](https://github.com/azavea/stac4s) do a
 good job of validating STAC objects (Catalog, Collection, Item). This suite focuses on the STAC API behavior
 validation.
 
 The three key concepts within a STAC API are:
-1. *Conformance classes* advertising the capabilities of the API
-2. *Link relations* between resources within the web API (hypermedia)
-3. *Parameters* that filter search results
 
-The conformance classes, as defined in the `conformsTo` field of the Landing Page (root, `/`), advertise to 
+1. _Conformance classes_ advertising the capabilities of the API
+2. _Link relations_ between resources within the web API (hypermedia)
+3. _Parameters_ that filter search results
+
+The conformance classes, as defined in the `conformsTo` field of the Landing Page (root, `/`), advertise to
 clients which capabilities are available in the API. Without this field, a client would not even be able to tell that a
-root URI was a STAC API. 
+root URI was a STAC API.
 
-The link relations define how to navigate a STAC catalog through parent-child links and find resources such as the OpenAPI specification. While many OGC API and STAC API endpoint have a fixed value (e.g., `/collections`), it is preferable for clients discover the paths via hypermedia. 
+The link relations define how to navigate a STAC catalog through parent-child links and find resources such as the OpenAPI specification. While many OGC API and STAC API endpoint have a fixed value (e.g., `/collections`), it is preferable for clients discover the paths via hypermedia.
 
 The parameters that filter results apply to the Items resource and Item Search endpoints.
 
@@ -95,7 +96,7 @@ pip install -r requirements.txt
 Run:
 
 ```
-python stac_api_validator/validate.py --root https://cmr.earthdata.nasa.gov/stac/LARC_ASDC 
+python stac_api_validator/validate.py --root https://cmr.earthdata.nasa.gov/stac/LARC_ASDC
 ```
 
 Example output:
@@ -133,11 +134,11 @@ optional arguments:
 
 ## Validating OGC API Features - Part 1 compliance
 
-A STAC API that conforms to the "STAC API - Features" conformance class will also be a valid implementation 
+A STAC API that conforms to the "STAC API - Features" conformance class will also be a valid implementation
 of OGC API Features - Part 1. In general, this validator focuses on those aspects of API behavior that are
-different between STAC and OGC. It is recommended that implementers also use the [OGC API Features - Part 1 
+different between STAC and OGC. It is recommended that implementers also use the [OGC API Features - Part 1
 validation test suite](https://cite.opengeospatial.org/teamengine/about/ogcapi-features-1.0/1.0/site/) to
-validate conformance. 
+validate conformance.
 
 Full instructions are available at the link above, but the simplest way to run this is with:
 
@@ -145,7 +146,7 @@ Full instructions are available at the link above, but the simplest way to run t
 docker run -p 8081:8080 ogccite/ets-ogcapi-features10
 ```
 
-Then, open [http://localhost:8081/teamengine/](http://localhost:8081/teamengine/) and login with the 
+Then, open [http://localhost:8081/teamengine/](http://localhost:8081/teamengine/) and login with the
 username and password `ogctest`, `Create a new session`, with Organization `OGC`, Specification `OGC API - Features`, `Start a new test session`, input he root URL for the service, and `Start`.
 
 ## Common Mistakes

@@ -1,10 +1,11 @@
 """Command-line interface."""
-import click
-
 import logging
 import sys
-from stac_api_validator.validations import validate_api
 import traceback
+
+import click
+
+from stac_api_validator.validations import validate_api
 
 
 @click.command()
@@ -20,9 +21,9 @@ import traceback
     help="STAC API Root / Landing Page URL",
 )
 @click.option(
-    '--post/--no-post',
+    "--post/--no-post",
     default=True,
-    help="Test all validations with POST method for requests in addition to GET"
+    help="Test all validations with POST method for requests in addition to GET",
 )
 def main(log_level: str, root_url: str, post: bool) -> int:
     """STAC API Validator."""

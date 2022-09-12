@@ -1,21 +1,26 @@
-from typing import List, Tuple, Dict
-from pystac_client import Client
-from pystac import STACValidationError
-import requests
-from typing import Callable
-import re
-import json
+"""Validations module."""
 import itertools
-from stac_api_validator.geometries import (
-    point,
-    linestring,
-    polygon,
-    polygon_with_hole,
-    multipoint,
-    multilinestring,
-    multipolygon,
-    geometry_collection,
-)
+import json
+import re
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+
+import requests
+from pystac import STACValidationError
+from pystac_client import Client
+
+from stac_api_validator.geometries import geometry_collection
+from stac_api_validator.geometries import linestring
+from stac_api_validator.geometries import multilinestring
+from stac_api_validator.geometries import multipoint
+from stac_api_validator.geometries import multipolygon
+from stac_api_validator.geometries import point
+from stac_api_validator.geometries import polygon
+from stac_api_validator.geometries import polygon_with_hole
+
 
 # https://github.com/stac-utils/pystac/blob/4c7c775a6d0ca49d83dbec714855a189be759c8a/docs/concepts.rst#using-your-own-validator
 
@@ -176,7 +181,7 @@ def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
     return warnings, errors
 
 
-def href_for(links: List, key: str) -> Dict[str, str]:
+def href_for(links: List, key: str) -> Optional[Dict[str, str]]:
     return next((link for link in links if link.get("rel") == key), None)
 
 
@@ -303,7 +308,6 @@ def validate_search(
     errors: List[str],
 ) -> None:
     links = root_body.get("links")
-    root = href_for(links, "self")["href"]
     search = href_for(links, "search")
     if not search:
         errors.append("/: Link[rel=search] must exist when Item Search is implemented")
@@ -552,7 +556,7 @@ def validate_search_bbox(search_url: str, post: bool, errors: List[str]):
     bboxes = [[0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1]]
 
     for bbox in bboxes:
-        param = ",".join((str(c) for c in bbox))
+        param = ",".join(str(c) for c in bbox)
         r = requests.get(search_url, params={"bbox": param})
         if r.status_code != 400:
             errors.append(
@@ -747,7 +751,9 @@ def validate_search_collections(
             return
         collections = collections_entity.get("collections")
         if not collections:
-            errors.append('/collections entity does not contain a "collections" attribute')
+            errors.append(
+                '/collections entity does not contain a "collections" attribute'
+            )
             return
 
         collection_ids = [x["id"] for x in collections]
