@@ -1,5 +1,57 @@
 # STAC API Validator
 
+[![PyPI](https://img.shields.io/pypi/v/stac-api-validator.svg)][pypi_]
+[![Status](https://img.shields.io/pypi/status/stac-api-validator.svg)][status]
+[![Python Version](https://img.shields.io/pypi/pyversions/stac-api-validator)][python version]
+[![License](https://img.shields.io/pypi/l/stac-api-validator)][license]
+
+[![Read the documentation at https://stac-api-validator.readthedocs.io/](https://img.shields.io/readthedocs/stac-api-validator/latest.svg?label=Read%20the%20Docs)][read the docs]
+[![Tests](https://github.com/philvarner/stac-api-validator/workflows/Tests/badge.svg)][tests]
+[![Codecov](https://codecov.io/gh/philvarner/stac-api-validator/branch/main/graph/badge.svg)][codecov]
+
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
+[![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
+
+[pypi_]: https://pypi.org/project/stac-api-validator/
+[status]: https://pypi.org/project/stac-api-validator/
+[python version]: https://pypi.org/project/stac-api-validator
+[read the docs]: https://stac-api-validator.readthedocs.io/
+[tests]: https://github.com/philvarner/stac-api-validator/actions?workflow=Tests
+[codecov]: https://app.codecov.io/gh/philvarner/stac-api-validator
+[pre-commit]: https://github.com/pre-commit/pre-commit
+[black]: https://github.com/psf/black
+
+## Installation
+
+Install the package with development requirements:
+
+```console
+$ poetry install
+```
+
+You can now run the command-line interface:
+
+```console
+$ poetry run stac-api-validator
+```
+
+**Future Work** You can install _STAC API Validator_ via [pip] from [PyPI]:
+
+```console
+$ pip install stac-api-validator
+```
+
+## Usage
+
+Please see the [Command-line Reference] for details.
+
+## Contributing
+
+Contributions are very welcome.
+To learn more, see the [Contributor Guide].
+
+## Features
+
 **Work in Progress** -- this currently only validates a subset of behavior
 
 This validation suite focuses on validating STAC API interactions.  Tools such as
@@ -20,7 +72,7 @@ The link relations define how to navigate a STAC catalog through parent-child li
 
 The parameters that filter results apply to the Items resource and Item Search endpoints.
 
-The current validity status of several popular STAC API implementations can be found [here](COMPLIANCE_REPORT.md).
+The current validity status of several popular STAC API implementations can be found [here](../stac-api-validator/COMPLIANCE_REPORT.md).
 
 ## Running the validator
 
@@ -102,3 +154,29 @@ username and password `ogctest`, `Create a new session`, with Organization `OGC`
 - OGC API Features uses `data` relation link relation at the root to point to the Collections endpoint (`/collections`), not `collections` relation
 - media type for link relation `service-desc` and endpoint is `application/vnd.oai.openapi+json;version=3.0` (not `application/json`) and link relation `search` and endpoint is `application/geo+json` (not `application/json`)
 - Use of OCG API "req" urls instead of "conf" urls, e.g. `http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core` should be used, not `http://www.opengis.net/spec/ogcapi-features-1/1.0/req/core`
+
+## License
+
+Distributed under the terms of the [Apache 2.0 license][license],
+_STAC API Validator_ is free and open source software.
+
+## Issues
+
+If you encounter any problems,
+please [file an issue] along with a detailed description.
+
+## Credits
+
+This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter] template.
+
+[@cjolowicz]: https://github.com/cjolowicz
+[pypi]: https://pypi.org/
+[hypermodern python cookiecutter]: https://github.com/cjolowicz/cookiecutter-hypermodern-python
+[file an issue]: https://github.com/philvarner/stac-api-validator/issues
+[pip]: https://pip.pypa.io/
+
+<!-- github-only -->
+
+[license]: https://github.com/philvarner/stac-api-validator/blob/main/LICENSE
+[contributor guide]: https://github.com/philvarner/stac-api-validator/blob/main/CONTRIBUTING.md
+[command-line reference]: https://stac-api-validator.readthedocs.io/en/latest/usage.html

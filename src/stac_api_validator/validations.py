@@ -6,7 +6,7 @@ from typing import Callable
 import re
 import json
 import itertools
-from geometries import (
+from stac_api_validator.geometries import (
     point,
     linestring,
     polygon,
