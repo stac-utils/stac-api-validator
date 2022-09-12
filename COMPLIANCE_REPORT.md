@@ -2,11 +2,11 @@
 
 This document shows how well several popular STAC API implementations conform to STAC API.
 
-Many (if not all) of these APIs are in production use, so the fact that they have validation problems 
-should not be seen as a significant concern.  This validation suite is quite strict, so it finds 
-many obscure issues that can usually be worked around. Many of the defects are around the 
-correct advertisement of conformance classes and links to support hypermedia, and these more "advanced" 
-capabilities are only now starting to be fully used in tools like pystac-client. 
+Many (if not all) of these APIs are in production use, so the fact that they have validation problems
+should not be seen as a significant concern. This validation suite is quite strict, so it finds
+many obscure issues that can usually be worked around. Many of the defects are around the
+correct advertisement of conformance classes and links to support hypermedia, and these more "advanced"
+capabilities are only now starting to be fully used in tools like pystac-client.
 
 ## Open Source Implementations
 
@@ -19,6 +19,7 @@ URL: http://0.0.0.0:8081
 Date: 19-Jan-2022
 
 Output:
+
 ```
 Validating http://0.0.0.0:8081
 STAC API - Core conformance class found.
@@ -42,6 +43,7 @@ URL: http://0.0.0.0:8082
 Date: 19-Jan-2022
 
 Output:
+
 ```
 Validating http://0.0.0.0:8082
 STAC API - Core conformance class found.
@@ -69,6 +71,7 @@ URL: http://localhost:8083
 Date: 17-Mar-2022
 
 Output:
+
 ```
 Validating http://localhost:8083
 STAC API - Core conformance class found.
@@ -121,6 +124,7 @@ URL: https://planetarycomputer.microsoft.com/api/stac/v1/
 Date: 19-Jan-2022
 
 Output:
+
 ```
 Validating https://planetarycomputer.microsoft.com/api/stac/v1/
 STAC API - Core conformance class found.
@@ -148,6 +152,7 @@ URL: https://tamn.snapplanet.io/
 Date: 14-Mar-2022
 
 Output
+
 ```
 Validating https://tamn.snapplanet.io/
 STAC API - Core conformance class found.
@@ -166,6 +171,7 @@ URL: https://cmr.earthdata.nasa.gov/stac/USGS_EROS
 Date: 19-Jan-2022
 
 Output:
+
 ```
 Validating https://cmr.earthdata.nasa.gov/stac/USGS_EROS
 STAC API - Core conformance class found.
@@ -216,7 +222,6 @@ errors:
 - Search with datetime=2020-07-23T00:00:00.01234567Z returned status code 400
 - Search with datetime=2020-07-23T00:00:00.012345678Z returned status code 400
 ```
-
 
 ### Landsat Look (stac-server)
 
@@ -284,7 +289,6 @@ errors:
 - Search with datetime=1990-12-31T23:59:61Z returned status code 404 instead of 400
 ```
 
-
 ### Franklin NASA HSI
 
 URL: https://franklin.nasa-hsi.azavea.com/
@@ -337,6 +341,7 @@ URL: https://staccato.space/
 Date: 2-Jul-2021
 
 Output:
+
 ```
 Validating https://staccato.space/
 warnings: none
@@ -344,8 +349,7 @@ errors:
 - / : 'conformsTo' must contain at least one STAC API conformance class.
 ```
 
-
-### EarthAI OnDemand 
+### EarthAI OnDemand
 
 URL: https://eod-catalog-svc-prod.astraea.earth/
 

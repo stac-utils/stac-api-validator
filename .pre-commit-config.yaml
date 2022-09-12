@@ -1,6 +1,3 @@
-# Configuration file for pre-commit (https://pre-commit.com/).
-# Please run `pre-commit run --all-files` when adding or changing entries.
-
 repos:
   - repo: local
     hooks:
@@ -8,21 +5,68 @@ repos:
         name: black
         entry: black
         language: system
-        stages: [commit]
         types: [python]
-
+        require_serial: true
+      - id: check-added-large-files
+        name: Check for added large files
+        entry: check-added-large-files
+        language: system
+      - id: check-toml
+        name: Check Toml
+        entry: check-toml
+        language: system
+        types: [toml]
+      - id: check-yaml
+        name: Check Yaml
+        entry: check-yaml
+        language: system
+        types: [yaml]
+      - id: darglint
+        name: darglint
+        entry: darglint
+        language: system
+        types: [python]
+        stages: [manual]
+      - id: end-of-file-fixer
+        name: Fix End of Files
+        entry: end-of-file-fixer
+        language: system
+        types: [text]
+        stages: [commit, push, manual]
       - id: flake8
         name: flake8
         entry: flake8
         language: system
-        stages: [commit]
         types: [python]
-
+        require_serial: true
+        args: [--darglint-ignore-regex, .*]
+      - id: isort
+        name: isort
+        entry: isort
+        require_serial: true
+        language: system
+        types_or: [cython, pyi, python]
+        args: ["--filter-files"]
+      - id: pyupgrade
+        name: pyupgrade
+        description: Automatically upgrade syntax for newer versions.
+        entry: pyupgrade
+        language: system
+        types: [python]
+        args: [--py37-plus]
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespace
+        entry: trailing-whitespace-fixer
+        language: system
+        types: [text]
+        stages: [commit, push, manual]
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v2.6.0
+    hooks:
+      - id: prettier
+#  - repo: https://github.com/pre-commit/mirrors-mypy
+#    rev: v0.971
+#    hooks:
 #      - id: mypy
-#        name: mypy
-#        entry: mypy
-#        args: [--no-incremental]
-#        language: system
-#        stages: [commit]
-#        types: [python]
-#        require_serial: true
+#        exclude: '(test_.*|noxfile)\.py'
+#        additional_dependencies: ["types-requests", "types-click"]

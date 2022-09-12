@@ -1,6 +1,0 @@
-pystac-client==v0.3.0
-requests
-pystac
-pystac[validation]
-pytest
-pytest-cov

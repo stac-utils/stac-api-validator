@@ -1,0 +1,14 @@
+{
+  "_output_dir": "/Users/philvarner/code",
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "Phil Varner",
+  "copyright_year": "2022",
+  "development_status": "Development Status :: 3 - Alpha",
+  "email": "phil@philvarner.com",
+  "friendly_name": "STAC API Validator",
+  "github_user": "philvarner",
+  "license": "Apache-2.0",
+  "package_name": "stac_api_validator",
+  "project_name": "stac-api-validator",
+  "version": "0.0.0"
+}
