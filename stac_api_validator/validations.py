@@ -309,11 +309,12 @@ def validate_search(
         errors.append("/: Link[rel=search] must exist when Item Search is implemented")
         return
 
-    collections = href_for(links, "data")
-    if collections:
+    # Collections may not be implemented, so set to None
+    # and later get some collection ids another way
+    if collections := href_for(links, "data"):
         collections_url = collections.get("href")
     else:
-        collections_url = f"{root}/collections"
+        collections_url = None
 
     search_url = search["href"]
     r = requests.get(search_url)
@@ -739,16 +740,20 @@ def _validate_search_collections_with_ids(
 def validate_search_collections(
     search_url: str, collections_url: str, post: bool, errors: List[str]
 ):
-    collections_entity = requests.get(collections_url).json()
-    if isinstance(collections_entity, List):
-        errors.append("/collections entity is an array rather than an object")
-        return
-    collections = collections_entity.get("collections")
-    if not collections:
-        errors.append('/collections entity does not contain a "collections" attribute')
-        return
+    if collections_url:
+        collections_entity = requests.get(collections_url).json()
+        if isinstance(collections_entity, List):
+            errors.append("/collections entity is an array rather than an object")
+            return
+        collections = collections_entity.get("collections")
+        if not collections:
+            errors.append('/collections entity does not contain a "collections" attribute')
+            return
 
-    collection_ids = [x["id"] for x in collections]
+        collection_ids = [x["id"] for x in collections]
+    else:  # if Collections is not implemented, get some from search
+        r = requests.get(search_url)
+        collection_ids = list({i["collection"] for i in r.json().get("features")})
 
     _validate_search_collections_with_ids(search_url, collection_ids, post, errors)
 
