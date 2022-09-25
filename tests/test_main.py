@@ -11,6 +11,6 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
-def test_main_succeeds(runner: CliRunner) -> None:
+def test_main_fails(runner: CliRunner) -> None:
     result = runner.invoke(__main__.main)
-    assert result.exit_code == 1
+    assert result.exit_code == 2
