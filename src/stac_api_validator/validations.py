@@ -2,6 +2,7 @@
 import itertools
 import json
 import re
+from typing import Any
 from typing import Callable
 from typing import Dict
 from typing import List
@@ -26,23 +27,41 @@ from stac_api_validator.geometries import polygon_with_hole
 
 # resolve_stac_object
 
-core_cc_regex = re.compile(r"https://api\.stacspec\.org/.+/core")
+cc_core_regex = re.compile(r"https://api\.stacspec\.org/.+/core")
+cc_browseable_regex = re.compile(r"https://api\.stacspec\.org/.+/browseable")
+cc_children_regex = re.compile(r"https://api\.stacspec\.org/.+/children")
 
-oaf_cc_regex = re.compile(r"https://api\.stacspec\.org/.+/ogcapi-features")
-oaf_transaction_cc_regex = re.compile(
+cc_collections_regex = re.compile(r"https://api\.stacspec\.org/.+/collections")
+
+cc_features_regex = re.compile(r"https://api\.stacspec\.org/.+/ogcapi-features")
+cc_features_transaction_regex = re.compile(
     r"https://api\.stacspec\.org/.+/ogcapi-features/extensions/transaction"
 )
-oaf_version_cc_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/ogcapi-features/extensions/version"
+cc_features_fields_regex = re.compile(r"https://api\.stacspec\.org/.+/features#fields")
+cc_features_context_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/features#context"
 )
+cc_features_sort_regex = re.compile(r"https://api\.stacspec\.org/.+/features#sort")
+cc_features_query_regex = re.compile(r"https://api\.stacspec\.org/.+/features#query")
+cc_features_filter_regex = re.compile(r"https://api\.stacspec\.org/.+/features#filter")
 
-search_cc_regex = re.compile(r"https://api\.stacspec\.org/.+/item-search")
-search_fields_cc_regex = re.compile(r"https://api\.stacspec\.org/.+/item-search#fields")
-search_contextsearch_fields_cc_regex_cc_regex = re.compile(
+cc_item_search_regex = re.compile(r"https://api\.stacspec\.org/.+/item-search")
+
+cc_item_search_fields_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/item-search#fields"
+)
+cc_item_search_context_regex = re.compile(
     r"https://api\.stacspec\.org/.+/item-search#context"
 )
-search_sort_cc_regex = re.compile(r"https://api\.stacspec\.org/.+/item-search#sort")
-search_query_cc_regex = re.compile(r"https://api\.stacspec\.org/.+/item-search#query")
+cc_item_search_sort_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/item-search#sort"
+)
+cc_item_search_query_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/item-search#query"
+)
+cc_item_search_filter_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/item-search#filter"
+)
 
 geojson_mt = "application/geo+json"
 geojson_charset_mt = "application/geo+json; charset=utf-8"
@@ -106,7 +125,9 @@ invalid_datetimes = [
 ]
 
 
-def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
+def validate_api(
+    root_url: str, post: bool, conformance_classes: List[str]
+) -> Tuple[List[str], List[str]]:
     warnings: List[str] = []
     errors: List[str] = []
 
@@ -124,19 +145,62 @@ def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
         errors.append(
             "/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0."
         )
+        return warnings, errors
 
     if not root_body.get("links"):
         errors.append("/ : 'links' field must be defined and non-empty.")
+    else:
+        # todo
+        # root 	/ 	STAC Core 	The root URI
+        # self 	/ 	OAFeat 	Self reference, same as root URI
+        # service-desc
+        pass
 
-    if (
-        conforms_to
-        and not any(core_cc_regex.fullmatch(x) for x in conforms_to)
-        and not any(oaf_cc_regex.fullmatch(x) for x in conforms_to)
-        and not any(search_cc_regex.fullmatch(x) for x in conforms_to)
+    if "core" in conformance_classes and not any(
+        cc_core_regex.fullmatch(x) for x in conforms_to
     ):
         errors.append(
-            "/ : 'conformsTo' must contain at least one STAC API conformance class."
+            "/: Core configured for validation, but not contained in 'conformsTo'"
         )
+
+    if "browseable" in conformance_classes and not any(
+        cc_browseable_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors.append(
+            "/: Browseable configured for validation, but not contained in 'conformsTo'"
+        )
+
+    if "children" in conformance_classes and not any(
+        cc_children_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors.append(
+            "/: Children configured for validation, but not contained in 'conformsTo'"
+        )
+
+    if "collections" in conformance_classes and not any(
+        cc_collections_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors.append(
+            "/: Collections configured for validation, but not contained in 'conformsTo'"
+        )
+
+    if "features" in conformance_classes and not any(
+        cc_features_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors.append(
+            "/: Features configured for validation, but not contained in 'conformsTo'"
+        )
+
+    if "item-search" in conformance_classes and not any(
+        cc_item_search_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors.append(
+            "/: Item Search configured for validation, but not contained in 'conformsTo'"
+        )
+
+    # fail fast if there are errors with conformance or links so far
+    if errors:
+        return warnings, errors
 
     if conforms_to and (
         req_ccs := [
@@ -149,25 +213,34 @@ def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
             f"/ : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
         )
 
-    # fail fast if there are errors with conformance or links so far
-    if errors:
-        return warnings, errors
+    print("Validating STAC API - Core conformance class.")
+    validate_core(root_body, warnings, errors)
 
-    if any(core_cc_regex.fullmatch(x) for x in conforms_to):
-        print("STAC API - Core conformance class found.")
-        validate_core(root_body, warnings, errors)
-    else:
-        errors.append(
-            "/ : 'conformsTo' must contain STAC API - Core conformance class."
-        )
+    if "browseable" in conformance_classes:
+        print("Validating STAC API - Browseable conformance class.")
+        validate_browseable(root_body, warnings, errors)
 
-    if any(oaf_cc_regex.fullmatch(x) for x in conforms_to):
-        print("STAC API - Features conformance class found.")
-        validate_oaf(root_body, warnings, errors)
+    if "children" in conformance_classes:
+        print("Validating STAC API - Children conformance class.")
+        validate_children(root_body, warnings, errors)
 
-    if any(search_cc_regex.fullmatch(x) for x in conforms_to):
-        print("STAC API - Item Search conformance class found.")
-        validate_search(root_body, post, conforms_to, warnings, errors)
+    if "collections" in conformance_classes:
+        print("Validating STAC API - Collections conformance class.")
+        validate_collections(root_body, warnings, errors)
+
+    if "features" in conformance_classes:
+        print("Validating STAC API - Features conformance class.")
+        validate_features(root_body, conforms_to, warnings, errors)
+
+    if "item-search" in conformance_classes:
+        print("Validating STAC API - Item Search conformance class.")
+        validate_item_search(root_body, post, conforms_to, warnings, errors)
+
+    # old filter conformance classes
+    "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:basic-cql",
+    "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-json",
+    "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-text",
+    "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:filter",
 
     if not errors:
         try:
@@ -181,11 +254,18 @@ def validate_api(root_url: str, post: bool) -> Tuple[List[str], List[str]]:
     return warnings, errors
 
 
-def href_for(links: List, key: str) -> Optional[Dict[str, str]]:
-    return next((link for link in links if link.get("rel") == key), None)
+def href_for(
+    links: Optional[List[Dict[str, str]]], key: str
+) -> Optional[Dict[str, str]]:
+    if not links:
+        return None
+    else:
+        return next((link for link in links if link.get("rel") == key), None)
 
 
-def validate_core(root_body: Dict, warnings: List[str], errors: List[str]) -> None:
+def validate_core(
+    root_body: Dict[str, Any], warnings: List[str], errors: List[str]
+) -> None:
     links = root_body.get("links")
 
     # Link rel=root
@@ -216,9 +296,9 @@ def validate_core(root_body: Dict, warnings: List[str], errors: List[str]) -> No
             lambda: r_service_desc.status_code == 200,
         )
 
-        service_desc_type = service_desc.get("type")
+        service_desc_type = service_desc.get("type", "")
         if (
-            (ct := r_service_desc.headers.get("content-type")) == service_desc_type
+            (ct := r_service_desc.headers.get("content-type", "")) == service_desc_type
         ) or (
             (";" in ct or ";" in service_desc_type)
             and (ct.split(";", 1)[0] == service_desc_type.split(";", 1)[0])
@@ -253,7 +333,46 @@ def validate_core(root_body: Dict, warnings: List[str], errors: List[str]) -> No
             )
 
 
-def validate_oaf(root_body: Dict, warnings: List[str], errors: List[str]) -> None:
+def validate_browseable(
+    root_body: Dict[str, Any], warnings: List[str], errors: List[str]
+) -> None:
+    print("Browseable validation is not yet implemented.")
+
+
+def validate_children(
+    root_body: Dict[str, Any], warnings: List[str], errors: List[str]
+) -> None:
+    print("Children validation is not yet implemented.")
+
+
+def validate_collections(
+    root_body: Dict[str, Any], warnings: List[str], errors: List[str]
+) -> None:
+    print("Collections validation is not yet implemented.")
+
+
+def validate_features(
+    root_body: Dict[str, Any],
+    conforms_to: List[str],
+    warnings: List[str],
+    errors: List[str],
+) -> None:
+    if "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core" not in conforms_to:
+        warnings.append(
+            "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core'"
+        )
+
+    if (
+        "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson"
+        not in conforms_to
+    ):
+        warnings.append(
+            "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson'"
+        )
+
+    # todo: add this one somewhere
+    #  "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/oas30",
+
     links = root_body.get("links")
     conformance = href_for(links, "conformance")
     errors += validate(
@@ -266,7 +385,7 @@ def validate_oaf(root_body: Dict, warnings: List[str], errors: List[str]) -> Non
         "conformance must return 200", lambda: r_conformance.status_code == 200
     )
 
-    if (ct := r_conformance.headers.get("content-type")).split(";")[
+    if (ct := r_conformance.headers.get("content-type"), "").split(";")[
         0
     ] == "application/json":
         pass
@@ -279,7 +398,7 @@ def validate_oaf(root_body: Dict, warnings: List[str], errors: List[str]) -> Non
         conformance_json = r_conformance.json()
         warnings += validate(
             "Landing Page conforms to and conformance conformsTo must be the same",
-            lambda: set(root_body.get("conformsTo"))
+            lambda: set(root_body.get("conformsTo"), [])
             == set(conformance_json["conformsTo"]),
         )
     except json.decoder.JSONDecodeError:
@@ -299,11 +418,26 @@ def validate_oaf(root_body: Dict, warnings: List[str], errors: List[str]) -> Non
         lambda: href_for(links, "collections") is None,
     )
 
+    # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Features - Fields extension conformance class found.")
+    #
+    # if any(cc_features_context_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Features - Context extension conformance class found.")
+    #
+    # if any(cc_features_sort_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Features - Sort extension conformance class found.")
+    #
+    # if any(cc_features_query_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Features - Query extension conformance class found.")
+    #
+    # if any(cc_features_filter_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Features - Filter extension conformance class found.")
 
-def validate_search(
-    root_body: Dict,
+
+def validate_item_search(
+    root_body: Dict[str, Any],
     post: bool,
-    conforms_to: List,
+    conforms_to: List[str],
     warnings: List[str],
     errors: List[str],
 ) -> None:
@@ -315,14 +449,14 @@ def validate_search(
 
     # Collections may not be implemented, so set to None
     # and later get some collection ids another way
-    if collections := href_for(links, "data"):
+    if links and (collections := href_for(links, "data")):
         collections_url = collections.get("href")
     else:
         collections_url = None
 
     search_url = search["href"]
     r = requests.get(search_url)
-    content_type: str = r.headers.get("content-type")
+    content_type = r.headers.get("content-type")
     if content_type == geojson_mt or content_type == geojson_charset_mt:
         pass
     else:
@@ -342,9 +476,6 @@ def validate_search(
             f"Search ({search_url}): must return JSON, instead got non-JSON text"
         )
 
-    if any(search_fields_cc_regex.fullmatch(x) for x in conforms_to):
-        print("STAC API - Item Search Fields extension conformance class found.")
-
     validate_search_limit(search_url, post, errors)
     validate_search_bbox_xor_intersects(search_url, post, errors)
     validate_search_bbox(search_url, post, errors)
@@ -353,8 +484,25 @@ def validate_search(
     validate_search_collections(search_url, collections_url, post, errors)
     validate_search_intersects(search_url, post, errors)
 
+    # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Item Search - Fields extension conformance class found.")
+    #
+    # if any(cc_item_search_context_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Item Search - Context extension conformance class found.")
+    #
+    # if any(cc_item_search_sort_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Item Search - Sort extension conformance class found.")
+    #
+    # if any(cc_item_search_query_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Item Search - Query extension conformance class found.")
+    #
+    # if any(cc_item_search_filter_regex.fullmatch(x) for x in conforms_to):
+    #     print("STAC API - Item Search - Filter extension conformance class found.")
 
-def validate_search_datetime(search_url: str, warnings: List[str], errors: List[str]):
+
+def validate_search_datetime(
+    search_url: str, warnings: List[str], errors: List[str]
+) -> None:
     # find an Item and try to use its datetime value in a query
     r = requests.get(search_url)
     dt = r.json()["features"][0]["properties"]["datetime"]  # todo: if no results, fail
@@ -396,7 +544,9 @@ def validate_search_datetime(search_url: str, warnings: List[str], errors: List[
     # todo: POST
 
 
-def validate_search_bbox_xor_intersects(search_url: str, post: bool, errors: List[str]):
+def validate_search_bbox_xor_intersects(
+    search_url: str, post: bool, errors: List[str]
+) -> None:
     r = requests.get(
         search_url, params={"bbox": "0,0,1,1", "intersects": json.dumps(polygon)}
     )
@@ -416,7 +566,7 @@ def validate_search_bbox_xor_intersects(search_url: str, post: bool, errors: Lis
             )
 
 
-def validate_search_intersects(search_url: str, post: bool, errors: List[str]):
+def validate_search_intersects(search_url: str, post: bool, errors: List[str]) -> None:
     intersects_params = [
         point,
         linestring,
@@ -458,7 +608,7 @@ def validate_search_intersects(search_url: str, post: bool, errors: List[str]):
                     )
 
 
-def validate_search_bbox(search_url: str, post: bool, errors: List[str]):
+def validate_search_bbox(search_url: str, post: bool, errors: List[str]) -> None:
     # Valid GET query
     param = "100.0,0.0,105.0,1.0"
     r = requests.get(search_url, params={"bbox": param})
@@ -476,18 +626,18 @@ def validate_search_bbox(search_url: str, post: bool, errors: List[str]):
 
     if post:
         # Valid POST query
-        param = [100.0, 0.0, 105.0, 1.0]
-        r = requests.post(search_url, json={"bbox": param})
+        param_list = [100.0, 0.0, 105.0, 1.0]
+        r = requests.post(search_url, json={"bbox": param_list})
         if r.status_code != 200:
             errors.append(
-                f"POST Search with bbox:{param} returned status code {r.status_code}"
+                f"POST Search with bbox:{param_list} returned status code {r.status_code}"
             )
         else:
             try:
                 r.json()
             except json.decoder.JSONDecodeError:
                 errors.append(
-                    f"POST Search with bbox:{param} returned non-json response: {r.text}"
+                    f"POST Search with bbox:{param_list} returned non-json response: {r.text}"
                 )
 
     # Valid 3D GET query
@@ -505,18 +655,18 @@ def validate_search_bbox(search_url: str, post: bool, errors: List[str]):
 
     if post:
         # Valid 3D POST query
-        param = [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]
-        r = requests.post(search_url, json={"bbox": param})
+        param_list = [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]
+        r = requests.post(search_url, json={"bbox": param_list})
         if r.status_code != 200:
             errors.append(
-                f"POST Search with bbox:{param} returned status code {r.status_code}"
+                f"POST Search with bbox:{param_list} returned status code {r.status_code}"
             )
         else:
             try:
                 r.json()
             except json.decoder.JSONDecodeError:
                 errors.append(
-                    f"POST with bbox:{param} returned non-json response: {r.text}"
+                    f"POST with bbox:{param_list} returned non-json response: {r.text}"
                 )
 
     # Invalid GET query with coordinates in brackets
@@ -545,11 +695,11 @@ def validate_search_bbox(search_url: str, post: bool, errors: List[str]):
         )
 
     if post:
-        param = [100.0, 1.0, 105.0, 0.0]
-        r = requests.post(search_url, json={"bbox": param})
+        param_list = [100.0, 1.0, 105.0, 0.0]
+        r = requests.post(search_url, json={"bbox": param_list})
         if r.status_code != 400:
             errors.append(
-                f"POST Search with bbox: {param} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
+                f"POST Search with bbox: {param_list} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
             )
 
     # Invalid bbox - 1, 2, 3, 5, and 7 element array
@@ -570,8 +720,8 @@ def validate_search_bbox(search_url: str, post: bool, errors: List[str]):
                 )
 
 
-def validate_search_limit(search_url: str, post: bool, errors: List[str]):
-    valid_limits = [1, 2, 10, 10000]
+def validate_search_limit(search_url: str, post: bool, errors: List[str]) -> None:
+    valid_limits = [1, 2, 10, 1000]
     for limit in valid_limits:
         # Valid GET query
         params = {"limit": limit}
@@ -634,8 +784,12 @@ def validate_search_limit(search_url: str, post: bool, errors: List[str]):
 
 
 def _validate_search_ids_request(
-    r, item_ids: List[str], method: str, params: Dict, errors: List[str]
-):
+    r: requests.Response,
+    item_ids: List[str],
+    method: str,
+    params: Dict[str, Any],
+    errors: List[str],
+) -> None:
     if r.status_code != 200:
         errors.append(
             f"{method} Search with {params} returned status code {r.status_code}"
@@ -656,8 +810,8 @@ def _validate_search_ids_request(
 
 
 def _validate_search_ids_with_ids(
-    search_url, item_ids: List[str], post: bool, errors: List[str]
-):
+    search_url: str, item_ids: List[str], post: bool, errors: List[str]
+) -> None:
     get_params = {"ids": ",".join(item_ids)}
 
     _validate_search_ids_request(
@@ -681,7 +835,7 @@ def _validate_search_ids_with_ids(
 
 def validate_search_ids(
     search_url: str, post: bool, warnings: List[str], errors: List[str]
-):
+) -> None:
     r = requests.get(f"{search_url}?limit=2")
     items = r.json().get("features")
     if items and len(items) >= 2:
@@ -697,8 +851,12 @@ def validate_search_ids(
 
 
 def _validate_search_collections_request(
-    r, coll_ids: List[str], method: str, params: Dict, errors: List[str]
-):
+    r: requests.Response,
+    coll_ids: List[str],
+    method: str,
+    params: Dict[str, Any],
+    errors: List[str],
+) -> None:
     if r.status_code != 200:
         errors.append(
             f"{method} Search with {params} returned status code {r.status_code}"
@@ -719,8 +877,8 @@ def _validate_search_collections_request(
 
 
 def _validate_search_collections_with_ids(
-    search_url, coll_ids: List[str], post: bool, errors: List[str]
-):
+    search_url: str, coll_ids: List[str], post: bool, errors: List[str]
+) -> None:
     get_params = {"collections": ",".join(coll_ids)}
     _validate_search_collections_request(
         requests.get(search_url, params=get_params),
@@ -742,8 +900,8 @@ def _validate_search_collections_with_ids(
 
 
 def validate_search_collections(
-    search_url: str, collections_url: str, post: bool, errors: List[str]
-):
+    search_url: str, collections_url: Optional[str], post: bool, errors: List[str]
+) -> None:
     if collections_url:
         collections_entity = requests.get(collections_url).json()
         if isinstance(collections_entity, List):
