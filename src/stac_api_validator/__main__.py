@@ -2,6 +2,7 @@
 import logging
 import sys
 import traceback
+from typing import List
 
 import click
 
@@ -25,7 +26,27 @@ from stac_api_validator.validations import validate_api
     default=True,
     help="Test all validations with POST method for requests in addition to GET",
 )
-def main(log_level: str, root_url: str, post: bool) -> int:
+@click.option(
+    "--conformance",
+    "conformance_classes",
+    required=True,
+    multiple=True,
+    type=click.Choice(
+        [
+            "core",
+            "browseable",
+            "item-search",
+            "features",
+            "collections",
+            "children",
+        ],
+        case_sensitive=False,
+    ),
+    help="Conformance class URIs to validate",
+)
+def main(
+    log_level: str, root_url: str, post: bool, conformance_classes: List[str]
+) -> int:
     """STAC API Validator."""
 
     logging.basicConfig(stream=sys.stdout, level=log_level)
@@ -33,7 +54,7 @@ def main(log_level: str, root_url: str, post: bool) -> int:
     print(f"Validating {root_url}", flush=True)
 
     try:
-        (warnings, errors) = validate_api(root_url, post)
+        (warnings, errors) = validate_api(root_url, post, conformance_classes)
     except Exception as e:
         print(f"Failed.\nError {root_url}: {type(e)} {str(e)}")
         traceback.print_exc()
