@@ -23,7 +23,7 @@
 
 ## Installation
 
-STAC API Validator requires Python 3.10 and [Poetry 1.2](https://python-poetry.org/docs/).
+STAC API Validator requires Python 3.10.
 
 You can install _STAC API Validator_ via [pip] from [PyPI]:
 
@@ -39,7 +39,8 @@ $ stac-api-validator \
     --conformance core --conformance item-search
 ```
 
-To install from a clone of this repository for development, first install the package with development requirements:
+To install from a clone of this repository for development, install [Poetry 1.2](https://python-poetry.org/docs/),
+and then install the package with development requirements:
 
 ```console
 $ poetry install
