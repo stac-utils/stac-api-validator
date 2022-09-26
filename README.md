@@ -31,6 +31,8 @@ Install the package with development requirements:
 $ poetry install
 ```
 
+Note: if `poetry update` or `poetry install` hang, try running `poetry cache clear --all pypi` to fix the issue.
+
 You can now run the command-line interface:
 
 ```console
