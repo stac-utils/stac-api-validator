@@ -25,7 +25,21 @@
 
 STAC API Validator requires Python 3.10 and [Poetry 1.2](https://python-poetry.org/docs/).
 
-Install the package with development requirements:
+You can install _STAC API Validator_ via [pip] from [PyPI]:
+
+```console
+$ pip install stac-api-validator
+```
+
+and then run it:
+
+```console
+$ stac-api-validator \
+    --root-url https://planetarycomputer.microsoft.com/api/stac/v1/ \
+    --conformance core --conformance item-search
+```
+
+To install from a clone of this repository for development, first install the package with development requirements:
 
 ```console
 $ poetry install
@@ -37,12 +51,6 @@ You can now run the command-line interface:
 
 ```console
 $ poetry run stac-api-validator
-```
-
-**Future Work** You can install _STAC API Validator_ via [pip] from [PyPI]:
-
-```console
-$ pip install stac-api-validator
 ```
 
 ## Usage
@@ -104,7 +112,7 @@ Options:
 Example:
 
 ```
-poetry run stac-api-validator \
+stac-api-validator \
     --root-url https://cmr.earthdata.nasa.gov/stac/LARC_ASDC \
     --conformance core --conformance item-search --conformance features
 ```
