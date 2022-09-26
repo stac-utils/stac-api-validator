@@ -58,8 +58,8 @@ jobs:
         if: steps.check-version.outputs.tag
         uses: pypa/gh-action-pypi-publish@v1.5.1
         with:
-          user: ${{ secrets.PYPI_STACUTILS_PASSWORD  }}
-          password: ${{ secrets.PYPI_STACUTILS_USERNAME }}
+          user: ${{ secrets.PYPI_STACUTILS_USERNAME }}
+          password: ${{ secrets.PYPI_STACUTILS_PASSWORD}}
 
       - name: Publish package on TestPyPI
         if: "! steps.check-version.outputs.tag"
