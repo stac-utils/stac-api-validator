@@ -101,7 +101,7 @@ Options:
   --help                          Show this message and exit.
 ```
 
-Example
+Example:
 
 ```
 poetry run stac-api-validator \
