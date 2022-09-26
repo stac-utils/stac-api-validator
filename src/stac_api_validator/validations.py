@@ -140,21 +140,14 @@ def validate_api(
 
     root_body = root.json()
 
-    conforms_to = root_body.get("conformsTo")
+    conforms_to = root_body.get("conformsTo", [])
     if not conforms_to:
         errors.append(
             "/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0."
         )
-        return warnings, errors
 
     if not root_body.get("links"):
         errors.append("/ : 'links' field must be defined and non-empty.")
-    else:
-        # todo
-        # root 	/ 	STAC Core 	The root URI
-        # self 	/ 	OAFeat 	Self reference, same as root URI
-        # service-desc
-        pass
 
     if "core" in conformance_classes and not any(
         cc_core_regex.fullmatch(x) for x in conforms_to
@@ -202,17 +195,6 @@ def validate_api(
     if errors:
         return warnings, errors
 
-    if conforms_to and (
-        req_ccs := [
-            x
-            for x in conforms_to
-            if x.startswith("http://www.opengis.net/spec/ogcapi-features-1/1.0/req/")
-        ]
-    ):
-        warnings.append(
-            f"/ : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
-        )
-
     print("Validating STAC API - Core conformance class.")
     validate_core(root_body, warnings, errors)
 
@@ -236,12 +218,6 @@ def validate_api(
         print("Validating STAC API - Item Search conformance class.")
         validate_item_search(root_body, post, conforms_to, warnings, errors)
 
-    # old filter conformance classes
-    "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:basic-cql",
-    "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-json",
-    "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-text",
-    "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:filter",
-
     if not errors:
         try:
             catalog = Client.open(root_url)
@@ -254,13 +230,13 @@ def validate_api(
     return warnings, errors
 
 
-def href_for(
-    links: Optional[List[Dict[str, str]]], key: str
+def link_by_rel(
+    links: Optional[List[Dict[str, str]]], rel: str
 ) -> Optional[Dict[str, str]]:
     if not links:
         return None
     else:
-        return next((link for link in links if link.get("rel") == key), None)
+        return next((link for link in links if link.get("rel") == rel), None)
 
 
 def validate_core(
@@ -268,25 +244,19 @@ def validate_core(
 ) -> None:
     links = root_body.get("links")
 
-    # Link rel=root
-    root = href_for(links, "root")
-    if root is not None:
+    if not (root := link_by_rel(links, "root")):
+        errors.append("/ : Link[rel=root] must exist")
+    else:
         if root.get("type") != "application/json":
             errors.append("root type is not application/json")
-    else:
-        errors.append("/ : Link[rel=root] must exist")
 
-    # Link rel=self
-    _self = href_for(links, "self")
-    if _self is not None:
+    if not (_self := link_by_rel(links, "self")):
+        warnings.append("/ : Link[rel=self] must exist")
+    else:
         if _self.get("type") != "application/json":
             errors.append("self type is not application/json")
-    else:
-        warnings.append("/ : Link[rel=self] must exist")
 
-    # Link rel=service-desc
-    service_desc = href_for(links, "service-desc")
-    if not service_desc:
+    if not (service_desc := link_by_rel(links, "service-desc")):
         errors.append("/ : Link[rel=service-desc] must exist")
     else:
         r_service_desc = requests.get(service_desc["href"])
@@ -310,9 +280,7 @@ def validate_core(
                 f"advertised '{service_desc_type}', actually '{ct}'"
             )
 
-    # Link rel=service-doc
-    service_doc = href_for(links, "service-doc")
-    if not service_doc:
+    if not (service_doc := link_by_rel(links, "service-doc")):
         warnings.append("/ : Link[rel=service-doc] must exist")
     else:
         if service_doc.get("type") != "text/html":
@@ -357,6 +325,17 @@ def validate_features(
     warnings: List[str],
     errors: List[str],
 ) -> None:
+    if conforms_to and (
+        req_ccs := [
+            x
+            for x in conforms_to
+            if x.startswith("http://www.opengis.net/spec/ogcapi-features-1/1.0/req/")
+        ]
+    ):
+        warnings.append(
+            f"/ : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
+        )
+
     if "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core" not in conforms_to:
         warnings.append(
             "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core'"
@@ -374,7 +353,7 @@ def validate_features(
     #  "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/oas30",
 
     links = root_body.get("links")
-    conformance = href_for(links, "conformance")
+    conformance = link_by_rel(links, "conformance")
     errors += validate(
         "/ Link[rel=conformance] must href /conformance",
         lambda: conformance and conformance["href"].endswith("/conformance"),
@@ -408,14 +387,14 @@ def validate_features(
 
     errors += validate(
         "/: Link[rel=data] must href /collections",
-        lambda: href_for(links, "data") is not None,
+        lambda: link_by_rel(links, "data") is not None,
     )
 
     # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
     # backwards-compat reasons
     warnings += validate(
         "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]",
-        lambda: href_for(links, "collections") is None,
+        lambda: link_by_rel(links, "collections") is None,
     )
 
     # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
@@ -442,14 +421,14 @@ def validate_item_search(
     errors: List[str],
 ) -> None:
     links = root_body.get("links")
-    search = href_for(links, "search")
+    search = link_by_rel(links, "search")
     if not search:
         errors.append("/: Link[rel=search] must exist when Item Search is implemented")
         return
 
     # Collections may not be implemented, so set to None
     # and later get some collection ids another way
-    if links and (collections := href_for(links, "data")):
+    if links and (collections := link_by_rel(links, "data")):
         collections_url = collections.get("href")
     else:
         collections_url = None
@@ -476,13 +455,13 @@ def validate_item_search(
             f"Search ({search_url}): must return JSON, instead got non-JSON text"
         )
 
-    validate_search_limit(search_url, post, errors)
-    validate_search_bbox_xor_intersects(search_url, post, errors)
-    validate_search_bbox(search_url, post, errors)
-    validate_search_datetime(search_url, warnings, errors)
-    validate_search_ids(search_url, post, warnings, errors)
-    validate_search_collections(search_url, collections_url, post, errors)
-    validate_search_intersects(search_url, post, errors)
+    validate_item_searc_limit(search_url, post, errors)
+    validate_item_searc_bbox_xor_intersects(search_url, post, errors)
+    validate_item_searc_bbox(search_url, post, errors)
+    validate_item_searc_datetime(search_url, warnings, errors)
+    validate_item_searc_ids(search_url, post, warnings, errors)
+    validate_item_searc_collections(search_url, collections_url, post, errors)
+    validate_item_searc_intersects(search_url, post, errors)
 
     # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Item Search - Fields extension conformance class found.")
@@ -496,11 +475,28 @@ def validate_item_search(
     # if any(cc_item_search_query_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Item Search - Query extension conformance class found.")
     #
-    # if any(cc_item_search_filter_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Item Search - Filter extension conformance class found.")
+
+    if any(
+        x.endswith("item-search#filter:basic-cql")
+        or x.endswith("item-search#filter:cql-json")
+        or x.endswith("item-search#filter:cql-text")
+        or x.endswith("item-search#filter:filter")
+        for x in conforms_to
+    ):
+        warnings.append(
+            "/: pre-1.0.0-rc.1 Filter Extension conformance classes are advertised."
+        )
+
+    if any(cc_item_search_filter_regex.fullmatch(x) for x in conforms_to):
+        print("STAC API - Item Search - Filter extension conformance class found.")
+        validate_item_search_filter()
 
 
-def validate_search_datetime(
+def validate_item_search_filter() -> None:
+    pass
+
+
+def validate_item_searc_datetime(
     search_url: str, warnings: List[str], errors: List[str]
 ) -> None:
     # find an Item and try to use its datetime value in a query
@@ -544,7 +540,7 @@ def validate_search_datetime(
     # todo: POST
 
 
-def validate_search_bbox_xor_intersects(
+def validate_item_searc_bbox_xor_intersects(
     search_url: str, post: bool, errors: List[str]
 ) -> None:
     r = requests.get(
@@ -566,7 +562,9 @@ def validate_search_bbox_xor_intersects(
             )
 
 
-def validate_search_intersects(search_url: str, post: bool, errors: List[str]) -> None:
+def validate_item_searc_intersects(
+    search_url: str, post: bool, errors: List[str]
+) -> None:
     intersects_params = [
         point,
         linestring,
@@ -608,7 +606,7 @@ def validate_search_intersects(search_url: str, post: bool, errors: List[str]) -
                     )
 
 
-def validate_search_bbox(search_url: str, post: bool, errors: List[str]) -> None:
+def validate_item_searc_bbox(search_url: str, post: bool, errors: List[str]) -> None:
     # Valid GET query
     param = "100.0,0.0,105.0,1.0"
     r = requests.get(search_url, params={"bbox": param})
@@ -720,7 +718,7 @@ def validate_search_bbox(search_url: str, post: bool, errors: List[str]) -> None
                 )
 
 
-def validate_search_limit(search_url: str, post: bool, errors: List[str]) -> None:
+def validate_item_searc_limit(search_url: str, post: bool, errors: List[str]) -> None:
     valid_limits = [1, 2, 10, 1000]
     for limit in valid_limits:
         # Valid GET query
@@ -833,7 +831,7 @@ def _validate_search_ids_with_ids(
         )
 
 
-def validate_search_ids(
+def validate_item_searc_ids(
     search_url: str, post: bool, warnings: List[str], errors: List[str]
 ) -> None:
     r = requests.get(f"{search_url}?limit=2")
@@ -899,7 +897,7 @@ def _validate_search_collections_with_ids(
         )
 
 
-def validate_search_collections(
+def validate_item_searc_collections(
     search_url: str, collections_url: Optional[str], post: bool, errors: List[str]
 ) -> None:
     if collections_url:

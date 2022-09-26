@@ -23,6 +23,8 @@
 
 ## Installation
 
+STAC API Validator requires Python 3.10 and [Poetry 1.2](https://python-poetry.org/docs/).
+
 Install the package with development requirements:
 
 ```console
@@ -75,28 +77,34 @@ The parameters that filter results apply to the Items resource and Item Search e
 
 The current validity status of several popular STAC API implementations can be found [here](../stac-api-validator/COMPLIANCE_REPORT.md).
 
-## Running the validator
+## Command-line Reference
 
-Running this requires Python 3.9.5.
-
-Create new venv with python >= 3.9:
+Usage:
 
 ```
-pyenv local 3.9.5
-python -m venv --prompt stac-api-validator .venv
-source ./.venv/bin/activate
+Usage: stac-api-validator [OPTIONS]
+
+  STAC API Validator.
+
+Options:
+  --version                       Show the version and exit.
+  --log-level TEXT                Logging level, one of DEBUG, INFO, WARN,
+                                  ERROR, CRITICAL
+  --root-url TEXT                 STAC API Root / Landing Page URL  [required]
+  --post / --no-post              Test all validations with POST method for
+                                  requests in addition to GET
+  --conformance [core|browseable|item-search|features|collections|children]
+                                  Conformance class URIs to validate
+                                  [required]
+  --help                          Show this message and exit.
 ```
 
-Install dependencies:
+Example
 
 ```
-pip install -r requirements.txt
-```
-
-Run:
-
-```
-python stac_api_validator/validate.py --root https://cmr.earthdata.nasa.gov/stac/LARC_ASDC
+poetry run stac-api-validator \
+    --root-url https://cmr.earthdata.nasa.gov/stac/LARC_ASDC \
+    --conformance core --conformance item-search --conformance features
 ```
 
 Example output:
@@ -117,20 +125,6 @@ errors:
 
 Additionally, the `--no-post` option can be specified to only test GET requests, instead of the default of using
 both GET and POST.
-
-Usage:
-
-```
-usage: validate.py [-h] [--logging LOGGING] [--root ROOT] [--post | --no-post]
-
-STAC API Validation Suite
-
-optional arguments:
-  -h, --help         show this help message and exit
-  --logging LOGGING  DEBUG, INFO, WARN, ERROR, CRITICAL
-  --root ROOT        STAC API Root / Landing Page URL
-  --post, --no-post  Also use POST method for requests (default: True)
-```
 
 ## Validating OGC API Features - Part 1 compliance
 
