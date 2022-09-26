@@ -21,6 +21,7 @@ click = ">=8.0.1"
 pystac-client = "^0.5.0"
 requests = "^2.28.1"
 pystac = {extras = ["orjson"], version = "^1.6.1"}
+jsonschema = "^4.16.0"
 
 [tool.poetry.dev-dependencies]
 Pygments = ">=2.10.0"

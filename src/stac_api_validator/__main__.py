@@ -27,6 +27,11 @@ from stac_api_validator.validations import validate_api
     help="Test all validations with POST method for requests in addition to GET",
 )
 @click.option(
+    "--collection",
+    required=True,
+    help="The name of the collection to use for some tests.",
+)
+@click.option(
     "--conformance",
     "conformance_classes",
     required=True,
@@ -45,7 +50,11 @@ from stac_api_validator.validations import validate_api
     help="Conformance class URIs to validate",
 )
 def main(
-    log_level: str, root_url: str, post: bool, conformance_classes: List[str]
+    log_level: str,
+    root_url: str,
+    post: bool,
+    conformance_classes: List[str],
+    collection: str,
 ) -> int:
     """STAC API Validator."""
 
@@ -54,7 +63,9 @@ def main(
     print(f"Validating {root_url}", flush=True)
 
     try:
-        (warnings, errors) = validate_api(root_url, post, conformance_classes)
+        (warnings, errors) = validate_api(
+            root_url, post, conformance_classes, collection
+        )
     except Exception as e:
         print(f"Failed.\nError {root_url}: {type(e)} {str(e)}")
         traceback.print_exc()

@@ -126,7 +126,7 @@ invalid_datetimes = [
 
 
 def validate_api(
-    root_url: str, post: bool, conformance_classes: List[str]
+    root_url: str, post: bool, conformance_classes: List[str], collection: str
 ) -> Tuple[List[str], List[str]]:
     warnings: List[str] = []
     errors: List[str] = []
@@ -216,7 +216,7 @@ def validate_api(
 
     if "item-search" in conformance_classes:
         print("Validating STAC API - Item Search conformance class.")
-        validate_item_search(root_body, post, conforms_to, warnings, errors)
+        validate_item_search(root_body, post, collection, conforms_to, warnings, errors)
 
     if not errors:
         try:
@@ -259,46 +259,52 @@ def validate_core(
     if not (service_desc := link_by_rel(links, "service-desc")):
         errors.append("/ : Link[rel=service-desc] must exist")
     else:
-        r_service_desc = requests.get(service_desc["href"])
-
-        errors += validate(
-            "/ : Link[service-desc] must return 200",
-            lambda: r_service_desc.status_code == 200,
-        )
-
-        service_desc_type = service_desc.get("type", "")
-        if (
-            (ct := r_service_desc.headers.get("content-type", "")) == service_desc_type
-        ) or (
-            (";" in ct or ";" in service_desc_type)
-            and (ct.split(";", 1)[0] == service_desc_type.split(";", 1)[0])
-        ):
-            pass
+        if not (service_desc_type := service_desc.get("type")):
+            errors.append("/ : Link[rel=service-desc] must have a type defined")
         else:
-            errors.append(
-                f"service-desc ({service_desc}): link must advertise same type as endpoint content-type header, "
-                f"advertised '{service_desc_type}', actually '{ct}'"
+            r_service_desc = requests.get(
+                service_desc["href"], headers={"Accept": service_desc_type}
             )
 
-    if not (service_doc := link_by_rel(links, "service-doc")):
-        warnings.append("/ : Link[rel=service-doc] must exist")
-    else:
-        if service_doc.get("type") != "text/html":
-            errors.append("service-doc type is not text/html")
-
-        r_service_doc = requests.get(service_doc["href"])
-
-        errors += validate(
-            "/ : Link[service-doc] must return 200",
-            lambda: r_service_doc.status_code == 200,
-        )
-
-        if (ct := r_service_doc.headers.get("content-type")).startswith("text/html"):
-            pass
-        else:
-            errors.append(
-                f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
+            errors += validate(
+                "/ : Link[service-desc] must return 200",
+                lambda: r_service_desc.status_code == 200,
             )
+
+            if (
+                (ct := r_service_desc.headers.get("content-type")) == service_desc_type
+            ) or (
+                (";" in ct or ";" in service_desc_type)
+                and (ct.split(";", 1)[0] == service_desc_type.split(";", 1)[0])
+            ):
+                pass
+            else:
+                errors.append(
+                    f"service-desc ({service_desc}): media type used in Accept header must get response with same "
+                    f"Content-Type header: used '{service_desc_type}', got '{ct}'"
+                )
+
+            if not (service_doc := link_by_rel(links, "service-doc")):
+                warnings.append("/ : Link[rel=service-doc] should exist")
+            else:
+                if service_doc.get("type") != "text/html":
+                    errors.append("service-doc type is not text/html")
+
+            r_service_doc = requests.get(service_doc["href"])
+
+            errors += validate(
+                "/ : Link[service-doc] must return 200",
+                lambda: r_service_doc.status_code == 200,
+            )
+
+            if (ct := r_service_doc.headers.get("content-type")).startswith(
+                "text/html"
+            ):
+                pass
+            else:
+                errors.append(
+                    f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
+                )
 
 
 def validate_browseable(
@@ -416,6 +422,7 @@ def validate_features(
 def validate_item_search(
     root_body: Dict[str, Any],
     post: bool,
+    collection: str,
     conforms_to: List[str],
     warnings: List[str],
     errors: List[str],
@@ -455,13 +462,16 @@ def validate_item_search(
             f"Search ({search_url}): must return JSON, instead got non-JSON text"
         )
 
-    validate_item_searc_limit(search_url, post, errors)
-    validate_item_searc_bbox_xor_intersects(search_url, post, errors)
-    validate_item_searc_bbox(search_url, post, errors)
-    validate_item_searc_datetime(search_url, warnings, errors)
-    validate_item_searc_ids(search_url, post, warnings, errors)
-    validate_item_searc_collections(search_url, collections_url, post, errors)
-    validate_item_searc_intersects(search_url, post, errors)
+    validate_item_search_limit(search_url, post, errors)
+    validate_item_search_bbox_xor_intersects(search_url, post, errors)
+    validate_item_search_bbox(search_url, post, errors)
+    validate_item_search_datetime(search_url, warnings, errors)
+    validate_item_search_ids(search_url, post, warnings, errors)
+    validate_item_search_ids_does_not_override_all_other_params(
+        search_url, post, collection, warnings, errors
+    )
+    validate_item_search_collections(search_url, collections_url, post, errors)
+    validate_item_search_intersects(search_url, post, errors)
 
     # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Item Search - Fields extension conformance class found.")
@@ -496,7 +506,7 @@ def validate_item_search_filter() -> None:
     pass
 
 
-def validate_item_searc_datetime(
+def validate_item_search_datetime(
     search_url: str, warnings: List[str], errors: List[str]
 ) -> None:
     # find an Item and try to use its datetime value in a query
@@ -540,7 +550,7 @@ def validate_item_searc_datetime(
     # todo: POST
 
 
-def validate_item_searc_bbox_xor_intersects(
+def validate_item_search_bbox_xor_intersects(
     search_url: str, post: bool, errors: List[str]
 ) -> None:
     r = requests.get(
@@ -562,7 +572,7 @@ def validate_item_searc_bbox_xor_intersects(
             )
 
 
-def validate_item_searc_intersects(
+def validate_item_search_intersects(
     search_url: str, post: bool, errors: List[str]
 ) -> None:
     intersects_params = [
@@ -606,7 +616,7 @@ def validate_item_searc_intersects(
                     )
 
 
-def validate_item_searc_bbox(search_url: str, post: bool, errors: List[str]) -> None:
+def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) -> None:
     # Valid GET query
     param = "100.0,0.0,105.0,1.0"
     r = requests.get(search_url, params={"bbox": param})
@@ -718,7 +728,7 @@ def validate_item_searc_bbox(search_url: str, post: bool, errors: List[str]) -> 
                 )
 
 
-def validate_item_searc_limit(search_url: str, post: bool, errors: List[str]) -> None:
+def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -> None:
     valid_limits = [1, 2, 10, 1000]
     for limit in valid_limits:
         # Valid GET query
@@ -831,7 +841,52 @@ def _validate_search_ids_with_ids(
         )
 
 
-def validate_item_searc_ids(
+def _validate_search_ids_with_ids_no_override(
+    search_url: str, item: Dict[str, Any], post: bool, errors: List[str]
+) -> None:
+    bbox = item["bbox"]
+    get_params = {
+        "ids": item["id"],
+        "collections": item["collection"],
+        "bbox": f"{bbox[2] + 1},{bbox[3] + 1},{bbox[2] + 2},{bbox[3] + 2}",
+    }
+
+    r = requests.get(search_url, params=get_params)
+    try:
+        if len(r.json().get("features")) > 0:
+            errors.append(
+                "GET Search with ids and non-intersecting bbox returned results, indicating "
+                "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
+                "STAC API 1.0.0-beta.1"
+            )
+    except json.decoder.JSONDecodeError:
+        errors.append(
+            f"GET Search with {get_params} returned non-json response: {r.text}"
+        )
+
+    if post:
+        post_params = {
+            "ids": [item["id"]],
+            "collections": [item["collection"]],
+            "bbox": [bbox[2] + 1, bbox[3] + 1, bbox[2] + 2, bbox[3] + 2],
+        }
+
+        r = requests.post(search_url, json=post_params)
+
+        try:
+            if len(r.json().get("features")) > 0:
+                errors.append(
+                    "POST Search with ids and non-intersecting bbox returned results, indicating "
+                    "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
+                    "STAC API 1.0.0-beta.1"
+                )
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"POST Search with {get_params} returned non-json response: {r.text}"
+            )
+
+
+def validate_item_search_ids(
     search_url: str, post: bool, warnings: List[str], errors: List[str]
 ) -> None:
     r = requests.get(f"{search_url}?limit=2")
@@ -846,6 +901,23 @@ def validate_item_searc_ids(
         )
     else:
         warnings.append("Get Search with no parameters returned < 2 results")
+
+
+def validate_item_search_ids_does_not_override_all_other_params(
+    search_url: str, post: bool, collection: str, warnings: List[str], errors: List[str]
+) -> None:
+    # find one item that we can then query by id and a non-intersecting bbox to see if
+    # we still get the item as a result
+    if (
+        items := requests.get(
+            f"{search_url}?limit=1&bbox=20,20,21,21&collections={collection}"
+        )
+        .json()
+        .get("features")
+    ):
+        _validate_search_ids_with_ids_no_override(search_url, items[0], post, errors)
+    else:
+        warnings.append("Get Search with no parameters returned 0 results")
 
 
 def _validate_search_collections_request(
@@ -897,7 +969,7 @@ def _validate_search_collections_with_ids(
         )
 
 
-def validate_item_searc_collections(
+def validate_item_search_collections(
     search_url: str, collections_url: Optional[str], post: bool, errors: List[str]
 ) -> None:
     if collections_url:
