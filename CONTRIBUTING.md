@@ -57,6 +57,8 @@ $ poetry run python
 $ poetry run stac-api-validator
 ```
 
+Note: if `poetry update` or `poetry install` hang, try running `poetry cache clear --all pypi` to fix the issue.
+
 [poetry]: https://python-poetry.org/
 [nox]: https://nox.thea.codes/
 [nox-poetry]: https://nox-poetry.readthedocs.io/

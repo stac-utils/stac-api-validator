@@ -21,6 +21,11 @@
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [black]: https://github.com/psf/black
 
+## Introduction
+
+The STAC API Validator is the official validation suite for the
+[STAC API](https://github.com/radiantearth/stac-api-spec/) family of specifications.
+
 ## Installation
 
 STAC API Validator requires Python 3.10.
@@ -39,29 +44,14 @@ $ stac-api-validator \
     --conformance core --conformance item-search
 ```
 
-To install from a clone of this repository for development, install [Poetry 1.2](https://python-poetry.org/docs/),
-and then install the package with development requirements:
-
-```console
-$ poetry install
-```
-
-Note: if `poetry update` or `poetry install` hang, try running `poetry cache clear --all pypi` to fix the issue.
-
-You can now run the command-line interface:
-
-```console
-$ poetry run stac-api-validator
-```
-
-## Usage
-
-Please see the [Command-line Reference] for details.
-
 ## Contributing
 
 Contributions are very welcome.
 To learn more, see the [Contributor Guide].
+
+## Usage
+
+Please see the [Command-line Reference] for details.
 
 ## Features
 
