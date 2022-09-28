@@ -208,10 +208,11 @@ def validate_api(
 
     if "collections" in conformance_classes:
         print("Validating STAC API - Collections conformance class.")
-        validate_collections(root_body, warnings, errors)
+        validate_collections(root_body, collection, warnings, errors)
 
     if "features" in conformance_classes:
         print("Validating STAC API - Features conformance class.")
+        validate_collections(root_body, warnings, errors)
         validate_features(root_body, conforms_to, warnings, errors)
 
     if "item-search" in conformance_classes:
@@ -320,9 +321,31 @@ def validate_children(
 
 
 def validate_collections(
-    root_body: Dict[str, Any], warnings: List[str], errors: List[str]
+    root_body: Dict[str, Any], collection: str, warnings: List[str], errors: List[str]
 ) -> None:
-    print("Collections validation is not yet implemented.")
+    print("WARNING: Collections validation is not yet fully implemented.")
+
+    if not (data_link := link_by_rel(root_body["links"], "data")):
+        errors.append("[Collections] /: Link[rel=data] must href /collections")
+    else:
+        r = requests.get(f"{data_link['href']}/{collection}")
+        if not (items_link := link_by_rel(r.json()["links"], "items")):
+            errors.append(
+                f"[Collections] /collections/{collection} is missing link with rel='items'"
+            )
+        else:
+            collection_url = items_link["href"]
+            r = requests.get(collection_url)
+            if r.status_code != 200:
+                errors.append(
+                    f"[Collections] link rel='items' returned status code {r.status_code}"
+                )
+            try:
+                r.json()
+            except json.decoder.JSONDecodeError:
+                errors.append(
+                    f"[Collections] link rel='items' ({collection_url}) had json problem"
+                )
 
 
 def validate_features(
