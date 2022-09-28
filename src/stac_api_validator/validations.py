@@ -212,7 +212,7 @@ def validate_api(
 
     if "features" in conformance_classes:
         print("Validating STAC API - Features conformance class.")
-        validate_collections(root_body, warnings, errors)
+        validate_collections(root_body, collection, warnings, errors)
         validate_features(root_body, conforms_to, warnings, errors)
 
     if "item-search" in conformance_classes:
@@ -223,8 +223,8 @@ def validate_api(
         try:
             catalog = Client.open(root_url)
             catalog.validate()
-            for collection in catalog.get_children():
-                collection.validate()
+            for child in catalog.get_children():
+                child.validate()
         except STACValidationError as e:
             errors.append(f"pystac error: {str(e)}")
 
@@ -273,7 +273,8 @@ def validate_core(
             )
 
             if (
-                (ct := r_service_desc.headers.get("content-type")) == service_desc_type
+                (ct := r_service_desc.headers.get("content-type", ""))
+                == service_desc_type
             ) or (
                 (";" in ct or ";" in service_desc_type)
                 and (ct.split(";", 1)[0] == service_desc_type.split(";", 1)[0])
@@ -291,21 +292,21 @@ def validate_core(
                 if service_doc.get("type") != "text/html":
                     errors.append("service-doc type is not text/html")
 
-            r_service_doc = requests.get(service_doc["href"])
+                r_service_doc = requests.get(service_doc["href"])
 
-            errors += validate(
-                "/ : Link[service-doc] must return 200",
-                lambda: r_service_doc.status_code == 200,
-            )
-
-            if (ct := r_service_doc.headers.get("content-type")).startswith(
-                "text/html"
-            ):
-                pass
-            else:
-                errors.append(
-                    f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
+                errors += validate(
+                    "/ : Link[service-doc] must return 200",
+                    lambda: r_service_doc.status_code == 200,
                 )
+
+                if (ct := r_service_doc.headers.get("content-type", "")).startswith(
+                    "text/html"
+                ):
+                    pass
+                else:
+                    errors.append(
+                        f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
+                    )
 
 
 def validate_browseable(
@@ -381,50 +382,52 @@ def validate_features(
     # todo: add this one somewhere
     #  "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/oas30",
 
-    links = root_body.get("links")
-    conformance = link_by_rel(links, "conformance")
+    root_links = root_body.get("links")
+    conformance = link_by_rel(root_links, "conformance")
     errors += validate(
         "/ Link[rel=conformance] must href /conformance",
-        lambda: conformance and conformance["href"].endswith("/conformance"),
+        lambda: conformance is not None
+        and conformance.get("href", "").endswith("/conformance"),
     )
 
-    r_conformance = requests.get(conformance["href"])
-    errors += validate(
-        "conformance must return 200", lambda: r_conformance.status_code == 200
-    )
-
-    if (ct := r_conformance.headers.get("content-type"), "").split(";")[
-        0
-    ] == "application/json":
-        pass
-    else:
-        errors.append(
-            f"conformance ({conformance}): must have content-type header 'application/json', actually '{ct}'"
+    if conformance:
+        r_conformance = requests.get(conformance["href"])
+        errors += validate(
+            "conformance must return 200", lambda: r_conformance.status_code == 200
         )
 
-    try:
-        conformance_json = r_conformance.json()
+        if (ct := r_conformance.headers.get("content-type", "")).split(";")[
+            0
+        ] == "application/json":
+            pass
+        else:
+            errors.append(
+                f"conformance ({conformance}): must have content-type header 'application/json', actually '{ct}'"
+            )
+
+        try:
+            conformance_json = r_conformance.json()
+            warnings += validate(
+                "Landing Page conforms to and conformance conformsTo must be the same",
+                lambda: set(root_body.get("conformsTo", []))
+                == set(conformance_json["conformsTo"]),
+            )
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"service-desc ({conformance}): must return JSON, instead got non-JSON text"
+            )
+
+        errors += validate(
+            "/: Link[rel=data] must href /collections",
+            lambda: link_by_rel(root_links, "data") is not None,
+        )
+
+        # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
+        # backwards-compat reasons
         warnings += validate(
-            "Landing Page conforms to and conformance conformsTo must be the same",
-            lambda: set(root_body.get("conformsTo"), [])
-            == set(conformance_json["conformsTo"]),
+            "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]",
+            lambda: link_by_rel(root_links, "collections") is None,
         )
-    except json.decoder.JSONDecodeError:
-        errors.append(
-            f"service-desc ({conformance}): must return JSON, instead got non-JSON text"
-        )
-
-    errors += validate(
-        "/: Link[rel=data] must href /collections",
-        lambda: link_by_rel(links, "data") is not None,
-    )
-
-    # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
-    # backwards-compat reasons
-    warnings += validate(
-        "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]",
-        lambda: link_by_rel(links, "collections") is None,
-    )
 
     # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Features - Fields extension conformance class found.")
