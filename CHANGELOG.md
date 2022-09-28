@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed validation of `service-desc` link rel type and use in Accept and Content-Type header.
+
 ## [0.0.2] - 2022-09-26
 
 ### Added
