@@ -37,7 +37,7 @@ Request features on the [Issue Tracker].
 
 ## How to set up your development environment
 
-You need Python 3.7+ and the following tools:
+You need Python 3.10 and the following tools:
 
 - [Poetry]
 - [Nox]
@@ -56,6 +56,8 @@ or the command-line interface:
 $ poetry run python
 $ poetry run stac-api-validator
 ```
+
+Note: if `poetry update` or `poetry install` hang, try running `poetry cache clear --all pypi` to fix the issue.
 
 [poetry]: https://python-poetry.org/
 [nox]: https://nox.thea.codes/
