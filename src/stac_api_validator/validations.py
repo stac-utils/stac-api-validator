@@ -7,6 +7,7 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Pattern
 from typing import Tuple
 
 import requests
@@ -21,6 +22,8 @@ from stac_api_validator.geometries import multipolygon
 from stac_api_validator.geometries import point
 from stac_api_validator.geometries import polygon
 from stac_api_validator.geometries import polygon_with_hole
+
+from . import filters
 
 
 # https://github.com/stac-utils/pystac/blob/4c7c775a6d0ca49d83dbec714855a189be759c8a/docs/concepts.rst#using-your-own-validator
@@ -37,13 +40,21 @@ cc_features_regex = re.compile(r"https://api\.stacspec\.org/.+/ogcapi-features")
 cc_features_transaction_regex = re.compile(
     r"https://api\.stacspec\.org/.+/ogcapi-features/extensions/transaction"
 )
-cc_features_fields_regex = re.compile(r"https://api\.stacspec\.org/.+/features#fields")
-cc_features_context_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/features#context"
+cc_features_fields_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/ogcapi-features#fields"
 )
-cc_features_sort_regex = re.compile(r"https://api\.stacspec\.org/.+/features#sort")
-cc_features_query_regex = re.compile(r"https://api\.stacspec\.org/.+/features#query")
-cc_features_filter_regex = re.compile(r"https://api\.stacspec\.org/.+/features#filter")
+cc_features_context_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/ogcapi-features#context"
+)
+cc_features_sort_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/ogcapi-features#sort"
+)
+cc_features_query_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/ogcapi-features#query"
+)
+cc_features_filter_regex = re.compile(
+    r"https://api\.stacspec\.org/.+/ogcapi-features#filter"
+)
 
 cc_item_search_regex = re.compile(r"https://api\.stacspec\.org/.+/item-search")
 
@@ -125,6 +136,18 @@ invalid_datetimes = [
 ]
 
 
+def supports_collections(conforms_to: List[str]) -> bool:
+    return supports(conforms_to, cc_collections_regex)
+
+
+def supports_features(conforms_to: List[str]) -> bool:
+    return supports(conforms_to, cc_features_regex)
+
+
+def supports(conforms_to: List[str], pattern: Pattern[str]) -> bool:
+    return any(pattern.fullmatch(x) for x in conforms_to)
+
+
 def validate_api(
     root_url: str, post: bool, conformance_classes: List[str], collection: str
 ) -> Tuple[List[str], List[str]]:
@@ -170,16 +193,12 @@ def validate_api(
             "/: Children configured for validation, but not contained in 'conformsTo'"
         )
 
-    if "collections" in conformance_classes and not any(
-        cc_collections_regex.fullmatch(x) for x in conforms_to
-    ):
+    if "collections" in conformance_classes and not supports_collections(conforms_to):
         errors.append(
             "/: Collections configured for validation, but not contained in 'conformsTo'"
         )
 
-    if "features" in conformance_classes and not any(
-        cc_features_regex.fullmatch(x) for x in conforms_to
-    ):
+    if "features" in conformance_classes and not supports_features(conforms_to):
         errors.append(
             "/: Features configured for validation, but not contained in 'conformsTo'"
         )
@@ -195,29 +214,31 @@ def validate_api(
     if errors:
         return warnings, errors
 
-    print("Validating STAC API - Core conformance class.")
+    print("STAC API - Core conformance class found.")
     validate_core(root_body, warnings, errors)
 
     if "browseable" in conformance_classes:
-        print("Validating STAC API - Browseable conformance class.")
+        print("STAC API - Browseable conformance class found.")
         validate_browseable(root_body, warnings, errors)
 
     if "children" in conformance_classes:
-        print("Validating STAC API - Children conformance class.")
+        print("STAC API - Children conformance class found.")
         validate_children(root_body, warnings, errors)
 
     if "collections" in conformance_classes:
-        print("Validating STAC API - Collections conformance class.")
+        print("STAC API - Collections conformance class found.")
         validate_collections(root_body, collection, warnings, errors)
 
     if "features" in conformance_classes:
-        print("Validating STAC API - Features conformance class.")
+        print("STAC API - Features conformance class found.")
         validate_collections(root_body, collection, warnings, errors)
-        validate_features(root_body, conforms_to, warnings, errors)
+        validate_features(root_body, conforms_to, collection, warnings, errors)
 
     if "item-search" in conformance_classes:
-        print("Validating STAC API - Item Search conformance class.")
-        validate_item_search(root_body, post, collection, conforms_to, warnings, errors)
+        print("STAC API - Item Search conformance class found.")
+        validate_item_search(
+            root_url, root_body, post, collection, conforms_to, warnings, errors
+        )
 
     if not errors:
         try:
@@ -352,9 +373,12 @@ def validate_collections(
 def validate_features(
     root_body: Dict[str, Any],
     conforms_to: List[str],
+    collection: str,
     warnings: List[str],
     errors: List[str],
 ) -> None:
+    print("WARNING: Features validation is not yet fully implemented.")
+
     if conforms_to and (
         req_ccs := [
             x
@@ -444,8 +468,17 @@ def validate_features(
     # if any(cc_features_filter_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Features - Filter extension conformance class found.")
 
+    if any(cc_features_filter_regex.fullmatch(x) for x in conforms_to):
+        print("STAC API - Features - Filter extension conformance class found.")
+        validate_features_filter(
+            root_body=root_body,
+            collection=collection,
+            errors=errors,
+        )
+
 
 def validate_item_search(
+    root_url: str,
     root_body: Dict[str, Any],
     post: bool,
     collection: str,
@@ -461,10 +494,10 @@ def validate_item_search(
 
     # Collections may not be implemented, so set to None
     # and later get some collection ids another way
-    if links and (collections := link_by_rel(links, "data")):
-        collections_url = collections.get("href")
-    else:
-        collections_url = None
+    # if links and (collections := link_by_rel(links, "data")):
+    #     collections_url = collections.get("href")
+    # else:
+    #     collections_url = None
 
     search_url = search["href"]
     r = requests.get(search_url)
@@ -488,16 +521,16 @@ def validate_item_search(
             f"Search ({search_url}): must return JSON, instead got non-JSON text"
         )
 
-    validate_item_search_limit(search_url, post, errors)
-    validate_item_search_bbox_xor_intersects(search_url, post, errors)
-    validate_item_search_bbox(search_url, post, errors)
-    validate_item_search_datetime(search_url, warnings, errors)
-    validate_item_search_ids(search_url, post, warnings, errors)
-    validate_item_search_ids_does_not_override_all_other_params(
-        search_url, post, collection, warnings, errors
-    )
-    validate_item_search_collections(search_url, collections_url, post, errors)
-    validate_item_search_intersects(search_url, post, errors)
+    # validate_item_search_limit(search_url, post, errors)
+    # validate_item_search_bbox_xor_intersects(search_url, post, errors)
+    # validate_item_search_bbox(search_url, post, errors)
+    # validate_item_search_datetime(search_url, warnings, errors)
+    # validate_item_search_ids(search_url, post, warnings, errors)
+    # validate_item_search_ids_does_not_override_all_other_params(
+    #     search_url, post, collection, warnings, errors
+    # )
+    # validate_item_search_collections(search_url, collections_url, post, errors)
+    # validate_item_search_intersects(search_url, post, errors)
 
     # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Item Search - Fields extension conformance class found.")
@@ -520,16 +553,183 @@ def validate_item_search(
         for x in conforms_to
     ):
         warnings.append(
-            "/: pre-1.0.0-rc.1 Filter Extension conformance classes are advertised."
+            "[Filter Ext] /: pre-1.0.0-rc.1 Filter Extension conformance classes are advertised."
         )
 
-    if any(cc_item_search_filter_regex.fullmatch(x) for x in conforms_to):
+    if any(
+        cc_item_search_filter_regex.fullmatch(x)
+        or x.endswith("item-search#filter:filter")
+        for x in conforms_to
+    ):
         print("STAC API - Item Search - Filter extension conformance class found.")
-        validate_item_search_filter()
+
+        cql2_text_supported = (
+            "http://www.opengis.net/spec/cql2/1.0/conf/cql2-text" in conforms_to
+        ) or (
+            "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-text"
+            in conforms_to
+        )
+
+        cql2_json_supported = (
+            "http://www.opengis.net/spec/cql2/1.0/conf/cql2-json" in conforms_to
+        ) or (
+            "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-json"
+            in conforms_to
+        )
+
+        basic_cql2_supported = (
+            "http://www.opengis.net/spec/cql2/1.0/conf/basic-cql2" in conforms_to
+        ) or (
+            "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:basic-cql"
+            in conforms_to
+        )
+
+        validate_item_search_filter(
+            root_url=root_url,
+            root_body=root_body,
+            search_url=search_url,
+            collection=collection,
+            cql2_text_supported=cql2_text_supported,
+            cql2_json_supported=cql2_json_supported,
+            basic_cql2_supported=basic_cql2_supported,
+            warnings=warnings,
+            errors=errors,
+        )
 
 
-def validate_item_search_filter() -> None:
-    pass
+def validate_filter_queryables(
+    queryables_url: str,
+    conformance_class: str,
+    errors: List[str],
+) -> None:
+    r = requests.get(queryables_url, headers={"Accept": "application/schema+json"})
+
+    if r.status_code != 200:
+        errors.append(
+            f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' returned status code {r.status_code}"
+        )
+    else:
+        if (ct := r.headers.get("Content-Type")) != "application/schema+json":
+            errors.append(
+                f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' returned Content-Type header '{ct}', must return 'application/schema+json'"
+            )
+        try:
+            json_schemas = [
+                "https://json-schema.org/draft/2019-09/schema",
+                "http://json-schema.org/draft-07/schema#",
+            ]
+            queryables_schema = r.json()
+            if queryables_schema.get("$schema") not in json_schemas:
+                errors.append(
+                    f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$schema' value invalid, must be one of: '{','.join(json_schemas)}'"
+                )
+
+            if queryables_schema.get("$id") != queryables_url:
+                errors.append(
+                    f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$id' value invalid, must be same as queryables url"
+                )
+
+            if queryables_schema.get("type") != "object":
+                errors.append(
+                    f"[{conformance_class} Filter Ext] Queryables '{queryables_url}' 'type' value invalid, must be 'object'"
+                )
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"[{conformance_class} Filter Ext] Queryables '{queryables_url}' returned non-JSON response"
+            )
+
+
+def validate_features_filter(
+    root_body: Dict[str, Any],
+    collection: str,
+    errors: List[str],
+) -> None:
+    print("WARNING: Features - Filter Ext validation is not yet fully implemented.")
+
+    if not (collections_link := link_by_rel(root_body["links"], "data")):
+        errors.append("[Features] / : 'data' link relation missing")
+    else:
+        collection_url = f"{collections_link['href']}/{collection}"
+
+        r = requests.get(collection_url)
+        if r.status_code != 200:
+            errors.append(
+                f"[Featues - Filter Ext] GET {collection_url} returned status code {r.status_code}"
+            )
+
+        if not (
+            queryables_link := link_by_rel(
+                r.json()["links"], "http://www.opengis.net/def/rel/ogc/1.0/queryables"
+            )
+        ):
+            errors.append(
+                f"[Features - Filter Ext] {collection_url} : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
+            )
+
+        validate_filter_queryables(
+            queryables_url=(queryables_link and queryables_link["href"])
+            or f"{collection_url}/queryables",
+            conformance_class="Features",
+            errors=errors,
+        )
+
+
+# Assumes id, collection, geometry, and datetime are available
+def validate_item_search_filter(
+    root_url: str,
+    root_body: Dict[str, Any],
+    search_url: str,
+    collection: str,
+    cql2_text_supported: bool,
+    cql2_json_supported: bool,
+    basic_cql2_supported: bool,
+    warnings: List[str],
+    errors: List[str],
+) -> None:
+    if not (
+        queryables_link := link_by_rel(
+            root_body["links"], "http://www.opengis.net/def/rel/ogc/1.0/queryables"
+        )
+    ):
+        errors.append(
+            "[Item Search Filter Ext] / : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
+        )
+
+    validate_filter_queryables(
+        queryables_url=(queryables_link and queryables_link["href"])
+        or f"{root_url}/queryables",
+        conformance_class="Item Search",
+        errors=errors,
+    )
+
+    if basic_cql2_supported:
+        item = requests.get(f"{search_url}?collections={collection}").json()[
+            "features"
+        ][0]
+
+        if cql2_text_supported:
+            for f_name in ["cql2_text_ex_1", "cql2_text_ex_2"]:
+                f_text = getattr(filters, f_name)(item["id"], collection)
+
+                r = requests.get(
+                    search_url, params={"filter-lang": "cql2-text", "filter": f_text}
+                )
+                if r.status_code != 200:
+                    errors.append(
+                        f"[Item Search Filter Ext] GET {f_text} returned status code {r.status_code}"
+                    )
+
+        if cql2_json_supported:
+            for f_name in ["cql2_json_ex_1", "cql2_json_ex_2"]:
+                f_json = getattr(filters, f_name)(item["id"], collection)
+
+                r = requests.post(
+                    search_url, json={"filter-lang": "cql2-json", "filter": f_json}
+                )
+                if r.status_code != 200:
+                    errors.append(
+                        f"[Item Search Filter Ext] POST {f_json} returned status code {r.status_code}"
+                    )
 
 
 def validate_item_search_datetime(
