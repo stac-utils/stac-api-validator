@@ -94,18 +94,31 @@ Options:
   --root-url TEXT                 STAC API Root / Landing Page URL  [required]
   --post / --no-post              Test all validations with POST method for
                                   requests in addition to GET
+  --collection TEXT               The name of the collection to use for some
+                                  tests.
+  --geometry TEXT                 The geometry to use for intersection tests.
   --conformance [core|browseable|item-search|features|collections|children]
                                   Conformance class URIs to validate
                                   [required]
   --help                          Show this message and exit.
 ```
 
+Conformance classes item-search, features, and collections require the `--collection` parameter with the id of a
+collection to run some tests on.
+
+Conformance class `item-search` requires `--geometry` with a GeoJSON geometry that returns some items for
+the specified collection.
+
 Example:
 
 ```
 stac-api-validator \
-    --root-url https://cmr.earthdata.nasa.gov/stac/LARC_ASDC \
-    --conformance core --conformance item-search --conformance features
+    --root-url https://planetarycomputer.microsoft.com/api/stac/v1/ \
+    --conformance core \
+    --conformance item-search \
+    --conformance features \
+    --collection sentinel-2-l2a \
+    --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
 ```
 
 Example output:

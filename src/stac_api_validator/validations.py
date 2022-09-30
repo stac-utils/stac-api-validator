@@ -13,6 +13,7 @@ import requests
 import yaml
 from pystac import STACValidationError
 from pystac_client import Client
+from shapely.geometry import shape
 
 from stac_api_validator.geometries import geometry_collection
 from stac_api_validator.geometries import linestring
@@ -127,7 +128,11 @@ invalid_datetimes = [
 
 
 def validate_api(
-    root_url: str, post: bool, conformance_classes: List[str], collection: str
+    root_url: str,
+    post: bool,
+    conformance_classes: List[str],
+    collection: Optional[str],
+    geometry: Optional[str],
 ) -> Tuple[List[str], List[str]]:
     warnings: List[str] = []
     errors: List[str] = []
@@ -171,26 +176,43 @@ def validate_api(
             "/: Children configured for validation, but not contained in 'conformsTo'"
         )
 
-    if "collections" in conformance_classes and not any(
-        cc_collections_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Collections configured for validation, but not contained in 'conformsTo'"
-        )
+    if "collections" in conformance_classes:
+        if not any(cc_collections_regex.fullmatch(x) for x in conforms_to):
+            errors.append(
+                "/: Collections configured for validation, but not contained in 'conformsTo'"
+            )
+        if collection is None:
+            errors.append(
+                "/: Collections configured for validation, but `--collection` parameter not specified"
+            )
 
-    if "features" in conformance_classes and not any(
-        cc_features_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Features configured for validation, but not contained in 'conformsTo'"
-        )
+    if "features" in conformance_classes:
+        if not any(cc_features_regex.fullmatch(x) for x in conforms_to):
+            errors.append(
+                "/: Features configured for validation, but not contained in 'conformsTo'"
+            )
+        if collection is None:
+            errors.append(
+                "/: Features configured for validation, but `--collection` parameter not specified"
+            )
+        if geometry is None:
+            errors.append(
+                "/: Features configured for validation, but `--geometry` parameter not specified"
+            )
 
-    if "item-search" in conformance_classes and not any(
-        cc_item_search_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Item Search configured for validation, but not contained in 'conformsTo'"
-        )
+    if "item-search" in conformance_classes:
+        if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
+            errors.append(
+                "/: Item Search configured for validation, but not contained in 'conformsTo'"
+            )
+        if collection is None:
+            errors.append(
+                "/: Item Search configured for validation, but `--collection` parameter not specified"
+            )
+        if geometry is None:
+            errors.append(
+                "/: Item Search configured for validation, but `--geometry` parameter not specified"
+            )
 
     # fail fast if there are errors with conformance or links so far
     if errors:
@@ -209,16 +231,24 @@ def validate_api(
 
     if "collections" in conformance_classes:
         print("Validating STAC API - Collections conformance class.")
-        validate_collections(root_body, collection, warnings, errors)
+        validate_collections(root_body, collection, warnings, errors)  # type:ignore
 
     if "features" in conformance_classes:
         print("Validating STAC API - Features conformance class.")
-        validate_collections(root_body, collection, warnings, errors)
+        validate_collections(root_body, collection, warnings, errors)  # type:ignore
         validate_features(root_body, conforms_to, warnings, errors)
 
     if "item-search" in conformance_classes:
         print("Validating STAC API - Item Search conformance class.")
-        validate_item_search(root_body, post, collection, conforms_to, warnings, errors)
+        validate_item_search(
+            root_body=root_body,
+            post=post,
+            collection=collection,  # type:ignore
+            conforms_to=conforms_to,
+            warnings=warnings,
+            errors=errors,
+            geometry=geometry,  # type:ignore
+        )
 
     if not errors:
         try:
@@ -464,6 +494,7 @@ def validate_item_search(
     conforms_to: List[str],
     warnings: List[str],
     errors: List[str],
+    geometry: str,
 ) -> None:
     links = root_body.get("links")
     search = link_by_rel(links, "search")
@@ -473,10 +504,11 @@ def validate_item_search(
 
     # Collections may not be implemented, so set to None
     # and later get some collection ids another way
-    if links and (collections := link_by_rel(links, "data")):
-        collections_url = collections.get("href")
-    else:
-        collections_url = None
+    # todo: what is this for?
+    # if links and (collections := link_by_rel(links, "data")):
+    #     collections_url = collections.get("href")
+    # else:
+    #     collections_url = None
 
     search_url = search["href"]
     r = requests.get(search_url)
@@ -500,16 +532,22 @@ def validate_item_search(
             f"Search ({search_url}): must return JSON, instead got non-JSON text"
         )
 
-    validate_item_search_limit(search_url, post, errors)
-    validate_item_search_bbox_xor_intersects(search_url, post, errors)
-    validate_item_search_bbox(search_url, post, errors)
-    validate_item_search_datetime(search_url, warnings, errors)
-    validate_item_search_ids(search_url, post, warnings, errors)
-    validate_item_search_ids_does_not_override_all_other_params(
-        search_url, post, collection, warnings, errors
+    # validate_item_search_limit(search_url, post, errors)
+    # validate_item_search_bbox_xor_intersects(search_url, post, errors)
+    # validate_item_search_bbox(search_url, post, errors)
+    # validate_item_search_datetime(search_url, warnings, errors)
+    # validate_item_search_ids(search_url, post, warnings, errors)
+    # validate_item_search_ids_does_not_override_all_other_params(
+    #     search_url, post, collection, warnings, errors
+    # )
+    # validate_item_search_collections(search_url, collections_url, post, errors)
+    validate_item_search_intersects(
+        search_url=search_url,
+        collection=collection,
+        post=post,
+        errors=errors,
+        geometry=geometry,
     )
-    validate_item_search_collections(search_url, collections_url, post, errors)
-    validate_item_search_intersects(search_url, post, errors)
 
     # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Item Search - Fields extension conformance class found.")
@@ -611,8 +649,9 @@ def validate_item_search_bbox_xor_intersects(
 
 
 def validate_item_search_intersects(
-    search_url: str, post: bool, errors: List[str]
+    search_url: str, collection: str, post: bool, errors: List[str], geometry: str
 ) -> None:
+    # Validate that these GeoJSON Geometry types are accepted
     intersects_params = [
         point,
         linestring,
@@ -652,6 +691,60 @@ def validate_item_search_intersects(
                     errors.append(
                         f"POST Search with intersects:{param} returned non-json response: {r.text}"
                     )
+
+    intersects_shape = shape(json.loads(geometry))
+
+    # Validate GET query
+    r = requests.get(
+        search_url,
+        params={"collections": collection, "intersects": geometry},
+    )
+    if r.status_code != 200:
+        errors.append(
+            f"[Item Search] GET Search with collections={collection}&intersects={geometry} returned status code {r.status_code}"
+        )
+    else:
+        try:
+            item_collection = r.json()
+            if not len(item_collection["features"]):
+                errors.append(
+                    f"[Item Search] GET Search result for intersects={geometry} returned no results"
+                )
+            for item in item_collection["features"]:
+                if not intersects_shape.intersects(shape(item["geometry"])):
+                    errors.append(
+                        f"[Item Search] GET Search result for intersects={geometry}, does not intersect {item['geometry']}"
+                    )
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"[Item Search] GET Search with intersects={geometry} returned non-json response: {r.text}"
+            )
+
+    if post:
+        # Validate POST query
+        r = requests.post(
+            search_url, json={"collections": [collection], "intersects": geometry}
+        )
+        if r.status_code != 200:
+            errors.append(
+                f"[Item Search] POST Search with intersects={geometry} returned status code {r.status_code}"
+            )
+        else:
+            try:
+                item_collection = r.json()
+                if not len(item_collection["features"]):
+                    errors.append(
+                        f"[Item Search] POST Search result for intersects={geometry} returned no results"
+                    )
+                for item in item_collection["features"]:
+                    if not intersects_shape.intersects(shape(item["geometry"])):
+                        errors.append(
+                            f"[Item Search] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
+                        )
+            except json.decoder.JSONDecodeError:
+                errors.append(
+                    f"[Item Search] POST Search with intersects={geometry} returned non-json response: {r.text}"
+                )
 
 
 def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) -> None:
