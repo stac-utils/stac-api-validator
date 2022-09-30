@@ -10,6 +10,7 @@ from typing import Optional
 from typing import Tuple
 
 import requests
+import yaml
 from pystac import STACValidationError
 from pystac_client import Client
 
@@ -267,10 +268,21 @@ def validate_core(
                 service_desc["href"], headers={"Accept": service_desc_type}
             )
 
-            errors += validate(
-                "/ : Link[service-desc] must return 200",
-                lambda: r_service_desc.status_code == 200,
-            )
+            if not r_service_desc.status_code == 200:
+                errors.append("/ : Link[service-desc] must return 200")
+            else:
+                content_type = r_service_desc.headers.get("content-type", "")
+                if content_type in ["application/yaml", "application/vnd.oai.openapi"]:
+                    pass
+                    # openapi_spec = r_service_desc.json()
+                    # todo: verify limits exist and test them
+                elif content_type in [
+                    "application/json",
+                    "application/vnd.oai.openapi+json",
+                    "application/vnd.oai.openapi+json;version=3.0",
+                    "application/vnd.oai.openapi+json;version=3.1",
+                ]:
+                    yaml.safe_load(r_service_desc.text)
 
             if (
                 (ct := r_service_desc.headers.get("content-type", ""))
@@ -286,27 +298,27 @@ def validate_core(
                     f"Content-Type header: used '{service_desc_type}', got '{ct}'"
                 )
 
-            if not (service_doc := link_by_rel(links, "service-doc")):
-                warnings.append("/ : Link[rel=service-doc] should exist")
-            else:
-                if service_doc.get("type") != "text/html":
-                    errors.append("service-doc type is not text/html")
+    if not (service_doc := link_by_rel(links, "service-doc")):
+        warnings.append("/ : Link[rel=service-doc] should exist")
+    else:
+        if service_doc.get("type") != "text/html":
+            errors.append("service-doc type is not text/html")
 
-                r_service_doc = requests.get(service_doc["href"])
+        r_service_doc = requests.get(service_doc["href"])
 
-                errors += validate(
-                    "/ : Link[service-doc] must return 200",
-                    lambda: r_service_doc.status_code == 200,
-                )
+        errors += validate(
+            "/ : Link[service-doc] must return 200",
+            lambda: r_service_doc.status_code == 200,
+        )
 
-                if (ct := r_service_doc.headers.get("content-type", "")).startswith(
-                    "text/html"
-                ):
-                    pass
-                else:
-                    errors.append(
-                        f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
-                    )
+        if (ct := r_service_doc.headers.get("content-type", "")).startswith(
+            "text/html"
+        ):
+            pass
+        else:
+            errors.append(
+                f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
+            )
 
 
 def validate_browseable(
@@ -755,7 +767,7 @@ def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) ->
 
 
 def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -> None:
-    valid_limits = [1, 2, 10, 1000]
+    valid_limits = [1, 2, 10]  # todo: pull actual limits from service description
     for limit in valid_limits:
         # Valid GET query
         params = {"limit": limit}
@@ -798,7 +810,7 @@ def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -
                         f"POST Search with {params} returned non-json response: {r.text}"
                     )
 
-    invalid_limits = [-1, 0, 10001]
+    invalid_limits = [-1]  # todo: pull actual limits from service desc and test them
     for limit in invalid_limits:
         # Valid GET query
         params = {"limit": limit}
