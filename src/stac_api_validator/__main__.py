@@ -3,6 +3,7 @@ import logging
 import sys
 import traceback
 from typing import List
+from typing import Optional
 
 import click
 
@@ -28,8 +29,11 @@ from stac_api_validator.validations import validate_api
 )
 @click.option(
     "--collection",
-    required=True,
     help="The name of the collection to use for some tests.",
+)
+@click.option(
+    "--geometry",
+    help="The geometry to use for intersection tests.",
 )
 @click.option(
     "--conformance",
@@ -54,7 +58,8 @@ def main(
     root_url: str,
     post: bool,
     conformance_classes: List[str],
-    collection: str,
+    collection: Optional[str],
+    geometry: Optional[str],
 ) -> int:
     """STAC API Validator."""
 
@@ -64,7 +69,11 @@ def main(
 
     try:
         (warnings, errors) = validate_api(
-            root_url, post, conformance_classes, collection
+            root_url=root_url,
+            post=post,
+            conformance_classes=conformance_classes,
+            collection=collection,
+            geometry=geometry,
         )
     except Exception as e:
         print(f"Failed.\nError {root_url}: {type(e)} {str(e)}")
