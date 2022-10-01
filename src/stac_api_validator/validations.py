@@ -195,10 +195,6 @@ def validate_api(
             errors.append(
                 "/: Features configured for validation, but `--collection` parameter not specified"
             )
-        if geometry is None:
-            errors.append(
-                "/: Features configured for validation, but `--geometry` parameter not specified"
-            )
 
     if "item-search" in conformance_classes:
         if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
@@ -236,7 +232,9 @@ def validate_api(
     if "features" in conformance_classes:
         print("Validating STAC API - Features conformance class.")
         validate_collections(root_body, collection, warnings, errors)  # type:ignore
-        validate_features(root_body, conforms_to, warnings, errors)
+        validate_features(
+            root_body, conforms_to, collection, warnings, errors  # type:ignore
+        )
 
     if "item-search" in conformance_classes:
         print("Validating STAC API - Item Search conformance class.")
@@ -371,29 +369,33 @@ def validate_collections(
     if not (data_link := link_by_rel(root_body["links"], "data")):
         errors.append("[Collections] /: Link[rel=data] must href /collections")
     else:
-        r = requests.get(f"{data_link['href']}/{collection}")
-        if not (items_link := link_by_rel(r.json()["links"], "items")):
+        collection_url = f"{data_link['href']}/{collection}"
+        r = requests.get(collection_url)
+        if r.status_code != 200:
             errors.append(
-                f"[Collections] /collections/{collection} is missing link with rel='items'"
+                f"[Collections] GET {collection_url} failed with status code {r.status_code}"
             )
         else:
-            collection_url = items_link["href"]
-            r = requests.get(collection_url)
-            if r.status_code != 200:
-                errors.append(
-                    f"[Collections] link rel='items' returned status code {r.status_code}"
-                )
             try:
                 r.json()
+                # todo: validate this
             except json.decoder.JSONDecodeError:
                 errors.append(
-                    f"[Collections] link rel='items' ({collection_url}) had json problem"
+                    f"[Collections] GET {collection_url} returned non-JSON value"
                 )
+
+        collection_url = f"{data_link['href']}/non-existent-collection"
+        r = requests.get(collection_url)
+        if r.status_code != 404:
+            errors.append(
+                f"[Collections] GET {collection_url} (non-existent collection) returned status code {r.status_code} instead of 404"
+            )
 
 
 def validate_features(
     root_body: Dict[str, Any],
     conforms_to: List[str],
+    collection: str,
     warnings: List[str],
     errors: List[str],
 ) -> None:
@@ -459,17 +461,24 @@ def validate_features(
                 f"service-desc ({conformance}): must return JSON, instead got non-JSON text"
             )
 
-        errors += validate(
-            "/: Link[rel=data] must href /collections",
-            lambda: link_by_rel(root_links, "data") is not None,
-        )
-
         # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
         # backwards-compat reasons
         warnings += validate(
             "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]",
             lambda: link_by_rel(root_links, "collections") is None,
         )
+
+        # todo: validate items exists
+
+        if not (collections_url := link_by_rel(root_links, "data")):
+            errors.append("/: Link[rel=data] must href /collections")
+        else:
+            item_url = f"{collections_url['href']}/{collection}/items/non-existent-item"
+            r = requests.get(item_url)
+            if r.status_code != 404:
+                errors.append(
+                    f"[Features] GET {item_url} (non-existent item) returned status code {r.status_code} instead of 404"
+                )
 
     # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Features - Fields extension conformance class found.")

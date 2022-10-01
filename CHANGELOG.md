@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add validation that the footprint of each Item returned from Item Search intersects the AOI provided
   through the intersect parameter
 - Add validation that Collection has items link relation
+- Add validation that requests for non-existent collections and items returns 404
 
 ### Changed
 
