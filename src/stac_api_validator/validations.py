@@ -26,6 +26,16 @@ from stac_api_validator.geometries import polygon
 from stac_api_validator.geometries import polygon_with_hole
 
 from . import filters
+from .filters import cql2_json_ex_8
+from .filters import cql2_json_numeric_comparisons
+from .filters import cql2_json_s_intersects
+from .filters import cql2_json_string_comparisons
+from .filters import cql2_json_timestamp_comparisons
+from .filters import cql2_text_ex_8
+from .filters import cql2_text_numeric_comparisons
+from .filters import cql2_text_s_intersects
+from .filters import cql2_text_string_comparisons
+from .filters import cql2_text_timestamp_comparisons
 
 
 # https://github.com/stac-utils/pystac/blob/4c7c775a6d0ca49d83dbec714855a189be759c8a/docs/concepts.rst#using-your-own-validator
@@ -261,6 +271,7 @@ def validate_api(
     if "item-search" in conformance_classes:
         print("STAC API - Item Search conformance class found.")
         validate_item_search(
+            root_url=root_url,
             root_body=root_body,
             post=post,
             collection=collection,  # type:ignore
@@ -622,35 +633,11 @@ def validate_item_search(
     ):
         print("STAC API - Item Search - Filter extension conformance class found.")
 
-        cql2_text_supported = (
-            "http://www.opengis.net/spec/cql2/1.0/conf/cql2-text" in conforms_to
-        ) or (
-            "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-text"
-            in conforms_to
-        )
-
-        cql2_json_supported = (
-            "http://www.opengis.net/spec/cql2/1.0/conf/cql2-json" in conforms_to
-        ) or (
-            "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-json"
-            in conforms_to
-        )
-
-        basic_cql2_supported = (
-            "http://www.opengis.net/spec/cql2/1.0/conf/basic-cql2" in conforms_to
-        ) or (
-            "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:basic-cql"
-            in conforms_to
-        )
-
         validate_item_search_filter(
             root_url=root_url,
             root_body=root_body,
             search_url=search_url,
             collection=collection,
-            cql2_text_supported=cql2_text_supported,
-            cql2_json_supported=cql2_json_supported,
-            basic_cql2_supported=basic_cql2_supported,
             warnings=warnings,
             errors=errors,
         )
@@ -739,9 +726,6 @@ def validate_item_search_filter(
     root_body: Dict[str, Any],
     search_url: str,
     collection: str,
-    cql2_text_supported: bool,
-    cql2_json_supported: bool,
-    basic_cql2_supported: bool,
     warnings: List[str],
     errors: List[str],
 ) -> None:
@@ -761,34 +745,133 @@ def validate_item_search_filter(
         errors=errors,
     )
 
+    conforms_to = root_body["conforms_to"]
+
+    cql2_text_supported = (
+        "http://www.opengis.net/spec/cql2/1.0/conf/cql2-text" in conforms_to
+    ) or (
+        "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-text"
+        in conforms_to
+    )
+
+    cql2_json_supported = (
+        "http://www.opengis.net/spec/cql2/1.0/conf/cql2-json" in conforms_to
+    ) or (
+        "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:cql-json"
+        in conforms_to
+    )
+
+    basic_cql2_supported = (
+        "http://www.opengis.net/spec/cql2/1.0/conf/basic-cql2" in conforms_to
+    ) or (
+        "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:basic-cql"
+        in conforms_to
+    )
+    advanced_comparison_operators_supported = (
+        "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
+        in conforms_to
+    )
+    basic_spatial_operators_supported = (
+        "http://www.opengis.net/spec/cql2/1.0/conf/basic-spatial-operators"
+        in conforms_to
+    )
+
+    # todo: validate these
+    # Spatial Operators: http://www.opengis.net/spec/cql2/1.0/conf/spatial-operators
+    # Temporal Operators: http://www.opengis.net/spec/cql2/1.0/conf/temporal-operators
+    # Custom Functions: http://www.opengis.net/spec/cql2/1.0/conf/functions
+    # Arithmetic Expressions: http://www.opengis.net/spec/cql2/1.0/conf/arithmetic
+    # Array Operators: http://www.opengis.net/spec/cql2/1.0/conf/array-operators
+    # Property-Property Comparisons: http://www.opengis.net/spec/cql2/1.0/conf/property-property
+    # Accent and Case-insensitive Comparison: http://www.opengis.net/spec/cql2/1.0/conf/accent-case-insensitive-comparison
+
+    filter_texts = []
+    filter_jsons = []
+
     if basic_cql2_supported:
         item = requests.get(f"{search_url}?collections={collection}").json()[
             "features"
         ][0]
 
         if cql2_text_supported:
-            for f_name in ["cql2_text_ex_1", "cql2_text_ex_2"]:
-                f_text = getattr(filters, f_name)(item["id"], collection)
+            for f_name in [
+                "cql2_text_ex_1",
+                "cql2_text_ex_2",
+                "cql2_text_ex_3",
+                "cql2_text_ex_4",
+                "cql2_text_ex_6",
+                "cql2_text_ex_9",
+                "cql2_text_ex_10",
+                "cql2_text_ex_11",
+            ]:
+                filter_texts.append(getattr(filters, f_name)(item["id"], collection))
 
-                r = requests.get(
-                    search_url, params={"filter-lang": "cql2-text", "filter": f_text}
-                )
-                if r.status_code != 200:
-                    errors.append(
-                        f"[Item Search Filter Ext] GET {f_text} returned status code {r.status_code}"
-                    )
+            filter_texts.extend(cql2_text_string_comparisons(collection))
+            filter_texts.extend(cql2_text_numeric_comparisons)
+            filter_texts.extend(cql2_text_timestamp_comparisons)
+
+            # todo: logical ops
 
         if cql2_json_supported:
-            for f_name in ["cql2_json_ex_1", "cql2_json_ex_2"]:
-                f_json = getattr(filters, f_name)(item["id"], collection)
 
-                r = requests.post(
-                    search_url, json={"filter-lang": "cql2-json", "filter": f_json}
-                )
-                if r.status_code != 200:
-                    errors.append(
-                        f"[Item Search Filter Ext] POST {f_json} returned status code {r.status_code}"
-                    )
+            for f_name in [
+                "cql2_json_ex_1",
+                "cql2_json_ex_2",
+                "cql2_json_ex_3",
+                "cql2_json_ex_4",
+                "cql2_json_ex_6",
+                "cql2_json_ex_9",
+                "cql2_json_ex_10",
+                "cql2_json_ex_11",
+                "cql2_json_common_1",
+            ]:
+                filter_jsons.append(getattr(filters, f_name)(item["id"], collection))
+
+            filter_jsons.extend(cql2_json_string_comparisons(collection))
+            filter_jsons.extend(cql2_json_numeric_comparisons)
+            filter_jsons.extend(cql2_json_timestamp_comparisons)
+
+            # todo: use terms not in queryables
+
+    if basic_spatial_operators_supported:
+
+        if cql2_text_supported:
+            filter_texts.append(cql2_text_s_intersects)
+            filter_texts.append(cql2_text_ex_8)
+
+        if cql2_json_supported:
+            filter_jsons.append(cql2_json_s_intersects)
+            filter_texts.append(cql2_json_ex_8)
+
+            # todo: use terms not in queryables
+
+    # todo how to support all 4 combos of GET|POST & Text|JSON ?
+
+    if advanced_comparison_operators_supported:
+        pass
+
+    for f_text in filter_texts:
+        print(f"running {f_text}", flush=True)
+
+        r = requests.get(
+            search_url,
+            params={"limit": 1, "filter-lang": "cql2-text", "filter": f_text},
+        )
+        if r.status_code != 200:
+            errors.append(
+                f"[Item Search Filter Ext] GET {f_text} returned status code {r.status_code}"
+            )
+
+    for f_json in filter_jsons:
+        print(f"running {f_json}", flush=True)
+
+        r = requests.post(
+            search_url, json={"limit": 1, "filter-lang": "cql2-json", "filter": f_json}
+        )
+        if r.status_code != 200:
+            errors.append(
+                f"[Item Search Filter Ext] POST {f_json} returned status code {r.status_code}"
+            )
 
 
 def validate_item_search_datetime(
