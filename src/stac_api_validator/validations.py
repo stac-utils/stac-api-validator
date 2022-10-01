@@ -11,8 +11,10 @@ from typing import Pattern
 from typing import Tuple
 
 import requests
+import yaml
 from pystac import STACValidationError
 from pystac_client import Client
+from shapely.geometry import shape
 
 from stac_api_validator.geometries import geometry_collection
 from stac_api_validator.geometries import linestring
@@ -149,7 +151,11 @@ def supports(conforms_to: List[str], pattern: Pattern[str]) -> bool:
 
 
 def validate_api(
-    root_url: str, post: bool, conformance_classes: List[str], collection: str
+    root_url: str,
+    post: bool,
+    conformance_classes: List[str],
+    collection: Optional[str],
+    geometry: Optional[str],
 ) -> Tuple[List[str], List[str]]:
     warnings: List[str] = []
     errors: List[str] = []
@@ -198,17 +204,33 @@ def validate_api(
             "/: Collections configured for validation, but not contained in 'conformsTo'"
         )
 
+        if collection is None:
+            errors.append(
+                "/: Collections configured for validation, but `--collection` parameter not specified"
+            )
+
     if "features" in conformance_classes and not supports_features(conforms_to):
         errors.append(
             "/: Features configured for validation, but not contained in 'conformsTo'"
         )
+        if collection is None:
+            errors.append(
+                "/: Features configured for validation, but `--collection` parameter not specified"
+            )
 
-    if "item-search" in conformance_classes and not any(
-        cc_item_search_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Item Search configured for validation, but not contained in 'conformsTo'"
-        )
+    if "item-search" in conformance_classes:
+        if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
+            errors.append(
+                "/: Item Search configured for validation, but not contained in 'conformsTo'"
+            )
+        if collection is None:
+            errors.append(
+                "/: Item Search configured for validation, but `--collection` parameter not specified"
+            )
+        if geometry is None:
+            errors.append(
+                "/: Item Search configured for validation, but `--geometry` parameter not specified"
+            )
 
     # fail fast if there are errors with conformance or links so far
     if errors:
@@ -227,17 +249,25 @@ def validate_api(
 
     if "collections" in conformance_classes:
         print("STAC API - Collections conformance class found.")
-        validate_collections(root_body, collection, warnings, errors)
+        validate_collections(root_body, collection, warnings, errors)  # type:ignore
 
     if "features" in conformance_classes:
         print("STAC API - Features conformance class found.")
-        validate_collections(root_body, collection, warnings, errors)
-        validate_features(root_body, conforms_to, collection, warnings, errors)
+        validate_collections(root_body, collection, warnings, errors)  # type:ignore
+        validate_features(
+            root_body, conforms_to, collection, warnings, errors  # type:ignore
+        )
 
     if "item-search" in conformance_classes:
         print("STAC API - Item Search conformance class found.")
         validate_item_search(
-            root_url, root_body, post, collection, conforms_to, warnings, errors
+            root_body=root_body,
+            post=post,
+            collection=collection,  # type:ignore
+            conforms_to=conforms_to,
+            warnings=warnings,
+            errors=errors,
+            geometry=geometry,  # type:ignore
         )
 
     if not errors:
@@ -288,10 +318,21 @@ def validate_core(
                 service_desc["href"], headers={"Accept": service_desc_type}
             )
 
-            errors += validate(
-                "/ : Link[service-desc] must return 200",
-                lambda: r_service_desc.status_code == 200,
-            )
+            if not r_service_desc.status_code == 200:
+                errors.append("/ : Link[service-desc] must return 200")
+            else:
+                content_type = r_service_desc.headers.get("content-type", "")
+                if content_type in ["application/yaml", "application/vnd.oai.openapi"]:
+                    pass
+                    # openapi_spec = r_service_desc.json()
+                    # todo: verify limits exist and test them
+                elif content_type in [
+                    "application/json",
+                    "application/vnd.oai.openapi+json",
+                    "application/vnd.oai.openapi+json;version=3.0",
+                    "application/vnd.oai.openapi+json;version=3.1",
+                ]:
+                    yaml.safe_load(r_service_desc.text)
 
             if (
                 (ct := r_service_desc.headers.get("content-type", ""))
@@ -307,27 +348,27 @@ def validate_core(
                     f"Content-Type header: used '{service_desc_type}', got '{ct}'"
                 )
 
-            if not (service_doc := link_by_rel(links, "service-doc")):
-                warnings.append("/ : Link[rel=service-doc] should exist")
-            else:
-                if service_doc.get("type") != "text/html":
-                    errors.append("service-doc type is not text/html")
+    if not (service_doc := link_by_rel(links, "service-doc")):
+        warnings.append("/ : Link[rel=service-doc] should exist")
+    else:
+        if service_doc.get("type") != "text/html":
+            errors.append("service-doc type is not text/html")
 
-                r_service_doc = requests.get(service_doc["href"])
+        r_service_doc = requests.get(service_doc["href"])
 
-                errors += validate(
-                    "/ : Link[service-doc] must return 200",
-                    lambda: r_service_doc.status_code == 200,
-                )
+        errors += validate(
+            "/ : Link[service-doc] must return 200",
+            lambda: r_service_doc.status_code == 200,
+        )
 
-                if (ct := r_service_doc.headers.get("content-type", "")).startswith(
-                    "text/html"
-                ):
-                    pass
-                else:
-                    errors.append(
-                        f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
-                    )
+        if (ct := r_service_doc.headers.get("content-type", "")).startswith(
+            "text/html"
+        ):
+            pass
+        else:
+            errors.append(
+                f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
+            )
 
 
 def validate_browseable(
@@ -350,24 +391,27 @@ def validate_collections(
     if not (data_link := link_by_rel(root_body["links"], "data")):
         errors.append("[Collections] /: Link[rel=data] must href /collections")
     else:
-        r = requests.get(f"{data_link['href']}/{collection}")
-        if not (items_link := link_by_rel(r.json()["links"], "items")):
+        collection_url = f"{data_link['href']}/{collection}"
+        r = requests.get(collection_url)
+        if r.status_code != 200:
             errors.append(
-                f"[Collections] /collections/{collection} is missing link with rel='items'"
+                f"[Collections] GET {collection_url} failed with status code {r.status_code}"
             )
         else:
-            collection_url = items_link["href"]
-            r = requests.get(collection_url)
-            if r.status_code != 200:
-                errors.append(
-                    f"[Collections] link rel='items' returned status code {r.status_code}"
-                )
             try:
                 r.json()
+                # todo: validate this
             except json.decoder.JSONDecodeError:
                 errors.append(
-                    f"[Collections] link rel='items' ({collection_url}) had json problem"
+                    f"[Collections] GET {collection_url} returned non-JSON value"
                 )
+
+        collection_url = f"{data_link['href']}/non-existent-collection"
+        r = requests.get(collection_url)
+        if r.status_code != 404:
+            errors.append(
+                f"[Collections] GET {collection_url} (non-existent collection) returned status code {r.status_code} instead of 404"
+            )
 
 
 def validate_features(
@@ -441,17 +485,24 @@ def validate_features(
                 f"service-desc ({conformance}): must return JSON, instead got non-JSON text"
             )
 
-        errors += validate(
-            "/: Link[rel=data] must href /collections",
-            lambda: link_by_rel(root_links, "data") is not None,
-        )
-
         # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
         # backwards-compat reasons
         warnings += validate(
             "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]",
             lambda: link_by_rel(root_links, "collections") is None,
         )
+
+        # todo: validate items exists
+
+        if not (collections_url := link_by_rel(root_links, "data")):
+            errors.append("/: Link[rel=data] must href /collections")
+        else:
+            item_url = f"{collections_url['href']}/{collection}/items/non-existent-item"
+            r = requests.get(item_url)
+            if r.status_code != 404:
+                errors.append(
+                    f"[Features] GET {item_url} (non-existent item) returned status code {r.status_code} instead of 404"
+                )
 
     # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Features - Fields extension conformance class found.")
@@ -485,6 +536,7 @@ def validate_item_search(
     conforms_to: List[str],
     warnings: List[str],
     errors: List[str],
+    geometry: str,
 ) -> None:
     links = root_body.get("links")
     search = link_by_rel(links, "search")
@@ -494,6 +546,7 @@ def validate_item_search(
 
     # Collections may not be implemented, so set to None
     # and later get some collection ids another way
+    # todo: what is this for?
     # if links and (collections := link_by_rel(links, "data")):
     #     collections_url = collections.get("href")
     # else:
@@ -530,7 +583,13 @@ def validate_item_search(
     #     search_url, post, collection, warnings, errors
     # )
     # validate_item_search_collections(search_url, collections_url, post, errors)
-    # validate_item_search_intersects(search_url, post, errors)
+    validate_item_search_intersects(
+        search_url=search_url,
+        collection=collection,
+        post=post,
+        errors=errors,
+        geometry=geometry,
+    )
 
     # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Item Search - Fields extension conformance class found.")
@@ -799,8 +858,9 @@ def validate_item_search_bbox_xor_intersects(
 
 
 def validate_item_search_intersects(
-    search_url: str, post: bool, errors: List[str]
+    search_url: str, collection: str, post: bool, errors: List[str], geometry: str
 ) -> None:
+    # Validate that these GeoJSON Geometry types are accepted
     intersects_params = [
         point,
         linestring,
@@ -840,6 +900,60 @@ def validate_item_search_intersects(
                     errors.append(
                         f"POST Search with intersects:{param} returned non-json response: {r.text}"
                     )
+
+    intersects_shape = shape(json.loads(geometry))
+
+    # Validate GET query
+    r = requests.get(
+        search_url,
+        params={"collections": collection, "intersects": geometry},
+    )
+    if r.status_code != 200:
+        errors.append(
+            f"[Item Search] GET Search with collections={collection}&intersects={geometry} returned status code {r.status_code}"
+        )
+    else:
+        try:
+            item_collection = r.json()
+            if not len(item_collection["features"]):
+                errors.append(
+                    f"[Item Search] GET Search result for intersects={geometry} returned no results"
+                )
+            for item in item_collection["features"]:
+                if not intersects_shape.intersects(shape(item["geometry"])):
+                    errors.append(
+                        f"[Item Search] GET Search result for intersects={geometry}, does not intersect {item['geometry']}"
+                    )
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"[Item Search] GET Search with intersects={geometry} returned non-json response: {r.text}"
+            )
+
+    if post:
+        # Validate POST query
+        r = requests.post(
+            search_url, json={"collections": [collection], "intersects": geometry}
+        )
+        if r.status_code != 200:
+            errors.append(
+                f"[Item Search] POST Search with intersects={geometry} returned status code {r.status_code}"
+            )
+        else:
+            try:
+                item_collection = r.json()
+                if not len(item_collection["features"]):
+                    errors.append(
+                        f"[Item Search] POST Search result for intersects={geometry} returned no results"
+                    )
+                for item in item_collection["features"]:
+                    if not intersects_shape.intersects(shape(item["geometry"])):
+                        errors.append(
+                            f"[Item Search] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
+                        )
+            except json.decoder.JSONDecodeError:
+                errors.append(
+                    f"[Item Search] POST Search with intersects={geometry} returned non-json response: {r.text}"
+                )
 
 
 def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) -> None:
@@ -955,7 +1069,7 @@ def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) ->
 
 
 def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -> None:
-    valid_limits = [1, 2, 10, 1000]
+    valid_limits = [1, 2, 10]  # todo: pull actual limits from service description
     for limit in valid_limits:
         # Valid GET query
         params = {"limit": limit}
@@ -998,7 +1112,7 @@ def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -
                         f"POST Search with {params} returned non-json response: {r.text}"
                     )
 
-    invalid_limits = [-1, 0, 10001]
+    invalid_limits = [-1]  # todo: pull actual limits from service desc and test them
     for limit in invalid_limits:
         # Valid GET query
         params = {"limit": limit}

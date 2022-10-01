@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "stac-api-validator"
-version = "0.0.2"
+version = "0.0.3"
 description = "STAC API Validator"
 authors = ["Phil Varner <phil@philvarner.com>"]
 license = "Apache-2.0"
@@ -22,6 +22,8 @@ pystac-client = "^0.5.0"
 requests = "^2.28.1"
 pystac = {extras = ["orjson"], version = "^1.6.1"}
 jsonschema = "^4.16.0"
+PyYAML = "6.0"
+Shapely = "1.8.4"
 
 [tool.poetry.dev-dependencies]
 Pygments = ">=2.10.0"
@@ -76,6 +78,11 @@ pretty = true
 show_column_numbers = true
 show_error_codes = true
 show_error_context = true
+#ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["shapely.geometry"]
+ignore_missing_imports = true
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
