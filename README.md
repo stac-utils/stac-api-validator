@@ -41,7 +41,7 @@ and then run it:
 ```console
 $ stac-api-validator \
     --root-url https://planetarycomputer.microsoft.com/api/stac/v1/ \
-    --conformance core --conformance item-search
+    --conformance core --conformance item-search --collection <collection-id>
 ```
 
 ## Contributing
@@ -95,7 +95,7 @@ Options:
   --post / --no-post              Test all validations with POST method for
                                   requests in addition to GET
   --collection TEXT               The name of the collection to use for some
-                                  tests.
+                                  tests.  [required]
   --geometry TEXT                 The geometry to use for intersection tests.
   --conformance [core|browseable|item-search|features|collections|children]
                                   Conformance class URIs to validate
@@ -103,7 +103,7 @@ Options:
   --help                          Show this message and exit.
 ```
 
-Conformance classes item-search, features, and collections require the `--collection` parameter with the id of a
+The `--collection` parameter is required, and it must include the id of a
 collection to run some tests on.
 
 Conformance class `item-search` requires `--geometry` with a GeoJSON geometry that returns some items for
