@@ -3,7 +3,6 @@ import itertools
 import json
 import re
 from typing import Any
-from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -25,22 +24,42 @@ from stac_api_validator.geometries import point
 from stac_api_validator.geometries import polygon
 from stac_api_validator.geometries import polygon_with_hole
 
-from . import filters
+from .filters import cql2_json_and
+from .filters import cql2_json_between
+from .filters import cql2_json_common_1
+from .filters import cql2_json_ex_2
+from .filters import cql2_json_ex_3
+from .filters import cql2_json_ex_4
+from .filters import cql2_json_ex_6
 from .filters import cql2_json_ex_8
+from .filters import cql2_json_ex_9
+from .filters import cql2_json_like
+from .filters import cql2_json_not
+from .filters import cql2_json_not_between
+from .filters import cql2_json_not_like
 from .filters import cql2_json_numeric_comparisons
+from .filters import cql2_json_or
 from .filters import cql2_json_s_intersects
 from .filters import cql2_json_string_comparisons
 from .filters import cql2_json_timestamp_comparisons
+from .filters import cql2_text_and
+from .filters import cql2_text_between
+from .filters import cql2_text_ex_2
+from .filters import cql2_text_ex_3
+from .filters import cql2_text_ex_4
+from .filters import cql2_text_ex_6
 from .filters import cql2_text_ex_8
+from .filters import cql2_text_ex_9
+from .filters import cql2_text_like
+from .filters import cql2_text_not
+from .filters import cql2_text_not_between
+from .filters import cql2_text_not_like
 from .filters import cql2_text_numeric_comparisons
+from .filters import cql2_text_or
 from .filters import cql2_text_s_intersects
 from .filters import cql2_text_string_comparisons
 from .filters import cql2_text_timestamp_comparisons
 
-
-# https://github.com/stac-utils/pystac/blob/4c7c775a6d0ca49d83dbec714855a189be759c8a/docs/concepts.rst#using-your-own-validator
-
-# resolve_stac_object
 
 cc_core_regex = re.compile(r"https://api\.stacspec\.org/.+/core")
 cc_browseable_regex = re.compile(r"https://api\.stacspec\.org/.+/browseable")
@@ -279,6 +298,7 @@ def validate_api(
             warnings=warnings,
             errors=errors,
             geometry=geometry,  # type:ignore
+            conformance_classes=conformance_classes,
         )
 
     if not errors:
@@ -367,10 +387,8 @@ def validate_core(
 
         r_service_doc = requests.get(service_doc["href"])
 
-        errors += validate(
-            "/ : Link[service-doc] must return 200",
-            lambda: r_service_doc.status_code == 200,
-        )
+        if not (r_service_doc.status_code == 200):
+            errors.append("/ : Link[service-doc] must return 200")
 
         if (ct := r_service_doc.headers.get("content-type", "")).startswith(
             "text/html"
@@ -463,17 +481,16 @@ def validate_features(
 
     root_links = root_body.get("links")
     conformance = link_by_rel(root_links, "conformance")
-    errors += validate(
-        "/ Link[rel=conformance] must href /conformance",
-        lambda: conformance is not None
-        and conformance.get("href", "").endswith("/conformance"),
-    )
+    if not (
+        conformance is not None and conformance.get("href", "").endswith("/conformance")
+    ):
+        errors.append("/ Link[rel=conformance] must href /conformance")
 
     if conformance:
         r_conformance = requests.get(conformance["href"])
-        errors += validate(
-            "conformance must return 200", lambda: r_conformance.status_code == 200
-        )
+
+        if not (r_conformance.status_code == 200):
+            errors.append("conformance must return 200")
 
         if (ct := r_conformance.headers.get("content-type", "")).split(";")[
             0
@@ -486,11 +503,12 @@ def validate_features(
 
         try:
             conformance_json = r_conformance.json()
-            warnings += validate(
-                "Landing Page conforms to and conformance conformsTo must be the same",
-                lambda: set(root_body.get("conformsTo", []))
-                == set(conformance_json["conformsTo"]),
-            )
+            if set(root_body.get("conformsTo", [])) == set(
+                conformance_json["conformsTo"]
+            ):
+                warnings.append(
+                    "Landing Page conforms to and conformance conformsTo must be the same",
+                )
         except json.decoder.JSONDecodeError:
             errors.append(
                 f"service-desc ({conformance}): must return JSON, instead got non-JSON text"
@@ -498,10 +516,10 @@ def validate_features(
 
         # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
         # backwards-compat reasons
-        warnings += validate(
-            "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]",
-            lambda: link_by_rel(root_links, "collections") is None,
-        )
+        if not (link_by_rel(root_links, "collections") is None):
+            warnings.append(
+                "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
+            )
 
         # todo: validate items exists
 
@@ -548,6 +566,7 @@ def validate_item_search(
     warnings: List[str],
     errors: List[str],
     geometry: str,
+    conformance_classes: List[str],
 ) -> None:
     links = root_body.get("links")
     search = link_by_rel(links, "search")
@@ -557,11 +576,10 @@ def validate_item_search(
 
     # Collections may not be implemented, so set to None
     # and later get some collection ids another way
-    # todo: what is this for?
-    # if links and (collections := link_by_rel(links, "data")):
-    #     collections_url = collections.get("href")
-    # else:
-    #     collections_url = None
+    if links and (collections := link_by_rel(links, "data")):
+        collections_url = collections.get("href")
+    else:
+        collections_url = None
 
     search_url = search["href"]
     r = requests.get(search_url)
@@ -573,9 +591,8 @@ def validate_item_search(
             f"Search ({search_url}): must have content-type header '{geojson_mt}', actually '{content_type}'"
         )
 
-    errors += validate(
-        f"Search({search_url}): must return 200", lambda: r.status_code == 200
-    )
+    if not (r.status_code == 200):
+        errors.append(f"Search({search_url}): must return 200")
 
     # todo: validate geojson, not just json
     try:
@@ -585,15 +602,15 @@ def validate_item_search(
             f"Search ({search_url}): must return JSON, instead got non-JSON text"
         )
 
-    # validate_item_search_limit(search_url, post, errors)
-    # validate_item_search_bbox_xor_intersects(search_url, post, errors)
-    # validate_item_search_bbox(search_url, post, errors)
-    # validate_item_search_datetime(search_url, warnings, errors)
-    # validate_item_search_ids(search_url, post, warnings, errors)
-    # validate_item_search_ids_does_not_override_all_other_params(
-    #     search_url, post, collection, warnings, errors
-    # )
-    # validate_item_search_collections(search_url, collections_url, post, errors)
+    validate_item_search_limit(search_url, post, errors)
+    validate_item_search_bbox_xor_intersects(search_url, post, errors)
+    validate_item_search_bbox(search_url, post, errors)
+    validate_item_search_datetime(search_url, warnings, errors)
+    validate_item_search_ids(search_url, post, warnings, errors)
+    validate_item_search_ids_does_not_override_all_other_params(
+        search_url, post, collection, warnings, errors
+    )
+    validate_item_search_collections(search_url, collections_url, post, errors)
     validate_item_search_intersects(
         search_url=search_url,
         collection=collection,
@@ -626,7 +643,7 @@ def validate_item_search(
             "[Filter Ext] /: pre-1.0.0-rc.1 Filter Extension conformance classes are advertised."
         )
 
-    if any(
+    if "filter" in conformance_classes and any(
         cc_item_search_filter_regex.fullmatch(x)
         or x.endswith("item-search#filter:filter")
         for x in conforms_to
@@ -745,7 +762,7 @@ def validate_item_search_filter(
         errors=errors,
     )
 
-    conforms_to = root_body["conforms_to"]
+    conforms_to = root_body["conformsTo"]
 
     cql2_text_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/cql2-text" in conforms_to
@@ -754,6 +771,9 @@ def validate_item_search_filter(
         in conforms_to
     )
 
+    if cql2_text_supported:
+        print("CQL2 - CQL2-Text conformance class found.")
+
     cql2_json_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/cql2-json" in conforms_to
     ) or (
@@ -761,110 +781,134 @@ def validate_item_search_filter(
         in conforms_to
     )
 
+    if cql2_json_supported:
+        print("CQL2 - CQL2-JSON conformance class found.")
+
     basic_cql2_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/basic-cql2" in conforms_to
     ) or (
         "https://api.stacspec.org/v1.0.0-rc.1/item-search#filter:basic-cql"
         in conforms_to
     )
+
+    if basic_cql2_supported:
+        print("CQL2 - Basic CQL2 conformance class found.")
+
     advanced_comparison_operators_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
         in conforms_to
     )
+    if advanced_comparison_operators_supported:
+        print("CQL2 - Advanced Comparison Operators conformance class found.")
+
     basic_spatial_operators_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/basic-spatial-operators"
         in conforms_to
     )
 
+    if basic_spatial_operators_supported:
+        print("CQL2 - Basic Spatial Operators conformance class found.")
+
+    temporal_operators_supported = (
+        "http://www.opengis.net/spec/cql2/1.0/conf/temporal-operators" in conforms_to
+    )
+
+    if temporal_operators_supported:
+        print("CQL2 - Temporal Operators conformance class found.")
+
     # todo: validate these
     # Spatial Operators: http://www.opengis.net/spec/cql2/1.0/conf/spatial-operators
-    # Temporal Operators: http://www.opengis.net/spec/cql2/1.0/conf/temporal-operators
     # Custom Functions: http://www.opengis.net/spec/cql2/1.0/conf/functions
     # Arithmetic Expressions: http://www.opengis.net/spec/cql2/1.0/conf/arithmetic
     # Array Operators: http://www.opengis.net/spec/cql2/1.0/conf/array-operators
     # Property-Property Comparisons: http://www.opengis.net/spec/cql2/1.0/conf/property-property
     # Accent and Case-insensitive Comparison: http://www.opengis.net/spec/cql2/1.0/conf/accent-case-insensitive-comparison
 
-    filter_texts = []
-    filter_jsons = []
+    filter_texts: List[str] = []
+    filter_jsons: List[Dict[str, Any]] = []
 
     if basic_cql2_supported:
+        # todo: better error handling when the wrong collection name is given, so 0 results
         item = requests.get(f"{search_url}?collections={collection}").json()[
             "features"
         ][0]
 
         if cql2_text_supported:
-            for f_name in [
-                "cql2_text_ex_1",
-                "cql2_text_ex_2",
-                "cql2_text_ex_3",
-                "cql2_text_ex_4",
-                "cql2_text_ex_6",
-                "cql2_text_ex_9",
-                "cql2_text_ex_10",
-                "cql2_text_ex_11",
-            ]:
-                filter_texts.append(getattr(filters, f_name)(item["id"], collection))
-
+            filter_texts.append(cql2_text_ex_3)
+            filter_texts.append(cql2_text_ex_4)
+            filter_texts.append(cql2_text_ex_9)
+            filter_texts.append(cql2_text_and(item["id"], collection))
+            filter_texts.append(cql2_text_or(item["id"], collection))
+            filter_texts.append(cql2_text_not(item["id"]))
             filter_texts.extend(cql2_text_string_comparisons(collection))
             filter_texts.extend(cql2_text_numeric_comparisons)
             filter_texts.extend(cql2_text_timestamp_comparisons)
 
-            # todo: logical ops
+            # todo boolean and date
 
         if cql2_json_supported:
-
-            for f_name in [
-                "cql2_json_ex_1",
-                "cql2_json_ex_2",
-                "cql2_json_ex_3",
-                "cql2_json_ex_4",
-                "cql2_json_ex_6",
-                "cql2_json_ex_9",
-                "cql2_json_ex_10",
-                "cql2_json_ex_11",
-                "cql2_json_common_1",
-            ]:
-                filter_jsons.append(getattr(filters, f_name)(item["id"], collection))
-
+            filter_jsons.append(cql2_json_ex_3)
+            filter_jsons.append(cql2_json_ex_4)
+            filter_jsons.append(cql2_json_ex_9)
+            filter_jsons.append(cql2_json_and(item["id"], collection))
+            filter_jsons.append(cql2_json_or(item["id"], collection))
+            filter_jsons.append(cql2_json_not(item["id"]))
             filter_jsons.extend(cql2_json_string_comparisons(collection))
             filter_jsons.extend(cql2_json_numeric_comparisons)
             filter_jsons.extend(cql2_json_timestamp_comparisons)
 
-            # todo: use terms not in queryables
+            # todo boolean and date
+
+    if advanced_comparison_operators_supported:
+        if cql2_text_supported:
+            filter_texts.append(cql2_text_between)
+            filter_texts.append(cql2_text_not_between)
+            filter_texts.append(cql2_text_like)
+            filter_texts.append(cql2_text_not_like)
+
+        if cql2_json_supported:
+            filter_jsons.append(cql2_json_between)
+            filter_jsons.append(cql2_json_not_between)
+            filter_jsons.append(cql2_json_like)
+            filter_jsons.append(cql2_json_not_like)
 
     if basic_spatial_operators_supported:
 
         if cql2_text_supported:
             filter_texts.append(cql2_text_s_intersects)
+            filter_texts.append(cql2_text_ex_2(collection))
             filter_texts.append(cql2_text_ex_8)
 
         if cql2_json_supported:
             filter_jsons.append(cql2_json_s_intersects)
-            filter_texts.append(cql2_json_ex_8)
+            filter_jsons.append(cql2_json_ex_2(collection))
+            filter_jsons.append(cql2_json_ex_8)
 
-            # todo: use terms not in queryables
+    if temporal_operators_supported:
+        if cql2_text_supported:
+            filter_texts.append(cql2_text_ex_6)
 
-    # todo how to support all 4 combos of GET|POST & Text|JSON ?
+        if cql2_json_supported:
+            filter_jsons.append(cql2_json_ex_6)
 
-    if advanced_comparison_operators_supported:
-        pass
+    if basic_spatial_operators_supported and temporal_operators_supported:
+        if cql2_json_supported:
+            filter_jsons.append(cql2_json_common_1)
+
+    # todo: use terms not in queryables
+    # todo: how to support all 4 combos of GET|POST & Text|JSON ?
 
     for f_text in filter_texts:
-        print(f"running {f_text}", flush=True)
-
         r = requests.get(
             search_url,
-            params={"limit": 1, "filter-lang": "cql2-text", "filter": f_text},
+            params={"limit": 1, "filter-lang": "cql2-text", "filter": f_text},  # type: ignore
         )
-        if r.status_code != 200:
+        if not (r.status_code == 200):
             errors.append(
                 f"[Item Search Filter Ext] GET {f_text} returned status code {r.status_code}"
             )
 
     for f_json in filter_jsons:
-        print(f"running {f_json}", flush=True)
-
         r = requests.post(
             search_url, json={"limit": 1, "filter-lang": "cql2-json", "filter": f_json}
         )
@@ -1002,11 +1046,13 @@ def validate_item_search_intersects(
                 errors.append(
                     f"[Item Search] GET Search result for intersects={geometry} returned no results"
                 )
-            for item in item_collection["features"]:
-                if not intersects_shape.intersects(shape(item["geometry"])):
-                    errors.append(
-                        f"[Item Search] GET Search result for intersects={geometry}, does not intersect {item['geometry']}"
-                    )
+            if any(
+                not intersects_shape.intersects(shape(item["geometry"]))
+                for item in item_collection["features"]
+            ):
+                errors.append(
+                    f"[Item Search] GET Search results for intersects={geometry} do not all intersect"
+                )
         except json.decoder.JSONDecodeError:
             errors.append(
                 f"[Item Search] GET Search with intersects={geometry} returned non-json response: {r.text}"
@@ -1420,10 +1466,3 @@ def validate_item_search_collections(
     _validate_search_collections_with_ids(
         search_url, list(itertools.islice(collection_ids, 3)), post, errors
     )
-
-
-def validate(error_str: str, p: Callable[[], bool]) -> List[str]:
-    if not p():
-        return [error_str]
-    else:
-        return []

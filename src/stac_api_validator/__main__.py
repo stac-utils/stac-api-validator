@@ -48,6 +48,7 @@ from stac_api_validator.validations import validate_api
             "features",
             "collections",
             "children",
+            "filter",
         ],
         case_sensitive=False,
     ),

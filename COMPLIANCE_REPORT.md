@@ -91,6 +91,15 @@ errors:
 
 ### stac-server
 
+<https://github.com/stac-utils/stac-fastapi-elasticsearch>
+
+URL: http://localhost:8083
+
+Date: 17-Mar-2022
+
+Output:
+
+```
 Validating http://localhost:3000
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
@@ -98,12 +107,17 @@ STAC API - Item Search conformance class found.
 STAC API - Item Search Fields extension conformance class found.
 warnings: none
 errors: none
+```
 
 ### resto
+
+<https://github.com/jjrom/resto>
 
 TBD.
 
 ### Franklin
+
+<https://github.com/azavea/franklin>
 
 TBD.
 
@@ -119,49 +133,78 @@ Non-compliant with 1.0.0-x
 
 ### Microsoft Planetary Computer (stac-fastapi)
 
-URL: https://planetarycomputer.microsoft.com/api/stac/v1/
+URL: https://planetarycomputer.microsoft.com/api/stac/v1
 
-Date: 19-Jan-2022
+Date: 03-Oct-2022
 
 Output:
 
 ```
-Validating https://planetarycomputer.microsoft.com/api/stac/v1/
+$ poetry run stac-api-validator --root-url https://planetarycomputer.microsoft.com/api/stac/v1 \
+   --conformance features --conformance item-search --collection sentinel-2-l2a \
+   --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
+
+Validating https://planetarycomputer.microsoft.com/api/stac/v1
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
+WARNING: Collections validation is not yet fully implemented.
+WARNING: Features validation is not yet fully implemented.
 STAC API - Item Search conformance class found.
+STAC API - Item Search - Filter extension conformance class found.
 warnings:
-- Search with datetime=1985-04-12 returned status code 200 instead of 400
-- Search with datetime=1937-01-01T12:00:27.87+0100 returned status code 200 instead of 400
-- Search with datetime=1985-12-12T23:20:50.52 returned status code 200 instead of 400
-- Search with datetime=1985-04-12T23:20:50,Z returned status code 200 instead of 400
+- Landing Page conforms to and conformance conformsTo must be the same
+- GET Search with datetime=1985-04-12 returned status code 200 instead of 400
+- GET Search with datetime=1937-01-01T12:00:27.87+0100 returned status code 200 instead of 400
+- GET Search with datetime=1985-12-12T23:20:50.52 returned status code 200 instead of 400
+- GET Search with datetime=1985-04-12T23:20:50,Z returned status code 200 instead of 400
+- [Filter Ext] /: pre-1.0.0-rc.1 Filter Extension conformance classes are advertised.
 errors:
-- GET Search with {'limit': 10000} returned status code 400
-- POST Search with {'limit': 10000} returned status code 400
+- GET Search with bbox and intersects returned status code 200
 - GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 500
 - POST Search with bbox:[100.0, 0.0, 0.0, 105.0, 1.0, 1.0] returned status code 500
-- Search with datetime=/1985-04-12T23:20:50.52Z returned status code 400
-- Search with datetime=1985-04-12T23:20:50.52Z/ returned status code 400
-- Search with datetime=37-01-01T12:00:27.87Z returned status code 500 instead of 400
+- GET Search with datetime=/1985-04-12T23:20:50.52Z returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52Z/ returned status code 400
+- GET Search with datetime=37-01-01T12:00:27.87Z returned status code 500 instead of 400
+- GET Search with ids and non-intersecting bbox returned results, indicating the ids parameter is overriding the bbox parameter. All parameters are applied equally since STAC API 1.0.0-beta.1
+- POST Search with ids and non-intersecting bbox returned results, indicating the ids parameter is overriding the bbox parameter. All parameters are applied equally since STAC API 1.0.0-beta.1
+- [Item Search] GET Search results for intersects={"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]} do not all intersect
+- [Item Search Filter Ext] / : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing
+- [Item Search - Filter Ext] Queryables 'https://planetarycomputer.microsoft.com/api/stac/v1/queryables' returned Content-Type header 'application/json', must return 'application/schema+json'
+- [Item Search - Filter Ext] Queryables 'https://planetarycomputer.microsoft.com/api/stac/v1/queryables' '$id' value invalid, must be same as queryables url
+- [Item Search Filter Ext] GET datetime = TIMESTAMP('2021-04-08T04:39:23Z') returned status code 500
+- [Item Search Filter Ext] POST {'op': '=', 'args': [{'property': 'datetime'}, {'timestamp': '2021-04-08T04:39:23Z'}]} returned status code 500
 ```
 
 ### Snap Planet (resto)
 
 URL: https://tamn.snapplanet.io/
 
-Date: 14-Mar-2022
+Date: 03-Oct-2022
 
 Output
 
 ```
-Validating https://tamn.snapplanet.io/
+$ poetry run stac-api-validator --root-url https://tamn.snapplanet.io  --conformance features --conformance item-search --collection S2 --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}' --no-post
+Validating https://tamn.snapplanet.io
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
+WARNING: Collections validation is not yet fully implemented.
+WARNING: Features validation is not yet fully implemented.
 STAC API - Item Search conformance class found.
-warnings: none
+STAC API - Item Search - Filter extension conformance class found.
+CQL2 - CQL2-Text conformance class found.
+CQL2 - Basic CQL2 conformance class found.
+CQL2 - Basic Spatial Operators conformance class found.
+warnings:
+- Landing Page conforms to and conformance conformsTo must be the same
 errors:
-- GET Search with {'limit': 10000} returned status code 400
-- GET Search with {'collections': 'L8'} returned status code 504
+- [Item Search Filter Ext] GET eo:cloud_cover > 50 OR eo:cloud_cover < 10 returned status code 504
+- [Item Search Filter Ext] GET eo:cloud_cover > 50 OR eo:cloud_cover < 10 OR (eo:cloud_cover IS NULL AND eo:cloud_cover IS NULL) returned status code 400
+- [Item Search Filter Ext] GET collection <> 'S2' returned status code 504
+- [Item Search Filter Ext] GET datetime = TIMESTAMP('2021-04-08T04:39:23Z') returned status code 504
+- [Item Search Filter Ext] GET datetime < TIMESTAMP('2021-04-08T04:39:23Z') returned status code 504
+- [Item Search Filter Ext] GET datetime <= TIMESTAMP('2021-04-08T04:39:23Z') returned status code 504
+- [Item Search Filter Ext] GET collection = 'S2' AND eo:cloud_cover <= 10 AND datetime >= TIMESTAMP('2021-04-08T04:39:23Z') AND S_INTERSECTS(geometry, POLYGON((43.5845 -79.5442, 43.6079 -79.4893, 43.5677 -79.4632, 43.6129 -79.3925, 43.6223 -79.3238, 43.6576 -79.3163, 43.7945 -79.1178, 43.8144 -79.1542, 43.8555 -79.1714, 43.7509 -79.6390, 43.5845 -79.5442))) returned status code 400
 ```
 
 ### EarthData CMR (stac-cmr)
