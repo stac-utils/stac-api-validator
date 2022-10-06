@@ -1321,17 +1321,24 @@ def _validate_search_ids_with_ids_no_override(
     }
 
     r = requests.get(search_url, params=get_params)
-    try:
-        if len(r.json().get("features")) > 0:
-            errors.append(
-                "GET Search with ids and non-intersecting bbox returned results, indicating "
-                "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
-                "STAC API 1.0.0-beta.1"
-            )
-    except json.decoder.JSONDecodeError:
+
+    if not (r.status_code == 200):
         errors.append(
-            f"GET Search with {get_params} returned non-json response: {r.text}"
+            f"GET Search with id and other parameters returned status code {r.status_code}"
         )
+    else:
+
+        try:
+            if len(r.json().get("features", [])) > 0:
+                errors.append(
+                    "GET Search with ids and non-intersecting bbox returned results, indicating "
+                    "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
+                    "STAC API 1.0.0-beta.1"
+                )
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"GET Search with {get_params} returned non-json response: {r.text}"
+            )
 
     if post:
         post_params = {
@@ -1342,17 +1349,22 @@ def _validate_search_ids_with_ids_no_override(
 
         r = requests.post(search_url, json=post_params)
 
-        try:
-            if len(r.json().get("features")) > 0:
-                errors.append(
-                    "POST Search with ids and non-intersecting bbox returned results, indicating "
-                    "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
-                    "STAC API 1.0.0-beta.1"
-                )
-        except json.decoder.JSONDecodeError:
+        if not (r.status_code == 200):
             errors.append(
-                f"POST Search with {get_params} returned non-json response: {r.text}"
+                f"POST Search with id and other parameters returned status code {r.status_code}"
             )
+        else:
+            try:
+                if len(r.json().get("features", [])) > 0:
+                    errors.append(
+                        "POST Search with ids and non-intersecting bbox returned results, indicating "
+                        "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
+                        "STAC API 1.0.0-beta.1"
+                    )
+            except json.decoder.JSONDecodeError:
+                errors.append(
+                    f"POST Search with {get_params} returned non-json response: {r.text}"
+                )
 
 
 def validate_item_search_ids(
