@@ -503,8 +503,9 @@ def validate_features(
 
         try:
             conformance_json = r_conformance.json()
-            if set(root_body.get("conformsTo", [])) == set(
-                conformance_json["conformsTo"]
+            if not (
+                set(root_body.get("conformsTo", []))
+                == set(conformance_json["conformsTo"])
             ):
                 warnings.append(
                     "Landing Page conforms to and conformance conformsTo must be the same",
