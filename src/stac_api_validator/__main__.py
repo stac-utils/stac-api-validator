@@ -29,11 +29,11 @@ from stac_api_validator.validations import validate_api
 )
 @click.option(
     "--collection",
-    help="The name of the collection to use for some tests.",
+    help="The name of the collection to use for item-search, collections, and features tests.",
 )
 @click.option(
     "--geometry",
-    help="The geometry to use for intersection tests.",
+    help="The GeoJSON geometry to use for intersection tests.",
 )
 @click.option(
     "--conformance",
@@ -52,7 +52,7 @@ from stac_api_validator.validations import validate_api
         ],
         case_sensitive=False,
     ),
-    help="Conformance class URIs to validate",
+    help="The conformance classes to validate.",
 )
 def main(
     log_level: str,

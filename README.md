@@ -94,11 +94,12 @@ Options:
   --root-url TEXT                 STAC API Root / Landing Page URL  [required]
   --post / --no-post              Test all validations with POST method for
                                   requests in addition to GET
-  --collection TEXT               The name of the collection to use for some
+  --collection TEXT               The name of the collection to use for item-
+                                  search, collections, and features tests.
+  --geometry TEXT                 The GeoJSON geometry to use for intersection
                                   tests.
-  --geometry TEXT                 The geometry to use for intersection tests.
-  --conformance [core|browseable|item-search|features|collections|children]
-                                  Conformance class URIs to validate
+  --conformance [core|browseable|item-search|features|collections|children|filter]
+                                  The conformance classes to validate.
                                   [required]
   --help                          Show this message and exit.
 ```
