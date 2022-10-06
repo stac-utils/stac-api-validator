@@ -152,7 +152,6 @@ WARNING: Features validation is not yet fully implemented.
 STAC API - Item Search conformance class found.
 STAC API - Item Search - Filter extension conformance class found.
 warnings:
-- Landing Page conforms to and conformance conformsTo must be the same
 - GET Search with datetime=1985-04-12 returned status code 200 instead of 400
 - GET Search with datetime=1937-01-01T12:00:27.87+0100 returned status code 200 instead of 400
 - GET Search with datetime=1985-12-12T23:20:50.52 returned status code 200 instead of 400
@@ -179,12 +178,12 @@ errors:
 
 URL: https://tamn.snapplanet.io/
 
-Date: 03-Oct-2022
+Date: 06-Oct-2022
 
 Output
 
 ```
-$ poetry run stac-api-validator --root-url https://tamn.snapplanet.io  --conformance features --conformance item-search --collection S2 --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}' --no-post
+$ poetry run stac-api-validator --root-url https://tamn.snapplanet.io  --conformance features --conformance item-search --conformance filter --collection S2 --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}' --no-post
 Validating https://tamn.snapplanet.io
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
@@ -195,8 +194,7 @@ STAC API - Item Search - Filter extension conformance class found.
 CQL2 - CQL2-Text conformance class found.
 CQL2 - Basic CQL2 conformance class found.
 CQL2 - Basic Spatial Operators conformance class found.
-warnings:
-- Landing Page conforms to and conformance conformsTo must be the same
+warnings: none
 errors:
 - [Item Search Filter Ext] GET eo:cloud_cover > 50 OR eo:cloud_cover < 10 returned status code 504
 - [Item Search Filter Ext] GET eo:cloud_cover > 50 OR eo:cloud_cover < 10 OR (eo:cloud_cover IS NULL AND eo:cloud_cover IS NULL) returned status code 400
@@ -211,125 +209,95 @@ errors:
 
 URL: https://cmr.earthdata.nasa.gov/stac/USGS_EROS
 
-Date: 19-Jan-2022
+Date: 06-Oct-2022
+
+Notes: Features is supported, but not advertised in conformsTo
 
 Output:
 
 ```
+$ poetry run stac-api-validator --root-url https://cmr.earthdata.nasa.gov/stac/USGS_EROS --conformance item-search --collection Landsat1-5_MSS_C1.v1 --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
+
 Validating https://cmr.earthdata.nasa.gov/stac/USGS_EROS
 STAC API - Core conformance class found.
 STAC API - Item Search conformance class found.
-STAC API - Item Search Fields extension conformance class found.
 warnings:
-- Search with datetime=1985-04-12 returned status code 200 instead of 400
+- GET Search with datetime=1985-04-12 returned status code 200 instead of 400
 errors:
-- / : Link[rel=service-desc] should have media_type 'application/vnd.oai.openapi+json;version=3.0', actually 'application/vnd.oai.openapi;version=3.0'
-- service-desc ({'rel': 'service-desc', 'href': 'https://api.stacspec.org/v1.0.0-beta.1/openapi.yaml', 'title': 'OpenAPI Doc', 'type': 'application/vnd.oai.openapi;version=3.0'}): should have content-type header 'application/vnd.oai.openapi+json;version=3.0', actually 'text/yaml'
-- service-desc ({'rel': 'service-desc', 'href': 'https://api.stacspec.org/v1.0.0-beta.1/openapi.yaml', 'title': 'OpenAPI Doc', 'type': 'application/vnd.oai.openapi;version=3.0'}): should return JSON, instead got non-JSON text
-- GET Search with {'limit': 10000} returned status code 400
-- POST Search with {'limit': 10000} returned status code 400
-- GET Search with {'limit': 0} returned status code 200, should be 400
-- POST Search with {'limit': 0} returned status code 200, should be 400
+- service-desc ({'rel': 'service-desc', 'href': 'https://api.stacspec.org/v1.0.0-beta.1/openapi.yaml', 'title': 'OpenAPI Doc', 'type': 'application/vnd.oai.openapi;version=3.0'}): media type used in Accept header must get response with same Content-Type header: used 'application/vnd.oai.openapi;version=3.0', got 'text/yaml'
+- POST Search with bbox and intersects returned status code 200
 - GET Search with bbox=100.0,0.0,105.0,1.0 returned status code 400
 - GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 400
 - POST Search with bbox:[100.0, 0.0, 0.0, 105.0, 1.0, 1.0] returned status code 400
-- Search with datetime=1972-07-25T00:00:00.000Z extracted from an Item returned status code 400
-- Search with datetime=1985-04-12T23:20:50.52Z returned status code 400
-- Search with datetime=1996-12-19T16:39:57-00:00 returned status code 400
-- Search with datetime=1996-12-19T16:39:57+00:00 returned status code 400
-- Search with datetime=1996-12-19T16:39:57-08:00 returned status code 400
-- Search with datetime=1996-12-19T16:39:57+08:00 returned status code 400
-- Search with datetime=../1985-04-12T23:20:50.52Z returned status code 400
-- Search with datetime=1985-04-12T23:20:50.52Z/.. returned status code 400
-- Search with datetime=/1985-04-12T23:20:50.52Z returned status code 400
-- Search with datetime=1985-04-12T23:20:50.52Z/ returned status code 400
-- Search with datetime=1985-04-12T23:20:50.52Z/1986-04-12T23:20:50.52Z returned status code 400
-- Search with datetime=1985-04-12T23:20:50.52+01:00/1986-04-12T23:20:50.52+01:00 returned status code 400
-- Search with datetime=1985-04-12T23:20:50.52-01:00/1986-04-12T23:20:50.52-01:00 returned status code 400
-- Search with datetime=1937-01-01T12:00:27.87+01:00 returned status code 400
-- Search with datetime=1985-04-12T23:20:50.52Z returned status code 400
-- Search with datetime=1937-01-01T12:00:27.8710+01:00 returned status code 400
-- Search with datetime=1937-01-01T12:00:27.8+01:00 returned status code 400
-- Search with datetime=1937-01-01T12:00:27.8Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.000+03:00 returned status code 400
-- Search with datetime=2020-07-23T00:00:00+03:00 returned status code 400
-- Search with datetime=1985-04-12t23:20:50.000z returned status code 400
-- Search with datetime=2020-07-23T00:00:00Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.0Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.01Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.012Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.0123Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.01234Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.012345Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.0123456Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.01234567Z returned status code 400
-- Search with datetime=2020-07-23T00:00:00.012345678Z returned status code 400
+- GET Search with datetime=1972-07-25T00:00:00.000Z extracted from an Item returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52Z returned status code 400
+- GET Search with datetime=1996-12-19T16:39:57-00:00 returned status code 400
+- GET Search with datetime=1996-12-19T16:39:57+00:00 returned status code 400
+- GET Search with datetime=1996-12-19T16:39:57-08:00 returned status code 400
+- GET Search with datetime=1996-12-19T16:39:57+08:00 returned status code 400
+- GET Search with datetime=../1985-04-12T23:20:50.52Z returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52Z/.. returned status code 400
+- GET Search with datetime=/1985-04-12T23:20:50.52Z returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52Z/ returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52Z/1986-04-12T23:20:50.52Z returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52+01:00/1986-04-12T23:20:50.52+01:00 returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52-01:00/1986-04-12T23:20:50.52-01:00 returned status code 400
+- GET Search with datetime=1937-01-01T12:00:27.87+01:00 returned status code 400
+- GET Search with datetime=1985-04-12T23:20:50.52Z returned status code 400
+- GET Search with datetime=1937-01-01T12:00:27.8710+01:00 returned status code 400
+- GET Search with datetime=1937-01-01T12:00:27.8+01:00 returned status code 400
+- GET Search with datetime=1937-01-01T12:00:27.8Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.000+03:00 returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00+03:00 returned status code 400
+- GET Search with datetime=1985-04-12t23:20:50.000z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.0Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.01Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.012Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.0123Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.01234Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.012345Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.0123456Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.01234567Z returned status code 400
+- GET Search with datetime=2020-07-23T00:00:00.012345678Z returned status code 400
+- GET Search with id and other parameters returned status code 400
+- GET Search with intersects={'type': 'Point', 'coordinates': [100.0, 0.0]} returned status code 400
+- GET Search with intersects={'type': 'LineString', 'coordinates': [[100.0, 0.0], [101.0, 1.0]]} returned status code 400
+- GET Search with intersects={'type': 'Polygon', 'coordinates': [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]} returned status code 400
+- GET Search with intersects={'type': 'Polygon', 'coordinates': [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]], [[100.8, 0.8], [100.8, 0.2], [100.2, 0.2], [100.2, 0.8], [100.8, 0.8]]]} returned status code 400
+- POST Search with intersects:{'type': 'Polygon', 'coordinates': [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]], [[100.8, 0.8], [100.8, 0.2], [100.2, 0.2], [100.2, 0.8], [100.8, 0.8]]]} returned status code 400
+- GET Search with intersects={'type': 'MultiPoint', 'coordinates': [[100.0, 0.0], [101.0, 1.0]]} returned status code 400
+- GET Search with intersects={'type': 'MultiLineString', 'coordinates': [[[100.0, 0.0], [101.0, 1.0]], [[102.0, 2.0], [103.0, 3.0]]]} returned status code 400
+- GET Search with intersects={'type': 'MultiPolygon', 'coordinates': [[[[102.0, 2.0], [103.0, 2.0], [103.0, 3.0], [102.0, 3.0], [102.0, 2.0]]], [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]], [[100.2, 0.2], [100.2, 0.8], [100.8, 0.8], [100.8, 0.2], [100.2, 0.2]]]]} returned status code 400
+- POST Search with intersects:{'type': 'MultiPolygon', 'coordinates': [[[[102.0, 2.0], [103.0, 2.0], [103.0, 3.0], [102.0, 3.0], [102.0, 2.0]]], [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]], [[100.2, 0.2], [100.2, 0.8], [100.8, 0.8], [100.8, 0.2], [100.2, 0.2]]]]} returned status code 400
+- GET Search with intersects={'type': 'GeometryCollection', 'geometries': [{'type': 'Point', 'coordinates': [100.0, 0.0]}, {'type': 'LineString', 'coordinates': [[101.0, 0.0], [102.0, 1.0]]}]} returned status code 400
+- POST Search with intersects:{'type': 'GeometryCollection', 'geometries': [{'type': 'Point', 'coordinates': [100.0, 0.0]}, {'type': 'LineString', 'coordinates': [[101.0, 0.0], [102.0, 1.0]]}]} returned status code 400
+- [Item Search] GET Search result for intersects={"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]} returned no results
+- [Item Search] POST Search result for intersects={"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]} returned no results
 ```
 
 ### Landsat Look (stac-server)
 
 URL: https://landsatlook.usgs.gov/stac-server
 
-Date: 14-Feb-2022
+Date: 06-Oct-2022
 
 ```
+poetry run stac-api-validator --root-url https://landsatlook.usgs.gov/stac-server --conformance features --conformance item-search \
+--collection landsat-c2l2-sr --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
+
 Validating https://landsatlook.usgs.gov/stac-server
 STAC API - Core conformance class found.
+STAC API - Features conformance class found.
+WARNING: Collections validation is not yet fully implemented.
+WARNING: Features validation is not yet fully implemented.
 STAC API - Item Search conformance class found.
-STAC API - Item Search Fields extension conformance class found.
-warnings:
-- / : Link[rel=service-doc] must exist
-- Search with datetime=1985-04-12 returned status code 200 instead of 400
-- Search with datetime=1937-01-01T12:00:27.87+0100 returned status code 200 instead of 400
-- Search with datetime=1985-12-12T23:20:50.52 returned status code 200 instead of 400
-- Search with datetime=1985-04-12T23:20:50.Z returned status code 200 instead of 400
-- Search with datetime=1985-04-12T23:20:50,Z returned status code 200 instead of 400
-- Search with datetime=1986-04-12T23:20:50.52Z/1985-04-12T23:20:50.52Z returned status code 200 instead of 400
-- Search with datetime=1985-04-12T23:20:50,52Z returned status code 200 instead of 400
+warnings: none
 errors:
-- / : Link[rel=root] must exist
-- service-desc ({'rel': 'service-desc', 'type': 'application/vnd.oai.openapi+json;version=3.0', 'href': 'https://landsatlook.usgs.gov/stac-server/api'}): link must advertise same type as endpoint content-type header, advertised 'application/vnd.oai.openapi+json;version=3.0', actually 'application/json'
-- Search (https://landsatlook.usgs.gov/stac-server/search): must have content-type header 'application/geo+json', actually 'application/json'
 - POST Search with {'limit': 1} returned status code 403
 - POST Search with {'limit': 2} returned status code 403
 - POST Search with {'limit': 10} returned status code 403
-- GET Search with {'limit': 10000} returned status code 502
-- POST Search with {'limit': 10000} returned status code 403
-- GET Search with {'limit': -1} returned status code 200, must be 400
 - POST Search with {'limit': -1} returned status code 403, must be 400
-- GET Search with {'limit': 0} returned status code 200, must be 400
-- POST Search with {'limit': 0} returned status code 403, must be 400
-- GET Search with {'limit': 10001} returned status code 404, must be 400
-- POST Search with {'limit': 10001} returned status code 403, must be 400
-- GET Search with bbox=100.0,0.0,105.0,1.0 returned status code 404
-- GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 404
-- GET Search with bbox=[100.0, 0.0, 105.0, 1.0] returned status code 200, instead of 400
-- POST Search with bbox:"100.0, 0.0, 105.0, 1.0" returned status code 404, instead of 400
-- GET Search with bbox=param (lat 1 > lat 2) returned status code 404, instead of 400
-- POST Search with bbox: [100.0, 1.0, 105.0, 0.0] (lat 1 > lat 2) returned status code 200, instead of 400
-- GET Search with bbox=0 returned status code 200, instead of 400
-- POST Search with bbox:[0] returned status code 404, instead of 400
-- GET Search with bbox=0,0 returned status code 404, instead of 400
-- POST Search with bbox:[0, 0] returned status code 404, instead of 400
-- GET Search with bbox=0,0,0 returned status code 404, instead of 400
-- POST Search with bbox:[0, 0, 0] returned status code 404, instead of 400
-- GET Search with bbox=0,0,0,1,1 returned status code 404, instead of 400
-- POST Search with bbox:[0, 0, 0, 1, 1] returned status code 404, instead of 400
-- GET Search with bbox=0,0,0,1,1,1,1 returned status code 404, instead of 400
-- POST Search with bbox:[0, 0, 0, 1, 1, 1, 1] returned status code 404, instead of 400
-- Search with datetime=../1985-04-12T23:20:50.52Z returned status code 404
-- Search with datetime=1985-04-12T23:20:50.52Z/.. returned status code 404
-- Search with datetime=/1985-04-12T23:20:50.52Z returned status code 404
-- Search with datetime=1985-04-12T23:20:50.52Z/ returned status code 404
-- Search with datetime=1985-04-12t23:20:50.000z returned status code 404
-- Search with datetime=37-01-01T12:00:27.87Z returned status code 404 instead of 400
-- Search with datetime=21985-12-12T23:20:50.52Z returned status code 404 instead of 400
-- Search with datetime=1985-13-12T23:20:50.52Z returned status code 404 instead of 400
-- Search with datetime=1985-12-32T23:20:50.52Z returned status code 404 instead of 400
-- Search with datetime=1985-12-01T25:20:50.52Z returned status code 404 instead of 400
-- Search with datetime=1985-12-01T00:60:50.52Z returned status code 404 instead of 400
-- Search with datetime=1985-12-01T00:06:61.52Z returned status code 404 instead of 400
-- Search with datetime=1990-12-31T23:59:61Z returned status code 404 instead of 400
 ```
 
 ### Franklin NASA HSI
@@ -375,21 +343,6 @@ errors:
 - Search with datetime=1937-01-01T12:00:27.8+01:00 returned status code 400
 - Search with datetime=2020-07-23T00:00:00.000+03:00 returned status code 400
 - Search with datetime=2020-07-23T00:00:00+03:00 returned status code 400
-```
-
-### staccato.space
-
-URL: https://staccato.space/
-
-Date: 2-Jul-2021
-
-Output:
-
-```
-Validating https://staccato.space/
-warnings: none
-errors:
-- / : 'conformsTo' must contain at least one STAC API conformance class.
 ```
 
 ### EarthAI OnDemand
