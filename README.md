@@ -41,7 +41,10 @@ and then run it:
 ```console
 $ stac-api-validator \
     --root-url https://planetarycomputer.microsoft.com/api/stac/v1/ \
-    --conformance core --conformance item-search
+    --conformance core \
+    --conformance item-search \
+    --collection sentinel-2-l2a \
+    --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
 ```
 
 ## Contributing
@@ -52,6 +55,14 @@ To learn more, see the [Contributor Guide].
 ## Usage
 
 Please see the [Command-line Reference] for details.
+
+The conformance class validations to run are selected with the `--conformance` parameters. This parameter
+can be used more than once to specify multiple conformance classes to validate. The `STAC API - Core` conformance
+class will always be validated, even if not specified.
+
+If `item-search`, `collections`, and/or `features` are specified, the `--collection` and `--geometry` parameters must also
+be specified. The `--collection` parameter specifies the name of a collection to use for some of the validations.
+The `--geometry` should specify an AOI over which there are some results in that collection.
 
 ## Features
 
