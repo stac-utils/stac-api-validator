@@ -6,8 +6,8 @@
 [![License](https://img.shields.io/pypi/l/stac-api-validator)][license]
 
 [![Read the documentation at https://stac-api-validator.readthedocs.io/](https://img.shields.io/readthedocs/stac-api-validator/latest.svg?label=Read%20the%20Docs)][read the docs]
-[![Tests](https://github.com/philvarner/stac-api-validator/workflows/Tests/badge.svg)][tests]
-[![Codecov](https://codecov.io/gh/philvarner/stac-api-validator/branch/main/graph/badge.svg)][codecov]
+[![Tests](https://github.com/stac-utils/stac-api-validator/workflows/Tests/badge.svg)][tests]
+[![Codecov](https://codecov.io/gh/stac-utils/stac-api-validator/branch/main/graph/badge.svg)][codecov]
 
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)][pre-commit]
 [![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
@@ -16,8 +16,8 @@
 [status]: https://pypi.org/project/stac-api-validator/
 [python version]: https://pypi.org/project/stac-api-validator
 [read the docs]: https://stac-api-validator.readthedocs.io/
-[tests]: https://github.com/philvarner/stac-api-validator/actions?workflow=Tests
-[codecov]: https://app.codecov.io/gh/philvarner/stac-api-validator
+[tests]: https://github.com/stac-utils/stac-api-validator/actions?workflow=Tests
+[codecov]: https://app.codecov.io/gh/stac-utils/stac-api-validator
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [black]: https://github.com/psf/black
 
@@ -198,11 +198,11 @@ This project was generated from [@cjolowicz]'s [Hypermodern Python Cookiecutter]
 [@cjolowicz]: https://github.com/cjolowicz
 [pypi]: https://pypi.org/
 [hypermodern python cookiecutter]: https://github.com/cjolowicz/cookiecutter-hypermodern-python
-[file an issue]: https://github.com/philvarner/stac-api-validator/issues
+[file an issue]: https://github.com/stac-utils/stac-api-validator/issues
 [pip]: https://pip.pypa.io/
 
 <!-- github-only -->
 
-[license]: https://github.com/philvarner/stac-api-validator/blob/main/LICENSE
-[contributor guide]: https://github.com/philvarner/stac-api-validator/blob/main/CONTRIBUTING.md
+[license]: https://github.com/stac-utils/stac-api-validator/blob/main/LICENSE
+[contributor guide]: https://github.com/stac-utils/stac-api-validator/blob/main/CONTRIBUTING.md
 [command-line reference]: https://stac-api-validator.readthedocs.io/en/latest/usage.html

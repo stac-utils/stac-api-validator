@@ -13,7 +13,7 @@ classifiers = [
 ]
 
 [tool.poetry.urls]
-Changelog = "https://github.com/philvarner/stac-api-validator/releases"
+Changelog = "https://github.com/stac-utils/stac-api-validator/releases"
 
 [tool.poetry.dependencies]
 python = "^3.10"

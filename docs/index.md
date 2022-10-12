@@ -19,5 +19,5 @@ reference
 contributing
 Code of Conduct <codeofconduct>
 License <license>
-Changelog <https://github.com/philvarner/stac-api-validator/releases>
+Changelog <https://github.com/stac-utils/stac-api-validator/releases>
 ```
