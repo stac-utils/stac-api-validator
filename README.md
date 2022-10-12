@@ -26,6 +26,11 @@
 The STAC API Validator is the official validation suite for the
 [STAC API](https://github.com/radiantearth/stac-api-spec/) family of specifications.
 
+## Documentation
+
+See the [stable](https://stac-api-validator.readthedocs.io/en/stable/) or
+[latest](https://stac-api-validator.readthedocs.io/en/latest) documentation pages.
+
 ## Installation
 
 STAC API Validator requires Python 3.10.
