@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "stac-api-validator"
-version = "0.1.0"
+version = "0.1.1"
 description = "STAC API Validator"
 authors = ["Phil Varner <phil@philvarner.com>"]
 license = "Apache-2.0"
 readme = "README.md"
-homepage = "https://github.com/philvarner/stac-api-validator"
-repository = "https://github.com/philvarner/stac-api-validator"
+homepage = "https://github.com/stac-utils/stac-api-validator"
+repository = "https://github.com/stac-utils/stac-api-validator"
 documentation = "https://stac-api-validator.readthedocs.io"
 classifiers = [
     "Development Status :: 4 - Beta",
