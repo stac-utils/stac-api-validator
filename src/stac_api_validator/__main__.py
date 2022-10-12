@@ -66,8 +66,6 @@ def main(
 
     logging.basicConfig(stream=sys.stdout, level=log_level)
 
-    print(f"Validating {root_url}", flush=True)
-
     try:
         (warnings, errors) = validate_api(
             root_url=root_url,
