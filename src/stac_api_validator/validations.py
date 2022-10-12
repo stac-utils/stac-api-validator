@@ -207,12 +207,8 @@ def validate_api(
     if not root_body.get("links"):
         errors.append("/ : 'links' field must be defined and non-empty.")
 
-    if "core" in conformance_classes and not any(
-        cc_core_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Core configured for validation, but not contained in 'conformsTo'"
-        )
+    if not any(cc_core_regex.fullmatch(x) for x in conforms_to):
+        errors.append("/: STAC API - Core not contained in 'conformsTo'")
 
     if "browseable" in conformance_classes and not any(
         cc_browseable_regex.fullmatch(x) for x in conforms_to
@@ -265,30 +261,30 @@ def validate_api(
     if errors:
         return warnings, errors
 
-    print("STAC API - Core conformance class found.")
+    print("Validating STAC API - Core conformance class")
     validate_core(root_body, warnings, errors)
 
     if "browseable" in conformance_classes:
-        print("STAC API - Browseable conformance class found.")
+        print("Validating STAC API - Browseable conformance class.")
         validate_browseable(root_body, warnings, errors)
 
     if "children" in conformance_classes:
-        print("STAC API - Children conformance class found.")
+        print("Validating STAC API - Children conformance class.")
         validate_children(root_body, warnings, errors)
 
     if "collections" in conformance_classes:
-        print("STAC API - Collections conformance class found.")
+        print("Validating STAC API - Collections conformance class.")
         validate_collections(root_body, collection, warnings, errors)  # type:ignore
 
     if "features" in conformance_classes:
-        print("STAC API - Features conformance class found.")
+        print("Validating STAC API - Features conformance class.")
         validate_collections(root_body, collection, warnings, errors)  # type:ignore
         validate_features(
             root_body, conforms_to, collection, warnings, errors  # type:ignore
         )
 
     if "item-search" in conformance_classes:
-        print("STAC API - Item Search conformance class found.")
+        print("Validating STAC API - Item Search conformance class.")
         validate_item_search(
             root_url=root_url,
             root_body=root_body,
@@ -326,6 +322,9 @@ def validate_core(
     root_body: Dict[str, Any], warnings: List[str], errors: List[str]
 ) -> None:
     links = root_body.get("links")
+
+    if links is None:
+        errors.append("/ : 'links' attribute missing")
 
     if not (root := link_by_rel(links, "root")):
         errors.append("/ : Link[rel=root] must exist")
@@ -505,7 +504,7 @@ def validate_features(
             conformance_json = r_conformance.json()
             if not (
                 set(root_body.get("conformsTo", []))
-                == set(conformance_json["conformsTo"])
+                == set(conformance_json.get("conformsTo", []))
             ):
                 warnings.append(
                     "Landing Page conforms to and conformance conformsTo must be the same",
@@ -763,7 +762,7 @@ def validate_item_search_filter(
         errors=errors,
     )
 
-    conforms_to = root_body["conformsTo"]
+    conforms_to = root_body.get("conformsTo", [])
 
     cql2_text_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/cql2-text" in conforms_to
