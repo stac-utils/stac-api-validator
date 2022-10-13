@@ -261,20 +261,26 @@ def validate_api(
     if errors:
         return warnings, errors
 
-    print("Validating STAC API - Core conformance class")
+    print("Validating STAC API - Core conformance class.")
     validate_core(root_body, warnings, errors)
 
     if "browseable" in conformance_classes:
         print("Validating STAC API - Browseable conformance class.")
         validate_browseable(root_body, warnings, errors)
+    else:
+        print("Skipping STAC API - Browseable conformance class.")
 
     if "children" in conformance_classes:
         print("Validating STAC API - Children conformance class.")
         validate_children(root_body, warnings, errors)
+    else:
+        print("Skipping STAC API - Children conformance class.")
 
     if "collections" in conformance_classes:
         print("Validating STAC API - Collections conformance class.")
         validate_collections(root_body, collection, warnings, errors)  # type:ignore
+    else:
+        print("Skipping STAC API - Collections conformance class.")
 
     if "features" in conformance_classes:
         print("Validating STAC API - Features conformance class.")
@@ -282,6 +288,8 @@ def validate_api(
         validate_features(
             root_body, conforms_to, collection, warnings, errors  # type:ignore
         )
+    else:
+        print("Skipping STAC API - Features conformance class.")
 
     if "item-search" in conformance_classes:
         print("Validating STAC API - Item Search conformance class.")
@@ -296,6 +304,8 @@ def validate_api(
             geometry=geometry,  # type:ignore
             conformance_classes=conformance_classes,
         )
+    else:
+        print("Skipping STAC API - Item Search conformance class.")
 
     if not errors:
         try:
@@ -549,12 +559,14 @@ def validate_features(
     #     print("STAC API - Features - Filter extension conformance class found.")
 
     if any(cc_features_filter_regex.fullmatch(x) for x in conforms_to):
-        print("STAC API - Features - Filter extension conformance class found.")
+        print("STAC API - Features - Filter Extension conformance class found.")
         validate_features_filter(
             root_body=root_body,
             collection=collection,
             errors=errors,
         )
+    else:
+        print("Skipping STAC API - Features - Filter Extension conformance class.")
 
 
 def validate_item_search(
@@ -648,8 +660,7 @@ def validate_item_search(
         or x.endswith("item-search#filter:filter")
         for x in conforms_to
     ):
-        print("STAC API - Item Search - Filter extension conformance class found.")
-
+        print("Validating STAC API - Item Search - Filter Extension conformance class.")
         validate_item_search_filter(
             root_url=root_url,
             root_body=root_body,
@@ -658,6 +669,8 @@ def validate_item_search(
             warnings=warnings,
             errors=errors,
         )
+    else:
+        print("Skipping STAC API - Item Search - Filter Extension conformance class.")
 
 
 def validate_filter_queryables(
@@ -752,7 +765,7 @@ def validate_item_search_filter(
         )
     ):
         errors.append(
-            "[Item Search Filter Ext] / : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
+            "[Item Search - Filter Ext] / : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
         )
 
     validate_filter_queryables(
@@ -772,7 +785,13 @@ def validate_item_search_filter(
     )
 
     if cql2_text_supported:
-        print("CQL2 - CQL2-Text conformance class found.")
+        print(
+            "Validating STAC API - Item Search - Filter Extension - CQL2-Text conformance class."
+        )
+    else:
+        print(
+            "Skipping STAC API - Item Search - Filter Extension - CQL2-Text conformance class."
+        )
 
     cql2_json_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/cql2-json" in conforms_to
@@ -782,7 +801,13 @@ def validate_item_search_filter(
     )
 
     if cql2_json_supported:
-        print("CQL2 - CQL2-JSON conformance class found.")
+        print(
+            "Validating STAC API - Item Search - Filter Extension - CQL2-JSON conformance class."
+        )
+    else:
+        print(
+            "Skipping STAC API - Item Search - Filter Extension - CQL2-JSON conformance class."
+        )
 
     basic_cql2_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/basic-cql2" in conforms_to
@@ -792,14 +817,27 @@ def validate_item_search_filter(
     )
 
     if basic_cql2_supported:
-        print("CQL2 - Basic CQL2 conformance class found.")
+        print(
+            "Validating STAC API - Item Search - Filter Extension - Basic CQL2 conformance class."
+        )
+    else:
+        print(
+            "Skipping STAC API - Item Search - Filter Extension - Basic CQL2 conformance class."
+        )
 
     advanced_comparison_operators_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
         in conforms_to
     )
+
     if advanced_comparison_operators_supported:
-        print("CQL2 - Advanced Comparison Operators conformance class found.")
+        print(
+            "Validating STAC API - Item Search - Filter Extension - Advanced Comparison Operators conformance class."
+        )
+    else:
+        print(
+            "Skipping STAC API - Item Search - Filter Extension - Advanced Comparison Operators conformance class."
+        )
 
     basic_spatial_operators_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/basic-spatial-operators"
@@ -807,14 +845,26 @@ def validate_item_search_filter(
     )
 
     if basic_spatial_operators_supported:
-        print("CQL2 - Basic Spatial Operators conformance class found.")
+        print(
+            "Validating STAC API - Item Search - Filter Extension - Basic Spatial Operators conformance class."
+        )
+    else:
+        print(
+            "Skipping STAC API - Item Search - Filter Extension - Basic Spatial Operators conformance class."
+        )
 
     temporal_operators_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/temporal-operators" in conforms_to
     )
 
     if temporal_operators_supported:
-        print("CQL2 - Temporal Operators conformance class found.")
+        print(
+            "Validating STAC API - Item Search - Filter Extension - Temporal Operators conformance class."
+        )
+    else:
+        print(
+            "Skipping STAC API - Item Search - Filter Extension - Temporal Operators conformance class."
+        )
 
     # todo: validate these
     # Spatial Operators: http://www.opengis.net/spec/cql2/1.0/conf/spatial-operators
@@ -905,7 +955,7 @@ def validate_item_search_filter(
         )
         if not (r.status_code == 200):
             errors.append(
-                f"[Item Search Filter Ext] GET {f_text} returned status code {r.status_code}"
+                f"[Item Search - Filter Ext] GET {f_text} returned status code {r.status_code}"
             )
 
     for f_json in filter_jsons:
@@ -914,7 +964,7 @@ def validate_item_search_filter(
         )
         if r.status_code != 200:
             errors.append(
-                f"[Item Search Filter Ext] POST {f_json} returned status code {r.status_code}"
+                f"[Item Search - Filter Ext] POST {f_json} returned status code {r.status_code}"
             )
 
 
