@@ -11,6 +11,7 @@ from typing import Tuple
 
 import requests
 import yaml
+from more_itertools import take
 from pystac import STACValidationError
 from pystac_client import Client
 from shapely.geometry import shape
@@ -320,8 +321,8 @@ def validate_api(
 
 
 def link_by_rel(
-    links: Optional[List[Dict[str, str]]], rel: str
-) -> Optional[Dict[str, str]]:
+    links: Optional[List[Dict[str, Any]]], rel: str
+) -> Optional[Dict[str, Any]]:
     if not links:
         return None
     else:
@@ -629,6 +630,15 @@ def validate_item_search(
         post=post,
         errors=errors,
         geometry=geometry,
+    )
+
+    validate_item_search_pagination(
+        root_url=root_url,
+        search_url=search_url,
+        collection=collection,
+        geometry=geometry,
+        post=post,
+        errors=errors,
     )
 
     # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
@@ -1031,6 +1041,158 @@ def validate_item_search_bbox_xor_intersects(
         if r.status_code != 400:
             errors.append(
                 f"POST Search with bbox and intersects returned status code {r.status_code}"
+            )
+
+
+def validate_item_search_pagination(
+    root_url: str,
+    search_url: str,
+    collection: str,
+    geometry: str,
+    post: bool,
+    errors: List[str],
+) -> None:
+    url = f"{search_url}?limit=1&collections={collection}"
+    r = requests.get(url)
+    if not r.status_code == 200:
+        errors.append(
+            "STAC API - Item Search GET pagination get failed for initial request"
+        )
+    else:
+        try:
+            first_body = r.json()
+            if link := link_by_rel(first_body.get("links"), "next"):
+                if (method := link.get("method")) and method != "GET":
+                    errors.append(
+                        f"STAC API - Item Search GET pagination first request 'next' link relation has method {method} instead of 'GET'"
+                    )
+
+                next_url = link.get("href")
+                if next_url is None:
+                    errors.append(
+                        "STAC API - Item Search GET pagination first request 'next' link relation missing href"
+                    )
+                else:
+                    if url == next_url:
+                        errors.append(
+                            "STAC API - Item Search GET pagination next href same as first url"
+                        )
+
+                    r = requests.get(next_url)
+                    if not r.status_code == 200:
+                        errors.append(
+                            f"STAC API - Item Search GET pagination get failed for next url {next_url}"
+                        )
+            else:
+                errors.append(
+                    "STAC API - Item Search GET pagination first request had no 'next' link relation"
+                )
+
+        except json.decoder.JSONDecodeError:
+            errors.append(
+                f"STAC API - Item Search GET pagination response failed {url}"
+            )
+
+    max_items = 100
+    client = Client.open(root_url)
+    search = client.search(
+        method="GET", collections=[collection], max_items=max_items, limit=5
+    )
+
+    items = list(search.items_as_dicts())
+
+    if len(items) > max_items:
+        errors.append(
+            "STAC API - Item Search GET pagination - more than max items returned from paginating"
+        )
+
+    if len(items) > len({item["id"] for item in items}):
+        errors.append(
+            "STAC API - Item Search GET pagination - duplicate items returned from paginating items"
+        )
+
+    # GET paging has a problem with intersects https://github.com/stac-utils/pystac-client/issues/335
+    # search = client.search(method="GET", collections=[collection], intersects=geometry)
+    # if len(list(take(20000, search.items_as_dicts()))) == 20000:
+    #     errors.append(
+    #         f"STAC API - Item Search GET pagination - paged through 20,000 results. This could mean the last page "
+    #         f"of results references itself, or your collection and geometry combination has too many results."
+    #     )
+
+    if post:
+        initial_json_body = {"limit": 1, "collections": [collection]}
+        r = requests.post(search_url, json=initial_json_body)
+        if not r.status_code == 200:
+            errors.append(
+                "STAC API - Item Search POST pagination get failed for initial request"
+            )
+        else:
+            try:
+                first_body = r.json()
+                if link := link_by_rel(first_body.get("links"), "next"):
+                    if (method := link.get("method")) and method != "POST":
+                        errors.append(
+                            f"STAC API - Item Search POST pagination first request 'next' link relation has method {method} instead of 'POST'"
+                        )
+
+                    next_url = link.get("href")
+                    if next_url is None:
+                        errors.append(
+                            "STAC API - Item Search POST pagination first request 'next' link relation missing href"
+                        )
+                    else:
+                        if url == next_url:
+                            errors.append(
+                                "STAC API - Item Search POST pagination next href same as first url"
+                            )
+
+                        next_body: Dict[str, Any] = link.get("body", {})
+                        if not link.get("merge", False):
+                            second_json_body = next_body
+                        else:
+                            second_json_body = initial_json_body
+                            second_json_body.update(next_body)
+
+                        r = requests.post(next_url, json=second_json_body)
+                        if not r.status_code == 200:
+                            errors.append(
+                                f"STAC API - Item Search POST pagination get failed for next url {next_url} with body {second_json_body}"
+                            )
+                        else:
+                            r.json()
+                else:
+                    errors.append(
+                        "STAC API - Item Search POST pagination first request had no 'next' link relation"
+                    )
+
+            except json.decoder.JSONDecodeError:
+                errors.append("STAC API - Item Search POST pagination response failed")
+
+        max_items = 100
+        client = Client.open(root_url)
+        search = client.search(
+            method="POST", collections=[collection], max_items=max_items, limit=5
+        )
+
+        items = list(search.items_as_dicts())
+
+        if len(items) > max_items:
+            errors.append(
+                "STAC API - Item Search POST pagination - more than max items returned from paginating"
+            )
+
+        if len(items) > len({item["id"] for item in items}):
+            errors.append(
+                "STAC API - Item Search POST pagination - duplicate items returned from paginating items"
+            )
+
+        search = client.search(
+            method="POST", collections=[collection], intersects=geometry
+        )
+        if len(list(take(20000, search.items_as_dicts()))) == 20000:
+            errors.append(
+                "STAC API - Item Search POST pagination - paged through 20,000 results. This could mean the last page "
+                "of results references itself, or your collection and geometry combination has too many results."
             )
 
 

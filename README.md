@@ -67,7 +67,8 @@ class will always be validated, even if not specified.
 
 If `item-search`, `collections`, and/or `features` are specified, the `--collection` and `--geometry` parameters must also
 be specified. The `--collection` parameter specifies the name of a collection to use for some of the validations.
-The `--geometry` should specify an AOI over which there are some results in that collection.
+The `--geometry` should specify an AOI over which there are between 100 and 20,000 results for the collection (more
+results means longer time to run).
 
 ## Features
 
