@@ -47,6 +47,7 @@ and then run it:
 $ stac-api-validator \
     --root-url https://planetarycomputer.microsoft.com/api/stac/v1/ \
     --conformance core \
+    --conformance features \
     --conformance item-search \
     --collection sentinel-2-l2a \
     --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
@@ -67,7 +68,8 @@ class will always be validated, even if not specified.
 
 If `item-search`, `collections`, and/or `features` are specified, the `--collection` and `--geometry` parameters must also
 be specified. The `--collection` parameter specifies the name of a collection to use for some of the validations.
-The `--geometry` should specify an AOI over which there are some results in that collection.
+The `--geometry` should specify an AOI over which there are between 100 and 20,000 results for the collection (more
+results means longer time to run).
 
 ## Features
 
