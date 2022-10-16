@@ -287,7 +287,12 @@ def validate_api(
         print("Validating STAC API - Features conformance class.")
         validate_collections(root_body, collection, warnings, errors)  # type:ignore
         validate_features(
-            root_body, conforms_to, collection, warnings, errors  # type:ignore
+            root_body,
+            conforms_to,
+            collection,
+            geometry,
+            warnings,
+            errors,
         )
     else:
         print("Skipping STAC API - Features conformance class.")
@@ -456,11 +461,20 @@ def validate_collections(
 def validate_features(
     root_body: Dict[str, Any],
     conforms_to: List[str],
-    collection: str,
+    collection: Optional[str],
+    geometry: Optional[str],
     warnings: List[str],
     errors: List[str],
 ) -> None:
     print("WARNING: Features validation is not yet fully implemented.")
+
+    if not geometry:
+        errors.append("Geometry parameter required for running Features validations.")
+        return
+
+    if not collection:
+        errors.append("Collection parameter required for running Features validations.")
+        return
 
     if conforms_to and (
         req_ccs := [
@@ -525,24 +539,42 @@ def validate_features(
                 f"service-desc ({conformance}): must return JSON, instead got non-JSON text"
             )
 
-        # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
-        # backwards-compat reasons
-        if not (link_by_rel(root_links, "collections") is None):
-            warnings.append(
-                "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
+    # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
+    # backwards-compat reasons
+    if not (link_by_rel(root_links, "collections") is None):
+        warnings.append(
+            "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
+        )
+
+    # todo: validate items exists in the collection
+
+    if not (collections_url := link_by_rel(root_links, "data")):
+        errors.append("/: Link[rel=data] must href /collections")
+    else:
+        item_url = f"{collections_url['href']}/{collection}/items/non-existent-item"
+        r = requests.get(item_url)
+        if r.status_code != 404:
+            errors.append(
+                f"[Features] GET {item_url} (non-existent item) returned status code {r.status_code} instead of 404"
             )
 
-        # todo: validate items exists
-
-        if not (collections_url := link_by_rel(root_links, "data")):
-            errors.append("/: Link[rel=data] must href /collections")
+    if not (collections_url := link_by_rel(root_links, "data")):
+        errors.append(
+            "/: Link[rel=data] must href /collections, cannot run pagination test"
+        )
+    else:
+        if not (self_link := link_by_rel(root_links, "self")):
+            errors.append("/: Link[rel=self] missing")
         else:
-            item_url = f"{collections_url['href']}/{collection}/items/non-existent-item"
-            r = requests.get(item_url)
-            if r.status_code != 404:
-                errors.append(
-                    f"[Features] GET {item_url} (non-existent item) returned status code {r.status_code} instead of 404"
-                )
+            validate_item_pagination(
+                root_url=self_link.get("href", ""),
+                search_url=f"{collections_url['href']}/{collection}/items",
+                collection=None,
+                geometry=geometry,
+                post=False,
+                errors=errors,
+                use_pystac_client=False,
+            )
 
     # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
     #     print("STAC API - Features - Fields extension conformance class found.")
@@ -632,7 +664,7 @@ def validate_item_search(
         geometry=geometry,
     )
 
-    validate_item_search_pagination(
+    validate_item_pagination(
         root_url=root_url,
         search_url=search_url,
         collection=collection,
@@ -1044,15 +1076,19 @@ def validate_item_search_bbox_xor_intersects(
             )
 
 
-def validate_item_search_pagination(
+def validate_item_pagination(
     root_url: str,
     search_url: str,
-    collection: str,
+    collection: Optional[str],
     geometry: str,
     post: bool,
     errors: List[str],
+    use_pystac_client: bool = True,
 ) -> None:
-    url = f"{search_url}?limit=1&collections={collection}"
+    url = f"{search_url}?limit=1"
+    if collection is not None:
+        url = f"{url}&collections={collection}"
+
     r = requests.get(url)
     if not r.status_code == 200:
         errors.append(
@@ -1094,22 +1130,26 @@ def validate_item_search_pagination(
             )
 
     max_items = 100
-    client = Client.open(root_url)
-    search = client.search(
-        method="GET", collections=[collection], max_items=max_items, limit=5
-    )
 
-    items = list(search.items_as_dicts())
+    # todo: how to paginate over items, not just search?
 
-    if len(items) > max_items:
-        errors.append(
-            "STAC API - Item Search GET pagination - more than max items returned from paginating"
+    if use_pystac_client:
+        client = Client.open(root_url)
+        search = client.search(
+            method="GET", collections=[collection], max_items=max_items, limit=5
         )
 
-    if len(items) > len({item["id"] for item in items}):
-        errors.append(
-            "STAC API - Item Search GET pagination - duplicate items returned from paginating items"
-        )
+        items = list(search.items_as_dicts())
+
+        if len(items) > max_items:
+            errors.append(
+                "STAC API - Item Search GET pagination - more than max items returned from paginating"
+            )
+
+        if len(items) > len({item["id"] for item in items}):
+            errors.append(
+                "STAC API - Item Search GET pagination - duplicate items returned from paginating items"
+            )
 
     # GET paging has a problem with intersects https://github.com/stac-utils/pystac-client/issues/335
     # search = client.search(method="GET", collections=[collection], intersects=geometry)

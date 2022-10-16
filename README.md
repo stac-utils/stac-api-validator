@@ -47,6 +47,7 @@ and then run it:
 $ stac-api-validator \
     --root-url https://planetarycomputer.microsoft.com/api/stac/v1/ \
     --conformance core \
+    --conformance features \
     --conformance item-search \
     --collection sentinel-2-l2a \
     --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
