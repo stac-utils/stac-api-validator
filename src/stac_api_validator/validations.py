@@ -2,18 +2,23 @@
 import itertools
 import json
 import re
+from enum import Enum
 from typing import Any
 from typing import Dict
+from typing import Iterator
 from typing import List
 from typing import Optional
 from typing import Pattern
 from typing import Tuple
+from typing import Union
 
 import requests
 import yaml
 from more_itertools import take
 from pystac import STACValidationError
 from pystac_client import Client
+from requests import Request
+from requests import Session
 from shapely.geometry import shape
 
 from stac_api_validator.geometries import geometry_collection
@@ -60,6 +65,49 @@ from .filters import cql2_text_or
 from .filters import cql2_text_s_intersects
 from .filters import cql2_text_string_comparisons
 from .filters import cql2_text_timestamp_comparisons
+
+
+class Method(Enum):
+    GET = "GET"
+    POST = "POST"
+
+
+class BaseErrors:
+    def __init__(self) -> None:
+        self.errors: List[Tuple[str, str]] = []
+
+    def __contains__(self, item: str) -> bool:
+        return item in (e[0] for e in self.errors)
+
+    def __bool__(self) -> bool:
+        return bool(self.errors)
+
+    def __str__(self) -> str:
+        return str(self.errors)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.as_list())
+
+    def as_list(self) -> List[str]:
+        return [e[1] for e in self.errors]
+
+
+class Errors(BaseErrors):
+    def __iadd__(self, x: Union[Tuple[str, str], str]) -> "Errors":
+        if isinstance(x, str):
+            self.errors.append(("none", x))
+        elif isinstance(x, tuple):
+            self.errors.append(x)
+        return self
+
+
+class Warnings(BaseErrors):
+    def __iadd__(self, x: Union[Tuple[str, str], str]) -> "Warnings":
+        if isinstance(x, str):
+            self.errors.append(("none", x))
+        elif isinstance(x, tuple):
+            self.errors.append(x)
+        return self
 
 
 cc_core_regex = re.compile(r"https://api\.stacspec\.org/.+/core")
@@ -180,114 +228,185 @@ def supports(conforms_to: List[str], pattern: Pattern[str]) -> bool:
     return any(pattern.fullmatch(x) for x in conforms_to)
 
 
+def retrieve(
+    url: str,
+    errors: Errors,
+    context: str,
+    method: Method = Method.GET,
+    params: Optional[Dict[str, str]] = None,
+    headers: Optional[Dict[str, str]] = None,
+    status_code: int = 200,
+    r_session: Optional[Session] = None,
+    additional: Optional[str] = "",
+) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
+    if not r_session:
+        r_session = Session()
+
+    resp = r_session.send(
+        Request(method.value, url, headers=headers, params=params).prepare()
+    )
+
+    # todo: handle connection exception, etc.
+    # todo: handle timeout
+
+    if resp.status_code != status_code:
+        errors += f"[{context}] {method.value} {url} failed with status code {resp.status_code}: {additional}"
+    else:
+        try:
+            return resp.json(), resp.headers  # type:ignore
+        except json.decoder.JSONDecodeError:
+            errors += f"[{context}] {method.value} {url} returned non-JSON value"
+    return None, None
+
+
+def validate_core_landing_page_body(
+    body: Dict[str, Any],
+    headers: Dict[str, str],
+    errors: Errors,
+    conformance_classes: List[str],
+    collection: Optional[str],
+    geometry: Optional[str],
+) -> None:
+    if not has_json_content_type(headers):
+        errors += (
+            "LP-1",
+            "[Core] : Landing Page (/) response Content-Type header is not application/json",
+        )
+
+    conforms_to = body.get("conformsTo", [])
+    if not conforms_to:
+        errors += (
+            "XXX",
+            "[Core] : Landing Page (/) 'conformsTo' field must be defined and non-empty."
+            "This field is required as of 1.0.0.",
+        )
+
+    if not body.get("links"):
+        errors += ("XXX", "/ : 'links' field must be defined and non-empty.")
+
+    if not any(cc_core_regex.fullmatch(x) for x in conforms_to):
+        errors += ("XXX", "/: STAC API - Core not contained in 'conformsTo'")
+
+    if "browseable" in conformance_classes and not any(
+        cc_browseable_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors += (
+            "XXX",
+            "/: Browseable configured for validation, but not contained in 'conformsTo'",
+        )
+
+    if "children" in conformance_classes and not any(
+        cc_children_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors += (
+            "XXX",
+            "/: Children configured for validation, but not contained in 'conformsTo'",
+        )
+
+    if "collections" in conformance_classes and not supports_collections(conforms_to):
+        errors += (
+            "XXX",
+            "/: Collections configured for validation, but not contained in 'conformsTo'",
+        )
+
+        if collection is None:
+            errors += (
+                "XXX",
+                "/: Collections configured for validation, but `--collection` parameter not specified",
+            )
+
+    if "features" in conformance_classes and not supports_features(conforms_to):
+        errors += (
+            "XXX",
+            "/: Features configured for validation, but not contained in 'conformsTo'",
+        )
+        if collection is None:
+            errors += (
+                "XXX",
+                "/: Features configured for validation, but `--collection` parameter not specified",
+            )
+
+    if "item-search" in conformance_classes:
+        if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
+            errors += (
+                "XXX",
+                "/: Item Search configured for validation, but not contained in 'conformsTo'",
+            )
+        if collection is None:
+            errors += (
+                "XXX",
+                "/: Item Search configured for validation, but `--collection` parameter not specified",
+            )
+        if geometry is None:
+            errors += (
+                "XXX",
+                "/: Item Search configured for validation, but `--geometry` parameter not specified",
+            )
+
+
+def has_json_content_type(headers: Dict[str, str]) -> bool:
+    return headers.get("content-type", "").split(";")[0] == "application/json"
+
+
 def validate_api(
     root_url: str,
     post: bool,
     conformance_classes: List[str],
     collection: Optional[str],
     geometry: Optional[str],
-) -> Tuple[List[str], List[str]]:
-    warnings: List[str] = []
-    errors: List[str] = []
+) -> Tuple[Warnings, Errors]:
+    warnings = Warnings()
+    errors = Errors()
 
-    root = requests.get(root_url)
+    landing_page_body, landing_page_headers = retrieve(root_url, errors, "Core")
 
-    # todo: handle connection exception, etc.
-    if root.status_code != 200:
-        errors.append(f"root URL {root_url} returned status code {root.status_code}")
+    if not landing_page_body:
         return warnings, errors
 
-    root_body = root.json()
+    assert landing_page_body is not None
+    assert landing_page_headers is not None
 
-    conforms_to = root_body.get("conformsTo", [])
-    if not conforms_to:
-        errors.append(
-            "/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0."
-        )
-
-    if not root_body.get("links"):
-        errors.append("/ : 'links' field must be defined and non-empty.")
-
-    if not any(cc_core_regex.fullmatch(x) for x in conforms_to):
-        errors.append("/: STAC API - Core not contained in 'conformsTo'")
-
-    if "browseable" in conformance_classes and not any(
-        cc_browseable_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Browseable configured for validation, but not contained in 'conformsTo'"
-        )
-
-    if "children" in conformance_classes and not any(
-        cc_children_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Children configured for validation, but not contained in 'conformsTo'"
-        )
-
-    if "collections" in conformance_classes and not supports_collections(conforms_to):
-        errors.append(
-            "/: Collections configured for validation, but not contained in 'conformsTo'"
-        )
-
-        if collection is None:
-            errors.append(
-                "/: Collections configured for validation, but `--collection` parameter not specified"
-            )
-
-    if "features" in conformance_classes and not supports_features(conforms_to):
-        errors.append(
-            "/: Features configured for validation, but not contained in 'conformsTo'"
-        )
-        if collection is None:
-            errors.append(
-                "/: Features configured for validation, but `--collection` parameter not specified"
-            )
-
-    if "item-search" in conformance_classes:
-        if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
-            errors.append(
-                "/: Item Search configured for validation, but not contained in 'conformsTo'"
-            )
-        if collection is None:
-            errors.append(
-                "/: Item Search configured for validation, but `--collection` parameter not specified"
-            )
-        if geometry is None:
-            errors.append(
-                "/: Item Search configured for validation, but `--geometry` parameter not specified"
-            )
+    validate_core_landing_page_body(
+        landing_page_body,
+        landing_page_headers,
+        errors,
+        conformance_classes,
+        collection,
+        geometry,
+    )
 
     # fail fast if there are errors with conformance or links so far
     if errors:
         return warnings, errors
 
     print("Validating STAC API - Core conformance class.")
-    validate_core(root_body, warnings, errors)
+    validate_core(landing_page_body, warnings, errors, Session())
 
     if "browseable" in conformance_classes:
         print("Validating STAC API - Browseable conformance class.")
-        validate_browseable(root_body, warnings, errors)
+        validate_browseable(landing_page_body, warnings, errors)
     else:
         print("Skipping STAC API - Browseable conformance class.")
 
     if "children" in conformance_classes:
         print("Validating STAC API - Children conformance class.")
-        validate_children(root_body, warnings, errors)
+        validate_children(landing_page_body, warnings, errors)
     else:
         print("Skipping STAC API - Children conformance class.")
 
     if "collections" in conformance_classes:
         print("Validating STAC API - Collections conformance class.")
-        validate_collections(root_body, collection, warnings, errors)  # type:ignore
+        validate_collections(landing_page_body, collection, warnings, errors)
     else:
         print("Skipping STAC API - Collections conformance class.")
 
+    conforms_to = landing_page_body.get("conformsTo", [])
+
     if "features" in conformance_classes:
         print("Validating STAC API - Features conformance class.")
-        validate_collections(root_body, collection, warnings, errors)  # type:ignore
+        validate_collections(landing_page_body, collection, warnings, errors)
         validate_features(
-            root_body,
+            landing_page_body,
             conforms_to,
             collection,
             geometry,
@@ -301,7 +420,7 @@ def validate_api(
         print("Validating STAC API - Item Search conformance class.")
         validate_item_search(
             root_url=root_url,
-            root_body=root_body,
+            root_body=landing_page_body,
             post=post,
             collection=collection,  # type:ignore
             conforms_to=conforms_to,
@@ -320,7 +439,7 @@ def validate_api(
             for child in catalog.get_children():
                 child.validate()
         except STACValidationError as e:
-            errors.append(f"pystac error: {str(e)}")
+            errors += f"pystac error: {str(e)}"
 
     return warnings, errors
 
@@ -335,37 +454,39 @@ def link_by_rel(
 
 
 def validate_core(
-    root_body: Dict[str, Any], warnings: List[str], errors: List[str]
+    root_body: Dict[str, Any], warnings: Warnings, errors: Errors, r_session: Session
 ) -> None:
     links = root_body.get("links")
 
     if links is None:
-        errors.append("/ : 'links' attribute missing")
+        errors += "/ : 'links' attribute missing"
 
     if not (root := link_by_rel(links, "root")):
-        errors.append("/ : Link[rel=root] must exist")
+        errors += "/ : Link[rel=root] must exist"
     else:
         if root.get("type") != "application/json":
-            errors.append("root type is not application/json")
+            errors += "root type is not application/json"
 
     if not (_self := link_by_rel(links, "self")):
-        warnings.append("/ : Link[rel=self] must exist")
+        warnings += "/ : Link[rel=self] must exist"
     else:
         if _self.get("type") != "application/json":
-            errors.append("self type is not application/json")
+            errors += "self type is not application/json"
 
     if not (service_desc := link_by_rel(links, "service-desc")):
-        errors.append("/ : Link[rel=service-desc] must exist")
+        errors += "/ : Link[rel=service-desc] must exist"
     else:
         if not (service_desc_type := service_desc.get("type")):
-            errors.append("/ : Link[rel=service-desc] must have a type defined")
+            errors += "/ : Link[rel=service-desc] must have a type defined"
         else:
-            r_service_desc = requests.get(
-                service_desc["href"], headers={"Accept": service_desc_type}
+            r_service_desc = r_session.send(
+                Request(
+                    "GET", service_desc["href"], headers={"Accept": service_desc_type}
+                ).prepare()
             )
 
             if not r_service_desc.status_code == 200:
-                errors.append("/ : Link[service-desc] must return 200")
+                errors += "/ : Link[service-desc] must return 200"
             else:
                 content_type = r_service_desc.headers.get("content-type", "")
                 if content_type in ["application/yaml", "application/vnd.oai.openapi"]:
@@ -389,73 +510,65 @@ def validate_core(
             ):
                 pass
             else:
-                errors.append(
-                    f"service-desc ({service_desc}): media type used in Accept header must get response with same "
-                    f"Content-Type header: used '{service_desc_type}', got '{ct}'"
-                )
+                errors += f"service-desc ({service_desc}): media type used in Accept header must get response with same Content-Type header: used '{service_desc_type}', got '{ct}'"
 
     if not (service_doc := link_by_rel(links, "service-doc")):
-        warnings.append("/ : Link[rel=service-doc] should exist")
+        warnings += "/ : Link[rel=service-doc] should exist"
     else:
         if service_doc.get("type") != "text/html":
-            errors.append("service-doc type is not text/html")
+            errors += "service-doc type is not text/html"
 
         r_service_doc = requests.get(service_doc["href"])
 
         if not (r_service_doc.status_code == 200):
-            errors.append("/ : Link[service-doc] must return 200")
+            errors += "/ : Link[service-doc] must return 200"
 
         if (ct := r_service_doc.headers.get("content-type", "")).startswith(
             "text/html"
         ):
             pass
         else:
-            errors.append(
-                f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
-            )
+            errors += f"service-doc ({service_doc}): must have content-type header 'text/html', actually '{ct}'"
 
 
 def validate_browseable(
-    root_body: Dict[str, Any], warnings: List[str], errors: List[str]
+    root_body: Dict[str, Any], warnings: Warnings, errors: Errors
 ) -> None:
     print("Browseable validation is not yet implemented.")
 
 
 def validate_children(
-    root_body: Dict[str, Any], warnings: List[str], errors: List[str]
+    root_body: Dict[str, Any], warnings: Warnings, errors: Errors
 ) -> None:
     print("Children validation is not yet implemented.")
 
 
 def validate_collections(
-    root_body: Dict[str, Any], collection: str, warnings: List[str], errors: List[str]
+    root_body: Dict[str, Any],
+    collection: Optional[str],
+    warnings: Warnings,
+    errors: Errors,
 ) -> None:
     print("WARNING: Collections validation is not yet fully implemented.")
 
     if not (data_link := link_by_rel(root_body["links"], "data")):
-        errors.append("[Collections] /: Link[rel=data] must href /collections")
+        errors += "[Collections] /: Link[rel=data] must href /collections"
     else:
         collection_url = f"{data_link['href']}/{collection}"
         r = requests.get(collection_url)
         if r.status_code != 200:
-            errors.append(
-                f"[Collections] GET {collection_url} failed with status code {r.status_code}"
-            )
+            errors += f"[Collections] GET {collection_url} failed with status code {r.status_code}"
         else:
             try:
                 r.json()
                 # todo: validate this
             except json.decoder.JSONDecodeError:
-                errors.append(
-                    f"[Collections] GET {collection_url} returned non-JSON value"
-                )
+                errors += f"[Collections] GET {collection_url} returned non-JSON value"
 
         collection_url = f"{data_link['href']}/non-existent-collection"
         r = requests.get(collection_url)
         if r.status_code != 404:
-            errors.append(
-                f"[Collections] GET {collection_url} (non-existent collection) returned status code {r.status_code} instead of 404"
-            )
+            errors += f"[Collections] GET {collection_url} (non-existent collection) returned status code {r.status_code} instead of 404"
 
 
 def validate_features(
@@ -463,17 +576,17 @@ def validate_features(
     conforms_to: List[str],
     collection: Optional[str],
     geometry: Optional[str],
-    warnings: List[str],
-    errors: List[str],
+    warnings: Warnings,
+    errors: Errors,
 ) -> None:
     print("WARNING: Features validation is not yet fully implemented.")
 
     if not geometry:
-        errors.append("Geometry parameter required for running Features validations.")
+        errors += "Geometry parameter required for running Features validations."
         return
 
     if not collection:
-        errors.append("Collection parameter required for running Features validations.")
+        errors += "Collection parameter required for running Features validations."
         return
 
     if conforms_to and (
@@ -483,22 +596,16 @@ def validate_features(
             if x.startswith("http://www.opengis.net/spec/ogcapi-features-1/1.0/req/")
         ]
     ):
-        warnings.append(
-            f"/ : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
-        )
+        warnings += f"/ : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
 
     if "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core" not in conforms_to:
-        warnings.append(
-            "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core'"
-        )
+        warnings += "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core'"
 
     if (
         "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson"
         not in conforms_to
     ):
-        warnings.append(
-            "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson'"
-        )
+        warnings += "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson'"
 
     # todo: add this one somewhere
     #  "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/oas30",
@@ -508,22 +615,20 @@ def validate_features(
     if not (
         conformance is not None and conformance.get("href", "").endswith("/conformance")
     ):
-        errors.append("/ Link[rel=conformance] must href /conformance")
+        errors += "/ Link[rel=conformance] must href /conformance"
 
     if conformance:
         r_conformance = requests.get(conformance["href"])
 
         if not (r_conformance.status_code == 200):
-            errors.append("conformance must return 200")
+            errors += "conformance must return 200"
 
         if (ct := r_conformance.headers.get("content-type", "")).split(";")[
             0
         ] == "application/json":
             pass
         else:
-            errors.append(
-                f"conformance ({conformance}): must have content-type header 'application/json', actually '{ct}'"
-            )
+            errors += f"conformance ({conformance}): must have content-type header 'application/json', actually '{ct}'"
 
         try:
             conformance_json = r_conformance.json()
@@ -531,40 +636,30 @@ def validate_features(
                 set(root_body.get("conformsTo", []))
                 == set(conformance_json.get("conformsTo", []))
             ):
-                warnings.append(
-                    "Landing Page conforms to and conformance conformsTo must be the same",
-                )
+                warnings += "Landing Page conforms to and conformance conformsTo must be the same"
         except json.decoder.JSONDecodeError:
-            errors.append(
-                f"service-desc ({conformance}): must return JSON, instead got non-JSON text"
-            )
+            errors += f"service-desc ({conformance}): must return JSON, instead got non-JSON text"
 
     # this is hard to figure out, since it's likely a mistake, but most apis can't undo it for
     # backwards-compat reasons
     if not (link_by_rel(root_links, "collections") is None):
-        warnings.append(
-            "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
-        )
+        warnings += "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
 
     # todo: validate items exists in the collection
 
     if not (collections_url := link_by_rel(root_links, "data")):
-        errors.append("/: Link[rel=data] must href /collections")
+        errors += "/: Link[rel=data] must href /collections"
     else:
         item_url = f"{collections_url['href']}/{collection}/items/non-existent-item"
         r = requests.get(item_url)
         if r.status_code != 404:
-            errors.append(
-                f"[Features] GET {item_url} (non-existent item) returned status code {r.status_code} instead of 404"
-            )
+            errors += f"[Features] GET {item_url} (non-existent item) returned status code {r.status_code} instead of 404"
 
     if not (collections_url := link_by_rel(root_links, "data")):
-        errors.append(
-            "/: Link[rel=data] must href /collections, cannot run pagination test"
-        )
+        errors += "/: Link[rel=data] must href /collections, cannot run pagination test"
     else:
         if not (self_link := link_by_rel(root_links, "self")):
-            errors.append("/: Link[rel=self] missing")
+            errors += "/: Link[rel=self] missing"
         else:
             validate_item_pagination(
                 root_url=self_link.get("href", ""),
@@ -608,15 +703,16 @@ def validate_item_search(
     post: bool,
     collection: str,
     conforms_to: List[str],
-    warnings: List[str],
-    errors: List[str],
+    warnings: Warnings,
+    errors: Errors,
     geometry: str,
     conformance_classes: List[str],
+    r_session: Optional[Session] = None,
 ) -> None:
     links = root_body.get("links")
     search = link_by_rel(links, "search")
     if not search:
-        errors.append("/: Link[rel=search] must exist when Item Search is implemented")
+        errors += "/: Link[rel=search] must exist when Item Search is implemented"
         return
 
     # Collections may not be implemented, so set to None
@@ -632,25 +728,21 @@ def validate_item_search(
     if content_type == geojson_mt or content_type == geojson_charset_mt:
         pass
     else:
-        errors.append(
-            f"Search ({search_url}): must have content-type header '{geojson_mt}', actually '{content_type}'"
-        )
+        errors += f"Search ({search_url}): must have content-type header '{geojson_mt}', actually '{content_type}'"
 
     if not (r.status_code == 200):
-        errors.append(f"Search({search_url}): must return 200")
+        errors += f"Search({search_url}): must return 200"
 
     # todo: validate geojson, not just json
     try:
         r.json()
     except json.decoder.JSONDecodeError:
-        errors.append(
-            f"Search ({search_url}): must return JSON, instead got non-JSON text"
-        )
+        errors += f"Search ({search_url}): must return JSON, instead got non-JSON text"
 
     validate_item_search_limit(search_url, post, errors)
     validate_item_search_bbox_xor_intersects(search_url, post, errors)
     validate_item_search_bbox(search_url, post, errors)
-    validate_item_search_datetime(search_url, warnings, errors)
+    validate_item_search_datetime(search_url, warnings, errors, r_session)
     validate_item_search_ids(search_url, post, warnings, errors)
     validate_item_search_ids_does_not_override_all_other_params(
         search_url, post, collection, warnings, errors
@@ -693,9 +785,7 @@ def validate_item_search(
         or x.endswith("item-search#filter:filter")
         for x in conforms_to
     ):
-        warnings.append(
-            "[Filter Ext] /: pre-1.0.0-rc.1 Filter Extension conformance classes are advertised."
-        )
+        warnings += "[Filter Ext] /: pre-1.0.0-rc.1 Filter Extension conformance classes are advertised."
 
     if "filter" in conformance_classes and any(
         cc_item_search_filter_regex.fullmatch(x)
@@ -718,19 +808,15 @@ def validate_item_search(
 def validate_filter_queryables(
     queryables_url: str,
     conformance_class: str,
-    errors: List[str],
+    errors: Errors,
 ) -> None:
     r = requests.get(queryables_url, headers={"Accept": "application/schema+json"})
 
     if r.status_code != 200:
-        errors.append(
-            f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' returned status code {r.status_code}"
-        )
+        errors += f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' returned status code {r.status_code}"
     else:
         if (ct := r.headers.get("Content-Type")) != "application/schema+json":
-            errors.append(
-                f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' returned Content-Type header '{ct}', must return 'application/schema+json'"
-            )
+            errors += f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' returned Content-Type header '{ct}', must return 'application/schema+json'"
         try:
             json_schemas = [
                 "https://json-schema.org/draft/2019-09/schema",
@@ -738,51 +824,39 @@ def validate_filter_queryables(
             ]
             queryables_schema = r.json()
             if queryables_schema.get("$schema") not in json_schemas:
-                errors.append(
-                    f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$schema' value invalid, must be one of: '{','.join(json_schemas)}'"
-                )
+                errors += f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$schema' value invalid, must be one of: '{','.join(json_schemas)}'"
 
             if queryables_schema.get("$id") != queryables_url:
-                errors.append(
-                    f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$id' value invalid, must be same as queryables url"
-                )
+                errors += f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$id' value invalid, must be same as queryables url"
 
             if queryables_schema.get("type") != "object":
-                errors.append(
-                    f"[{conformance_class} Filter Ext] Queryables '{queryables_url}' 'type' value invalid, must be 'object'"
-                )
+                errors += f"[{conformance_class} Filter Ext] Queryables '{queryables_url}' 'type' value invalid, must be 'object'"
         except json.decoder.JSONDecodeError:
-            errors.append(
-                f"[{conformance_class} Filter Ext] Queryables '{queryables_url}' returned non-JSON response"
-            )
+            errors += f"[{conformance_class} Filter Ext] Queryables '{queryables_url}' returned non-JSON response"
 
 
 def validate_features_filter(
     root_body: Dict[str, Any],
     collection: str,
-    errors: List[str],
+    errors: Errors,
 ) -> None:
     print("WARNING: Features - Filter Ext validation is not yet fully implemented.")
 
     if not (collections_link := link_by_rel(root_body["links"], "data")):
-        errors.append("[Features] / : 'data' link relation missing")
+        errors += "[Features] / : 'data' link relation missing"
     else:
         collection_url = f"{collections_link['href']}/{collection}"
 
         r = requests.get(collection_url)
         if r.status_code != 200:
-            errors.append(
-                f"[Featues - Filter Ext] GET {collection_url} returned status code {r.status_code}"
-            )
+            errors += f"[Featues - Filter Ext] GET {collection_url} returned status code {r.status_code}"
 
         if not (
             queryables_link := link_by_rel(
                 r.json()["links"], "http://www.opengis.net/def/rel/ogc/1.0/queryables"
             )
         ):
-            errors.append(
-                f"[Features - Filter Ext] {collection_url} : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
-            )
+            errors += f"[Features - Filter Ext] {collection_url} : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
 
         validate_filter_queryables(
             queryables_url=(queryables_link and queryables_link["href"])
@@ -798,17 +872,15 @@ def validate_item_search_filter(
     root_body: Dict[str, Any],
     search_url: str,
     collection: str,
-    warnings: List[str],
-    errors: List[str],
+    warnings: Warnings,
+    errors: Errors,
 ) -> None:
     if not (
         queryables_link := link_by_rel(
             root_body["links"], "http://www.opengis.net/def/rel/ogc/1.0/queryables"
         )
     ):
-        errors.append(
-            "[Item Search - Filter Ext] / : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
-        )
+        errors += "[Item Search - Filter Ext] / : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
 
     validate_filter_queryables(
         queryables_url=(queryables_link and queryables_link["href"])
@@ -996,72 +1068,77 @@ def validate_item_search_filter(
             params={"limit": 1, "filter-lang": "cql2-text", "filter": f_text},  # type: ignore
         )
         if not (r.status_code == 200):
-            errors.append(
-                f"[Item Search - Filter Ext] GET {f_text} returned status code {r.status_code}"
-            )
+            errors += f"[Item Search - Filter Ext] GET {f_text} returned status code {r.status_code}"
 
     for f_json in filter_jsons:
         r = requests.post(
             search_url, json={"limit": 1, "filter-lang": "cql2-json", "filter": f_json}
         )
         if r.status_code != 200:
-            errors.append(
-                f"[Item Search - Filter Ext] POST {f_json} returned status code {r.status_code}"
-            )
+            errors += f"[Item Search - Filter Ext] POST {f_json} returned status code {r.status_code}"
 
 
 def validate_item_search_datetime(
-    search_url: str, warnings: List[str], errors: List[str]
+    search_url: str, warnings: Warnings, errors: Errors, r_session: Optional[Session]
 ) -> None:
     # find an Item and try to use its datetime value in a query
-    r = requests.get(search_url)
-    dt = r.json()["features"][0]["properties"]["datetime"]  # todo: if no results, fail
-    r = requests.get(search_url, params={"datetime": dt})
-    if r.status_code != 200:
-        errors.append(
-            f"GET Search with datetime={dt} extracted from an Item returned status code {r.status_code}"
-        )
-    elif len(r.json()["features"]) == 0:
-        errors.append(
+    body, _ = retrieve(search_url, errors, "Item Search", r_session=r_session)
+    if not body:
+        return
+    else:
+        dt = body["features"][0]["properties"]["datetime"]  # todo: if no results, fail
+
+    body, _ = retrieve(
+        search_url,
+        errors,
+        "Item Search",
+        params={"datetime": dt},
+        additional=f"with datetime={dt} extracted from an Item",
+    )
+    if body and len(body["features"]) == 0:
+        errors += (
             f"GET Search with datetime={dt} extracted from an Item returned no results."
         )
 
     for dt in valid_datetimes:
-        r = requests.get(search_url, params={"datetime": dt})
+        if not r_session:
+            r_session = Session()
+
+        r = r_session.send(
+            Request("GET", search_url, params={"datetime": dt}).prepare()
+        )
         if r.status_code != 200:
-            errors.append(
+            errors += (
                 f"GET Search with datetime={dt} returned status code {r.status_code}"
             )
             continue
         try:
             r.json()
         except json.decoder.JSONDecodeError:
-            errors.append(f"GET Search with datetime={dt} returned non-json response")
+            errors += f"GET Search with datetime={dt} returned non-json response"
 
     for dt in invalid_datetimes:
         r = requests.get(search_url, params={"datetime": dt})
         if r.status_code == 200:
-            warnings.append(
+            warnings += (
                 f"GET Search with datetime={dt} returned status code 200 instead of 400"
             )
             continue
         if r.status_code != 400:
-            errors.append(
-                f"GET Search with datetime={dt} returned status code {r.status_code} instead of 400"
-            )
+            errors += f"GET Search with datetime={dt} returned status code {r.status_code} instead of 400"
             continue
 
     # todo: POST
 
 
 def validate_item_search_bbox_xor_intersects(
-    search_url: str, post: bool, errors: List[str]
+    search_url: str, post: bool, errors: Errors
 ) -> None:
     r = requests.get(
         search_url, params={"bbox": "0,0,1,1", "intersects": json.dumps(polygon)}
     )
     if r.status_code != 400:
-        errors.append(
+        errors += (
             f"GET Search with bbox and intersects returned status code {r.status_code}"
         )
 
@@ -1071,9 +1148,7 @@ def validate_item_search_bbox_xor_intersects(
             search_url, json={"bbox": [0, 0, 1, 1], "intersects": polygon}
         )
         if r.status_code != 400:
-            errors.append(
-                f"POST Search with bbox and intersects returned status code {r.status_code}"
-            )
+            errors += f"POST Search with bbox and intersects returned status code {r.status_code}"
 
 
 def validate_item_pagination(
@@ -1082,7 +1157,7 @@ def validate_item_pagination(
     collection: Optional[str],
     geometry: str,
     post: bool,
-    errors: List[str],
+    errors: Errors,
     use_pystac_client: bool = True,
 ) -> None:
     url = f"{search_url}?limit=1"
@@ -1091,49 +1166,35 @@ def validate_item_pagination(
 
     r = requests.get(url)
     if not r.status_code == 200:
-        errors.append(
-            "STAC API - Item Search GET pagination get failed for initial request"
-        )
+        errors += "STAC API - Item Search GET pagination get failed for initial request"
     else:
         try:
             first_body = r.json()
             if link := link_by_rel(first_body.get("links"), "next"):
                 if (method := link.get("method")) and method != "GET":
-                    errors.append(
-                        f"STAC API - Item Search GET pagination first request 'next' link relation has method {method} instead of 'GET'"
-                    )
+                    errors += f"STAC API - Item Search GET pagination first request 'next' link relation has method {method} instead of 'GET'"
 
                 next_url = link.get("href")
                 if next_url is None:
-                    errors.append(
-                        "STAC API - Item Search GET pagination first request 'next' link relation missing href"
-                    )
+                    errors += "STAC API - Item Search GET pagination first request 'next' link relation missing href"
                 else:
                     if url == next_url:
-                        errors.append(
-                            "STAC API - Item Search GET pagination next href same as first url"
-                        )
+                        errors += "STAC API - Item Search GET pagination next href same as first url"
 
                     r = requests.get(next_url)
                     if not r.status_code == 200:
-                        errors.append(
-                            f"STAC API - Item Search GET pagination get failed for next url {next_url}"
-                        )
+                        errors += f"STAC API - Item Search GET pagination get failed for next url {next_url}"
             else:
-                errors.append(
-                    "STAC API - Item Search GET pagination first request had no 'next' link relation"
-                )
+                errors += "STAC API - Item Search GET pagination first request had no 'next' link relation"
 
         except json.decoder.JSONDecodeError:
-            errors.append(
-                f"STAC API - Item Search GET pagination response failed {url}"
-            )
+            errors += f"STAC API - Item Search GET pagination response failed {url}"
 
     max_items = 100
 
     # todo: how to paginate over items, not just search?
 
-    if use_pystac_client:
+    if use_pystac_client and collection is not None:
         client = Client.open(root_url)
         search = client.search(
             method="GET", collections=[collection], max_items=max_items, limit=5
@@ -1142,19 +1203,17 @@ def validate_item_pagination(
         items = list(search.items_as_dicts())
 
         if len(items) > max_items:
-            errors.append(
-                "STAC API - Item Search GET pagination - more than max items returned from paginating"
-            )
+            errors += "STAC API - Item Search GET pagination - more than max items returned from paginating"
 
         if len(items) > len({item["id"] for item in items}):
-            errors.append(
-                "STAC API - Item Search GET pagination - duplicate items returned from paginating items"
-            )
+            errors += "STAC API - Item Search GET pagination - duplicate items returned from paginating items"
+    elif collection is None:
+        errors += "STAC API - Item Search GET pagination - pystac-client tests not run, collection is not defined"
 
     # GET paging has a problem with intersects https://github.com/stac-utils/pystac-client/issues/335
     # search = client.search(method="GET", collections=[collection], intersects=geometry)
     # if len(list(take(20000, search.items_as_dicts()))) == 20000:
-    #     errors.append(
+    #     errors +=
     #         f"STAC API - Item Search GET pagination - paged through 20,000 results. This could mean the last page "
     #         f"of results references itself, or your collection and geometry combination has too many results."
     #     )
@@ -1163,7 +1222,7 @@ def validate_item_pagination(
         initial_json_body = {"limit": 1, "collections": [collection]}
         r = requests.post(search_url, json=initial_json_body)
         if not r.status_code == 200:
-            errors.append(
+            errors += (
                 "STAC API - Item Search POST pagination get failed for initial request"
             )
         else:
@@ -1171,20 +1230,14 @@ def validate_item_pagination(
                 first_body = r.json()
                 if link := link_by_rel(first_body.get("links"), "next"):
                     if (method := link.get("method")) and method != "POST":
-                        errors.append(
-                            f"STAC API - Item Search POST pagination first request 'next' link relation has method {method} instead of 'POST'"
-                        )
+                        errors += f"STAC API - Item Search POST pagination first request 'next' link relation has method {method} instead of 'POST'"
 
                     next_url = link.get("href")
                     if next_url is None:
-                        errors.append(
-                            "STAC API - Item Search POST pagination first request 'next' link relation missing href"
-                        )
+                        errors += "STAC API - Item Search POST pagination first request 'next' link relation missing href"
                     else:
                         if url == next_url:
-                            errors.append(
-                                "STAC API - Item Search POST pagination next href same as first url"
-                            )
+                            errors += "STAC API - Item Search POST pagination next href same as first url"
 
                         next_body: Dict[str, Any] = link.get("body", {})
                         if not link.get("merge", False):
@@ -1195,49 +1248,44 @@ def validate_item_pagination(
 
                         r = requests.post(next_url, json=second_json_body)
                         if not r.status_code == 200:
-                            errors.append(
-                                f"STAC API - Item Search POST pagination get failed for next url {next_url} with body {second_json_body}"
-                            )
+                            errors += f"STAC API - Item Search POST pagination get failed for next url {next_url} with body {second_json_body}"
                         else:
                             r.json()
                 else:
-                    errors.append(
-                        "STAC API - Item Search POST pagination first request had no 'next' link relation"
-                    )
+                    errors += "STAC API - Item Search POST pagination first request had no 'next' link relation"
 
             except json.decoder.JSONDecodeError:
-                errors.append("STAC API - Item Search POST pagination response failed")
+                errors += "STAC API - Item Search POST pagination response failed"
 
-        max_items = 100
-        client = Client.open(root_url)
-        search = client.search(
-            method="POST", collections=[collection], max_items=max_items, limit=5
-        )
-
-        items = list(search.items_as_dicts())
-
-        if len(items) > max_items:
-            errors.append(
-                "STAC API - Item Search POST pagination - more than max items returned from paginating"
+        if use_pystac_client and collection is not None:
+            max_items = 100
+            client = Client.open(root_url)
+            search = client.search(
+                method="POST", collections=[collection], max_items=max_items, limit=5
             )
 
-        if len(items) > len({item["id"] for item in items}):
-            errors.append(
-                "STAC API - Item Search POST pagination - duplicate items returned from paginating items"
-            )
+            items = list(search.items_as_dicts())
 
-        search = client.search(
-            method="POST", collections=[collection], intersects=geometry
-        )
-        if len(list(take(20000, search.items_as_dicts()))) == 20000:
-            errors.append(
-                "STAC API - Item Search POST pagination - paged through 20,000 results. This could mean the last page "
-                "of results references itself, or your collection and geometry combination has too many results."
+            if len(items) > max_items:
+                errors += "STAC API - Item Search POST pagination - more than max items returned from paginating"
+
+            if len(items) > len({item["id"] for item in items}):
+                errors += "STAC API - Item Search POST pagination - duplicate items returned from paginating items"
+
+            search = client.search(
+                method="POST", collections=[collection], intersects=geometry
             )
+            if len(list(take(20000, search.items_as_dicts()))) == 20000:
+                errors += (
+                    "STAC API - Item Search POST pagination - paged through 20,000 results. This could mean the last page "
+                    "of results references itself, or your collection and geometry combination has too many results."
+                )
+        elif collection is not None:
+            errors += "STAC API - Item Search POST pagination - pystac-client tests not run, collection is undefined"
 
 
 def validate_item_search_intersects(
-    search_url: str, collection: str, post: bool, errors: List[str], geometry: str
+    search_url: str, collection: str, post: bool, errors: Errors, geometry: str
 ) -> None:
     # Validate that these GeoJSON Geometry types are accepted
     intersects_params = [
@@ -1255,30 +1303,22 @@ def validate_item_search_intersects(
         # Valid GET query
         r = requests.get(search_url, params={"intersects": json.dumps(param)})
         if r.status_code != 200:
-            errors.append(
-                f"GET Search with intersects={param} returned status code {r.status_code}"
-            )
+            errors += f"GET Search with intersects={param} returned status code {r.status_code}"
         else:
             try:
                 r.json()
             except json.decoder.JSONDecodeError:
-                errors.append(
-                    f"GET Search with intersects={param} returned non-json response: {r.text}"
-                )
+                errors += f"GET Search with intersects={param} returned non-json response: {r.text}"
         if post:
             # Valid POST query
             r = requests.post(search_url, json={"intersects": param})
             if r.status_code != 200:
-                errors.append(
-                    f"POST Search with intersects:{param} returned status code {r.status_code}"
-                )
+                errors += f"POST Search with intersects:{param} returned status code {r.status_code}"
             else:
                 try:
                     r.json()
                 except json.decoder.JSONDecodeError:
-                    errors.append(
-                        f"POST Search with intersects:{param} returned non-json response: {r.text}"
-                    )
+                    errors += f"POST Search with intersects:{param} returned non-json response: {r.text}"
 
     intersects_shape = shape(json.loads(geometry))
 
@@ -1288,27 +1328,19 @@ def validate_item_search_intersects(
         params={"collections": collection, "intersects": geometry},
     )
     if r.status_code != 200:
-        errors.append(
-            f"[Item Search] GET Search with collections={collection}&intersects={geometry} returned status code {r.status_code}"
-        )
+        errors += f"[Item Search] GET Search with collections={collection}&intersects={geometry} returned status code {r.status_code}"
     else:
         try:
             item_collection = r.json()
             if not len(item_collection["features"]):
-                errors.append(
-                    f"[Item Search] GET Search result for intersects={geometry} returned no results"
-                )
+                errors += f"[Item Search] GET Search result for intersects={geometry} returned no results"
             if any(
                 not intersects_shape.intersects(shape(item["geometry"]))
                 for item in item_collection["features"]
             ):
-                errors.append(
-                    f"[Item Search] GET Search results for intersects={geometry} do not all intersect"
-                )
+                errors += f"[Item Search] GET Search results for intersects={geometry} do not all intersect"
         except json.decoder.JSONDecodeError:
-            errors.append(
-                f"[Item Search] GET Search with intersects={geometry} returned non-json response: {r.text}"
-            )
+            errors += f"[Item Search] GET Search with intersects={geometry} returned non-json response: {r.text}"
 
     if post:
         # Validate POST query
@@ -1316,40 +1348,30 @@ def validate_item_search_intersects(
             search_url, json={"collections": [collection], "intersects": geometry}
         )
         if r.status_code != 200:
-            errors.append(
-                f"[Item Search] POST Search with intersects={geometry} returned status code {r.status_code}"
-            )
+            errors += f"[Item Search] POST Search with intersects={geometry} returned status code {r.status_code}"
         else:
             try:
                 item_collection = r.json()
                 if not len(item_collection["features"]):
-                    errors.append(
-                        f"[Item Search] POST Search result for intersects={geometry} returned no results"
-                    )
+                    errors += f"[Item Search] POST Search result for intersects={geometry} returned no results"
                 for item in item_collection["features"]:
                     if not intersects_shape.intersects(shape(item["geometry"])):
-                        errors.append(
-                            f"[Item Search] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
-                        )
+                        errors += f"[Item Search] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
             except json.decoder.JSONDecodeError:
-                errors.append(
-                    f"[Item Search] POST Search with intersects={geometry} returned non-json response: {r.text}"
-                )
+                errors += f"[Item Search] POST Search with intersects={geometry} returned non-json response: {r.text}"
 
 
-def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) -> None:
+def validate_item_search_bbox(search_url: str, post: bool, errors: Errors) -> None:
     # Valid GET query
     param = "100.0,0.0,105.0,1.0"
     r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 200:
-        errors.append(
-            f"GET Search with bbox={param} returned status code {r.status_code}"
-        )
+        errors += f"GET Search with bbox={param} returned status code {r.status_code}"
     else:
         try:
             r.json()
         except json.decoder.JSONDecodeError:
-            errors.append(
+            errors += (
                 f"GET Search with bbox={param} returned non-json response: {r.text}"
             )
 
@@ -1358,43 +1380,35 @@ def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) ->
         param_list = [100.0, 0.0, 105.0, 1.0]
         r = requests.post(search_url, json={"bbox": param_list})
         if r.status_code != 200:
-            errors.append(
-                f"POST Search with bbox:{param_list} returned status code {r.status_code}"
-            )
+            errors += f"POST Search with bbox:{param_list} returned status code {r.status_code}"
         else:
             try:
                 r.json()
             except json.decoder.JSONDecodeError:
-                errors.append(
-                    f"POST Search with bbox:{param_list} returned non-json response: {r.text}"
-                )
+                errors += f"POST Search with bbox:{param_list} returned non-json response: {r.text}"
 
     # Valid 3D GET query
     param = "100.0,0.0,0.0,105.0,1.0,1.0"
     r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 200:
-        errors.append(
-            f"GET Search with bbox={param} returned status code {r.status_code}"
-        )
+        errors += f"GET Search with bbox={param} returned status code {r.status_code}"
     else:
         try:
             r.json()
         except json.decoder.JSONDecodeError:
-            errors.append(f"GET with bbox={param} returned non-json response: {r.text}")
+            errors += f"GET with bbox={param} returned non-json response: {r.text}"
 
     if post:
         # Valid 3D POST query
         param_list = [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]
         r = requests.post(search_url, json={"bbox": param_list})
         if r.status_code != 200:
-            errors.append(
-                f"POST Search with bbox:{param_list} returned status code {r.status_code}"
-            )
+            errors += f"POST Search with bbox:{param_list} returned status code {r.status_code}"
         else:
             try:
                 r.json()
             except json.decoder.JSONDecodeError:
-                errors.append(
+                errors += (
                     f"POST with bbox:{param_list} returned non-json response: {r.text}"
                 )
 
@@ -1402,34 +1416,26 @@ def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) ->
     param = "[100.0, 0.0, 105.0, 1.0]"
     r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 400:
-        errors.append(
-            f"GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
-        )
+        errors += f"GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
 
     if post:
         # Invalid POST query with CSV string of coordinates
         param = "100.0, 0.0, 105.0, 1.0"
         r = requests.post(search_url, json={"bbox": param})
         if r.status_code != 400:
-            errors.append(
-                f'POST Search with bbox:"{param}" returned status code {r.status_code}, instead of 400'
-            )
+            errors += f'POST Search with bbox:"{param}" returned status code {r.status_code}, instead of 400'
 
     # Invalid bbox - lat 1 > lat 2
     param = "100.0, 1.0, 105.0, 0.0"
     r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 400:
-        errors.append(
-            f"GET Search with bbox=param (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
-        )
+        errors += f"GET Search with bbox=param (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
 
     if post:
         param_list = [100.0, 1.0, 105.0, 0.0]
         r = requests.post(search_url, json={"bbox": param_list})
         if r.status_code != 400:
-            errors.append(
-                f"POST Search with bbox: {param_list} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
-            )
+            errors += f"POST Search with bbox: {param_list} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
 
     # Invalid bbox - 1, 2, 3, 5, and 7 element array
     bboxes = [[0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1]]
@@ -1438,38 +1444,30 @@ def validate_item_search_bbox(search_url: str, post: bool, errors: List[str]) ->
         param = ",".join(str(c) for c in bbox)
         r = requests.get(search_url, params={"bbox": param})
         if r.status_code != 400:
-            errors.append(
-                f"GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
-            )
+            errors += f"GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
         if post:
             r = requests.post(search_url, json={"bbox": bbox})
             if r.status_code != 400:
-                errors.append(
-                    f"POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400"
-                )
+                errors += f"POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400"
 
 
-def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -> None:
+def validate_item_search_limit(search_url: str, post: bool, errors: Errors) -> None:
     valid_limits = [1, 2, 10]  # todo: pull actual limits from service description
     for limit in valid_limits:
         # Valid GET query
         params = {"limit": limit}
         r = requests.get(search_url, params=params)
         if r.status_code != 200:
-            errors.append(
-                f"GET Search with {params} returned status code {r.status_code}"
-            )
+            errors += f"GET Search with {params} returned status code {r.status_code}"
         else:
             try:
                 body = r.json()
                 items = body.get("items")
                 if items and len(items) <= 1:
-                    errors.append(
-                        f"POST Search with {params} returned fewer than 1 result"
-                    )
+                    errors += f"POST Search with {params} returned fewer than 1 result"
 
             except json.decoder.JSONDecodeError:
-                errors.append(
+                errors += (
                     f"GET Search with {params} returned non-json response: {r.text}"
                 )
 
@@ -1477,7 +1475,7 @@ def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -
             # Valid POST query
             r = requests.post(search_url, json=params)
             if r.status_code != 200:
-                errors.append(
+                errors += (
                     f"POST Search with {params} returned status code {r.status_code}"
                 )
             else:
@@ -1485,13 +1483,11 @@ def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -
                     body = r.json()
                     items = body.get("items")
                     if items and len(items) <= 1:
-                        errors.append(
+                        errors += (
                             f"POST Search with {params} returned fewer than 1 result"
                         )
                 except json.decoder.JSONDecodeError:
-                    errors.append(
-                        f"POST Search with {params} returned non-json response: {r.text}"
-                    )
+                    errors += f"POST Search with {params} returned non-json response: {r.text}"
 
     invalid_limits = [-1]  # todo: pull actual limits from service desc and test them
     for limit in invalid_limits:
@@ -1499,17 +1495,13 @@ def validate_item_search_limit(search_url: str, post: bool, errors: List[str]) -
         params = {"limit": limit}
         r = requests.get(search_url, params=params)
         if r.status_code != 400:
-            errors.append(
-                f"GET Search with {params} returned status code {r.status_code}, must be 400"
-            )
+            errors += f"GET Search with {params} returned status code {r.status_code}, must be 400"
 
         if post:
             # Valid POST query
             r = requests.post(search_url, json=params)
             if r.status_code != 400:
-                errors.append(
-                    f"POST Search with {params} returned status code {r.status_code}, must be 400"
-                )
+                errors += f"POST Search with {params} returned status code {r.status_code}, must be 400"
 
 
 def _validate_search_ids_request(
@@ -1517,29 +1509,25 @@ def _validate_search_ids_request(
     item_ids: List[str],
     method: str,
     params: Dict[str, Any],
-    errors: List[str],
+    errors: Errors,
 ) -> None:
     if r.status_code != 200:
-        errors.append(
-            f"{method} Search with {params} returned status code {r.status_code}"
-        )
+        errors += f"{method} Search with {params} returned status code {r.status_code}"
     else:
         try:
             items = r.json().get("features")
             if len(items) != len(
                 list(filter(lambda x: x.get("id") in item_ids, items))
             ):
-                errors.append(
-                    f"{method} Search with {params} returned items with ids other than specified one"
-                )
+                errors += f"{method} Search with {params} returned items with ids other than specified one"
         except json.decoder.JSONDecodeError:
-            errors.append(
+            errors += (
                 f"{method} Search with {params} returned non-json response: {r.text}"
             )
 
 
 def _validate_search_ids_with_ids(
-    search_url: str, item_ids: List[str], post: bool, errors: List[str]
+    search_url: str, item_ids: List[str], post: bool, errors: Errors
 ) -> None:
     get_params = {"ids": ",".join(item_ids)}
 
@@ -1563,7 +1551,7 @@ def _validate_search_ids_with_ids(
 
 
 def _validate_search_ids_with_ids_no_override(
-    search_url: str, item: Dict[str, Any], post: bool, errors: List[str]
+    search_url: str, item: Dict[str, Any], post: bool, errors: Errors
 ) -> None:
     bbox = item["bbox"]
     get_params = {
@@ -1575,20 +1563,18 @@ def _validate_search_ids_with_ids_no_override(
     r = requests.get(search_url, params=get_params)
 
     if not (r.status_code == 200):
-        errors.append(
-            f"GET Search with id and other parameters returned status code {r.status_code}"
-        )
+        errors += f"GET Search with id and other parameters returned status code {r.status_code}"
     else:
 
         try:
             if len(r.json().get("features", [])) > 0:
-                errors.append(
+                errors += (
                     "GET Search with ids and non-intersecting bbox returned results, indicating "
                     "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
                     "STAC API 1.0.0-beta.1"
                 )
         except json.decoder.JSONDecodeError:
-            errors.append(
+            errors += (
                 f"GET Search with {get_params} returned non-json response: {r.text}"
             )
 
@@ -1602,25 +1588,21 @@ def _validate_search_ids_with_ids_no_override(
         r = requests.post(search_url, json=post_params)
 
         if not (r.status_code == 200):
-            errors.append(
-                f"POST Search with id and other parameters returned status code {r.status_code}"
-            )
+            errors += f"POST Search with id and other parameters returned status code {r.status_code}"
         else:
             try:
                 if len(r.json().get("features", [])) > 0:
-                    errors.append(
+                    errors += (
                         "POST Search with ids and non-intersecting bbox returned results, indicating "
                         "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
                         "STAC API 1.0.0-beta.1"
                     )
             except json.decoder.JSONDecodeError:
-                errors.append(
-                    f"POST Search with {get_params} returned non-json response: {r.text}"
-                )
+                errors += f"POST Search with {get_params} returned non-json response: {r.text}"
 
 
 def validate_item_search_ids(
-    search_url: str, post: bool, warnings: List[str], errors: List[str]
+    search_url: str, post: bool, warnings: Warnings, errors: Errors
 ) -> None:
     r = requests.get(f"{search_url}?limit=2")
     items = r.json().get("features")
@@ -1633,11 +1615,11 @@ def validate_item_search_ids(
             search_url, [i["id"] for i in items], post, errors
         )
     else:
-        warnings.append("Get Search with no parameters returned < 2 results")
+        warnings += "Get Search with no parameters returned < 2 results"
 
 
 def validate_item_search_ids_does_not_override_all_other_params(
-    search_url: str, post: bool, collection: str, warnings: List[str], errors: List[str]
+    search_url: str, post: bool, collection: str, warnings: Warnings, errors: Errors
 ) -> None:
     # find one item that we can then query by id and a non-intersecting bbox to see if
     # we still get the item as a result
@@ -1650,7 +1632,7 @@ def validate_item_search_ids_does_not_override_all_other_params(
     ):
         _validate_search_ids_with_ids_no_override(search_url, items[0], post, errors)
     else:
-        warnings.append("Get Search with no parameters returned 0 results")
+        warnings += "Get Search with no parameters returned 0 results"
 
 
 def _validate_search_collections_request(
@@ -1658,29 +1640,25 @@ def _validate_search_collections_request(
     coll_ids: List[str],
     method: str,
     params: Dict[str, Any],
-    errors: List[str],
+    errors: Errors,
 ) -> None:
     if r.status_code != 200:
-        errors.append(
-            f"{method} Search with {params} returned status code {r.status_code}"
-        )
+        errors += f"{method} Search with {params} returned status code {r.status_code}"
     else:
         try:
             items = r.json().get("features")
             if len(items) != len(
                 list(filter(lambda x: x.get("collection") in coll_ids, items))
             ):
-                errors.append(
-                    f"{method} Search with {params} returned items with ids other than specified one"
-                )
+                errors += f"{method} Search with {params} returned items with ids other than specified one"
         except json.decoder.JSONDecodeError:
-            errors.append(
+            errors += (
                 f"{method} Search with {params} returned non-json response: {r.text}"
             )
 
 
 def _validate_search_collections_with_ids(
-    search_url: str, coll_ids: List[str], post: bool, errors: List[str]
+    search_url: str, coll_ids: List[str], post: bool, errors: Errors
 ) -> None:
     get_params = {"collections": ",".join(coll_ids)}
     _validate_search_collections_request(
@@ -1703,18 +1681,16 @@ def _validate_search_collections_with_ids(
 
 
 def validate_item_search_collections(
-    search_url: str, collections_url: Optional[str], post: bool, errors: List[str]
+    search_url: str, collections_url: Optional[str], post: bool, errors: Errors
 ) -> None:
     if collections_url:
         collections_entity = requests.get(collections_url).json()
         if isinstance(collections_entity, List):
-            errors.append("/collections entity is an array rather than an object")
+            errors += "/collections entity is an array rather than an object"
             return
         collections = collections_entity.get("collections")
         if not collections:
-            errors.append(
-                '/collections entity does not contain a "collections" attribute'
-            )
+            errors += '/collections entity does not contain a "collections" attribute'
             return
 
         collection_ids = [x["id"] for x in collections]
