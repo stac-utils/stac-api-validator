@@ -94,7 +94,7 @@ The link relations define how to navigate a STAC catalog through parent-child li
 
 The parameters that filter results apply to the Items resource and Item Search endpoints.
 
-The current validity status of several popular STAC API implementations can be found [here](../stac-api-validator/COMPLIANCE_REPORT.md).
+The current validity status of several popular STAC API implementations can be found [here](COMPLIANCE_REPORT.md).
 
 ## Command-line Reference
 

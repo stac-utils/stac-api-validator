@@ -1242,7 +1242,7 @@ def validate_item_pagination(
 
     # todo: how to paginate over items, not just search?
 
-    if use_pystac_client:
+    if use_pystac_client and collection is not None:
         client = Client.open(root_url)
         search = client.search(
             method="GET", collections=[collection], max_items=max_items, limit=5
@@ -1259,6 +1259,10 @@ def validate_item_pagination(
             errors.append(
                 "STAC API - Item Search GET pagination - duplicate items returned from paginating items"
             )
+    elif collection is None:
+        errors.append(
+            "STAC API - Item Search GET pagination - pystac-client tests not run, collection is not defined"
+        )
 
     # GET paging has a problem with intersects https://github.com/stac-utils/pystac-client/issues/335
     # search = client.search(method="GET", collections=[collection], intersects=geometry)
@@ -1317,31 +1321,36 @@ def validate_item_pagination(
             except json.decoder.JSONDecodeError:
                 errors.append("STAC API - Item Search POST pagination response failed")
 
-        max_items = 100
-        client = Client.open(root_url)
-        search = client.search(
-            method="POST", collections=[collection], max_items=max_items, limit=5
-        )
-
-        items = list(search.items_as_dicts())
-
-        if len(items) > max_items:
-            errors.append(
-                "STAC API - Item Search POST pagination - more than max items returned from paginating"
+        if use_pystac_client and collection is not None:
+            max_items = 100
+            client = Client.open(root_url)
+            search = client.search(
+                method="POST", collections=[collection], max_items=max_items, limit=5
             )
 
-        if len(items) > len({item["id"] for item in items}):
-            errors.append(
-                "STAC API - Item Search POST pagination - duplicate items returned from paginating items"
-            )
+            items = list(search.items_as_dicts())
 
-        search = client.search(
-            method="POST", collections=[collection], intersects=geometry
-        )
-        if len(list(take(20000, search.items_as_dicts()))) == 20000:
+            if len(items) > max_items:
+                errors.append(
+                    "STAC API - Item Search POST pagination - more than max items returned from paginating"
+                )
+
+            if len(items) > len({item["id"] for item in items}):
+                errors.append(
+                    "STAC API - Item Search POST pagination - duplicate items returned from paginating items"
+                )
+
+            search = client.search(
+                method="POST", collections=[collection], intersects=geometry
+            )
+            if len(list(take(20000, search.items_as_dicts()))) == 20000:
+                errors.append(
+                    "STAC API - Item Search POST pagination - paged through 20,000 results. This could mean the last page "
+                    "of results references itself, or your collection and geometry combination has too many results."
+                )
+        elif collection is not None:
             errors.append(
-                "STAC API - Item Search POST pagination - paged through 20,000 results. This could mean the last page "
-                "of results references itself, or your collection and geometry combination has too many results."
+                "STAC API - Item Search POST pagination - pystac-client tests not run, collection is undefined"
             )
 
 
