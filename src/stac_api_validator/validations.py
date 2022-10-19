@@ -2,18 +2,22 @@
 import itertools
 import json
 import re
+from enum import Enum
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Pattern
 from typing import Tuple
+from typing import Union
 
 import requests
 import yaml
 from more_itertools import take
 from pystac import STACValidationError
 from pystac_client import Client
+from requests import Request
+from requests import Session
 from shapely.geometry import shape
 
 from stac_api_validator.geometries import geometry_collection
@@ -60,6 +64,35 @@ from .filters import cql2_text_or
 from .filters import cql2_text_s_intersects
 from .filters import cql2_text_string_comparisons
 from .filters import cql2_text_timestamp_comparisons
+
+
+class Method(Enum):
+    GET = "GET"
+    POST = "POST"
+
+
+class Errors:
+    def __init__(self) -> None:
+        self.errors: List[Tuple[str, str]] = []
+
+    def __iadd__(self, x: Union[Tuple[str, str], str]) -> "Errors":
+        if isinstance(x, str):
+            self.errors.append(("none", x))
+        elif isinstance(x, tuple):
+            self.errors.append(x)
+        return self
+
+    def __contains__(self, item: str) -> bool:
+        return item in (e[0] for e in self.errors)
+
+    def __bool__(self) -> bool:
+        return bool(self.errors)
+
+    def __str__(self) -> str:
+        return str(self.errors)
+
+    def get_errors_as_list(self) -> List[str]:
+        return [e[1] for e in self.errors]
 
 
 cc_core_regex = re.compile(r"https://api\.stacspec\.org/.+/core")
@@ -180,6 +213,118 @@ def supports(conforms_to: List[str], pattern: Pattern[str]) -> bool:
     return any(pattern.fullmatch(x) for x in conforms_to)
 
 
+def retrieve(
+    url: str,
+    errors: Errors,
+    context: str,
+    method: Method = Method.GET,
+    headers: Optional[Dict[str, str]] = None,
+    status_code: int = 200,
+) -> Optional[Tuple[Dict[str, Any], Dict[str, str]]]:
+    resp = Session().send(Request(method.value, url, headers=headers).prepare())
+
+    # todo: handle connection exception, etc.
+    # todo: handle timeout
+
+    if resp.status_code != status_code:
+        errors += f"[{context}] {method.value} {url} failed with status code {resp.status_code}"
+    else:
+        try:
+            return resp.json(), resp.headers  # type:ignore
+        except json.decoder.JSONDecodeError:
+            errors += f"[{context}] {method.value} {url} returned non-JSON value"
+    return None
+
+
+def validate_core_landing_page_body(
+    body: Dict[str, Any],
+    headers: Dict[str, str],
+    errors: Errors,
+    conformance_classes: List[str],
+    collection: Optional[str],
+    geometry: Optional[str],
+) -> None:
+    if not has_json_content_type(headers):
+        errors += (
+            "LP-1",
+            "[Core] : Landing Page (/) response Content-Type header is not application/json",
+        )
+
+    conforms_to = body.get("conformsTo", [])
+    if not conforms_to:
+        errors += (
+            "XXX",
+            "[Core] : Landing Page (/) 'conformsTo' field must be defined and non-empty."
+            "This field is required as of 1.0.0.",
+        )
+
+    if not body.get("links"):
+        errors += ("XXX", "/ : 'links' field must be defined and non-empty.")
+
+    if not any(cc_core_regex.fullmatch(x) for x in conforms_to):
+        errors += ("XXX", "/: STAC API - Core not contained in 'conformsTo'")
+
+    if "browseable" in conformance_classes and not any(
+        cc_browseable_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors += (
+            "XXX",
+            "/: Browseable configured for validation, but not contained in 'conformsTo'",
+        )
+
+    if "children" in conformance_classes and not any(
+        cc_children_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors += (
+            "XXX",
+            "/: Children configured for validation, but not contained in 'conformsTo'",
+        )
+
+    if "collections" in conformance_classes and not supports_collections(conforms_to):
+        errors += (
+            "XXX",
+            "/: Collections configured for validation, but not contained in 'conformsTo'",
+        )
+
+        if collection is None:
+            errors += (
+                "XXX",
+                "/: Collections configured for validation, but `--collection` parameter not specified",
+            )
+
+    if "features" in conformance_classes and not supports_features(conforms_to):
+        errors += (
+            "XXX",
+            "/: Features configured for validation, but not contained in 'conformsTo'",
+        )
+        if collection is None:
+            errors += (
+                "XXX",
+                "/: Features configured for validation, but `--collection` parameter not specified",
+            )
+
+    if "item-search" in conformance_classes:
+        if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
+            errors += (
+                "XXX",
+                "/: Item Search configured for validation, but not contained in 'conformsTo'",
+            )
+        if collection is None:
+            errors += (
+                "XXX",
+                "/: Item Search configured for validation, but `--collection` parameter not specified",
+            )
+        if geometry is None:
+            errors += (
+                "XXX",
+                "/: Item Search configured for validation, but `--geometry` parameter not specified",
+            )
+
+
+def has_json_content_type(headers: Dict[str, str]) -> bool:
+    return headers.get("content-type", "").split(";")[0] == "application/json"
+
+
 def validate_api(
     root_url: str,
     post: bool,
@@ -190,104 +335,62 @@ def validate_api(
     warnings: List[str] = []
     errors: List[str] = []
 
-    root = requests.get(root_url)
+    # gradually transition to using this object instead of a List
+    errors_obj = Errors()
 
-    # todo: handle connection exception, etc.
-    if root.status_code != 200:
-        errors.append(f"root URL {root_url} returned status code {root.status_code}")
+    landing_page_body_and_headers = retrieve(root_url, errors_obj, "Core")
+
+    if not landing_page_body_and_headers:
+        errors.extend(errors_obj.get_errors_as_list())
         return warnings, errors
 
-    root_body = root.json()
+    landing_page_body, landing_page_headers = landing_page_body_and_headers
 
-    conforms_to = root_body.get("conformsTo", [])
-    if not conforms_to:
-        errors.append(
-            "/ : 'conformsTo' field must be defined and non-empty. This field is required as of 1.0.0."
-        )
+    assert isinstance(landing_page_body, dict)
 
-    if not root_body.get("links"):
-        errors.append("/ : 'links' field must be defined and non-empty.")
+    validate_core_landing_page_body(
+        landing_page_body,
+        landing_page_headers,
+        errors_obj,
+        conformance_classes,
+        collection,
+        geometry,
+    )
 
-    if not any(cc_core_regex.fullmatch(x) for x in conforms_to):
-        errors.append("/: STAC API - Core not contained in 'conformsTo'")
-
-    if "browseable" in conformance_classes and not any(
-        cc_browseable_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Browseable configured for validation, but not contained in 'conformsTo'"
-        )
-
-    if "children" in conformance_classes and not any(
-        cc_children_regex.fullmatch(x) for x in conforms_to
-    ):
-        errors.append(
-            "/: Children configured for validation, but not contained in 'conformsTo'"
-        )
-
-    if "collections" in conformance_classes and not supports_collections(conforms_to):
-        errors.append(
-            "/: Collections configured for validation, but not contained in 'conformsTo'"
-        )
-
-        if collection is None:
-            errors.append(
-                "/: Collections configured for validation, but `--collection` parameter not specified"
-            )
-
-    if "features" in conformance_classes and not supports_features(conforms_to):
-        errors.append(
-            "/: Features configured for validation, but not contained in 'conformsTo'"
-        )
-        if collection is None:
-            errors.append(
-                "/: Features configured for validation, but `--collection` parameter not specified"
-            )
-
-    if "item-search" in conformance_classes:
-        if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
-            errors.append(
-                "/: Item Search configured for validation, but not contained in 'conformsTo'"
-            )
-        if collection is None:
-            errors.append(
-                "/: Item Search configured for validation, but `--collection` parameter not specified"
-            )
-        if geometry is None:
-            errors.append(
-                "/: Item Search configured for validation, but `--geometry` parameter not specified"
-            )
+    errors.extend(errors_obj.get_errors_as_list())
 
     # fail fast if there are errors with conformance or links so far
     if errors:
         return warnings, errors
 
     print("Validating STAC API - Core conformance class.")
-    validate_core(root_body, warnings, errors)
+    validate_core(landing_page_body, warnings, errors)
 
     if "browseable" in conformance_classes:
         print("Validating STAC API - Browseable conformance class.")
-        validate_browseable(root_body, warnings, errors)
+        validate_browseable(landing_page_body, warnings, errors)
     else:
         print("Skipping STAC API - Browseable conformance class.")
 
     if "children" in conformance_classes:
         print("Validating STAC API - Children conformance class.")
-        validate_children(root_body, warnings, errors)
+        validate_children(landing_page_body, warnings, errors)
     else:
         print("Skipping STAC API - Children conformance class.")
 
     if "collections" in conformance_classes:
         print("Validating STAC API - Collections conformance class.")
-        validate_collections(root_body, collection, warnings, errors)  # type:ignore
+        validate_collections(landing_page_body, collection, warnings, errors)
     else:
         print("Skipping STAC API - Collections conformance class.")
 
+    conforms_to = landing_page_body.get("conformsTo", [])
+
     if "features" in conformance_classes:
         print("Validating STAC API - Features conformance class.")
-        validate_collections(root_body, collection, warnings, errors)  # type:ignore
+        validate_collections(landing_page_body, collection, warnings, errors)
         validate_features(
-            root_body,
+            landing_page_body,
             conforms_to,
             collection,
             geometry,
@@ -301,7 +404,7 @@ def validate_api(
         print("Validating STAC API - Item Search conformance class.")
         validate_item_search(
             root_url=root_url,
-            root_body=root_body,
+            root_body=landing_page_body,
             post=post,
             collection=collection,  # type:ignore
             conforms_to=conforms_to,
@@ -428,7 +531,10 @@ def validate_children(
 
 
 def validate_collections(
-    root_body: Dict[str, Any], collection: str, warnings: List[str], errors: List[str]
+    root_body: Dict[str, Any],
+    collection: Optional[str],
+    warnings: List[str],
+    errors: List[str],
 ) -> None:
     print("WARNING: Collections validation is not yet fully implemented.")
 
