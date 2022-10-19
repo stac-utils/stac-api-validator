@@ -218,10 +218,13 @@ def retrieve(
     errors: Errors,
     context: str,
     method: Method = Method.GET,
+    params: Optional[Dict[str, str]] = None,
     headers: Optional[Dict[str, str]] = None,
     status_code: int = 200,
 ) -> Optional[Tuple[Dict[str, Any], Dict[str, str]]]:
-    resp = Session().send(Request(method.value, url, headers=headers).prepare())
+    resp = Session().send(
+        Request(method.value, url, headers=headers, params=params).prepare()
+    )
 
     # todo: handle connection exception, etc.
     # todo: handle timeout
