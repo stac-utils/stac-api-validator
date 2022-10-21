@@ -1,6 +1,7 @@
 """Validations module."""
 import itertools
 import json
+import logging
 import re
 from enum import Enum
 from typing import Any
@@ -68,6 +69,9 @@ from .filters import cql2_text_string_comparisons
 from .filters import cql2_text_timestamp_comparisons
 
 
+logger = logging.getLogger(__name__)
+
+
 class Method(Enum):
     GET = "GET"
     POST = "POST"
@@ -84,6 +88,9 @@ class BaseErrors:
         return bool(self.errors)
 
     def __str__(self) -> str:
+        return str(self.errors)
+
+    def __repr__(self) -> str:
         return str(self.errors)
 
     def __iter__(self) -> Iterator[str]:
@@ -276,32 +283,32 @@ def validate_core_landing_page_body(
     conformance_classes: List[str],
     collection: Optional[str],
     geometry: Optional[str],
-) -> None:
+) -> bool:
     if not has_content_type(headers, "application/json"):
         errors += (
-            "LP-1",
+            "CORE-1",
             "[Core] : Landing Page (/) response Content-Type header is not application/json",
         )
 
     conforms_to = body.get("conformsTo", [])
     if not conforms_to:
         errors += (
-            "XXX",
+            "CORE-2",
             "[Core] : Landing Page (/) 'conformsTo' field must be defined and non-empty."
             "This field is required as of 1.0.0.",
         )
 
     if not body.get("links"):
-        errors += ("XXX", "/ : 'links' field must be defined and non-empty.")
+        errors += ("CORE-3", "/ : 'links' field must be defined and non-empty.")
 
     if not any(cc_core_regex.fullmatch(x) for x in conforms_to):
-        errors += ("XXX", "/: STAC API - Core not contained in 'conformsTo'")
+        errors += ("CORE-4", "/: STAC API - Core not contained in 'conformsTo'")
 
     if "browseable" in conformance_classes and not any(
         cc_browseable_regex.fullmatch(x) for x in conforms_to
     ):
         errors += (
-            "XXX",
+            "CORE-5",
             "/: Browseable configured for validation, but not contained in 'conformsTo'",
         )
 
@@ -309,49 +316,52 @@ def validate_core_landing_page_body(
         cc_children_regex.fullmatch(x) for x in conforms_to
     ):
         errors += (
-            "XXX",
+            "CORE-6",
             "/: Children configured for validation, but not contained in 'conformsTo'",
         )
 
-    if "collections" in conformance_classes and not supports_collections(conforms_to):
-        errors += (
-            "XXX",
-            "/: Collections configured for validation, but not contained in 'conformsTo'",
-        )
-
-        if collection is None:
+    if "collections" in conformance_classes:
+        if not supports_collections(conforms_to):
             errors += (
-                "XXX",
-                "/: Collections configured for validation, but `--collection` parameter not specified",
+                "CORE-7",
+                "/: Collections configured for validation, but not contained in 'conformsTo'",
             )
-
-    if "features" in conformance_classes and not supports_features(conforms_to):
-        errors += (
-            "XXX",
-            "/: Features configured for validation, but not contained in 'conformsTo'",
-        )
         if collection is None:
-            errors += (
-                "XXX",
-                "/: Features configured for validation, but `--collection` parameter not specified",
+            logger.fatal(
+                "Collections configured for validation, but `--collection` parameter not specified"
             )
+            return False
+
+    if "features" in conformance_classes:
+        if not supports_features(conforms_to):
+            errors += (
+                "CORE-8",
+                "/: Features configured for validation, but not contained in 'conformsTo'",
+            )
+        if collection is None:
+            logger.fatal(
+                "Features configured for validation, but `--collection` parameter not specified"
+            )
+            return False
 
     if "item-search" in conformance_classes:
         if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
             errors += (
-                "XXX",
+                "CORE-9",
                 "/: Item Search configured for validation, but not contained in 'conformsTo'",
             )
         if collection is None:
-            errors += (
-                "XXX",
-                "/: Item Search configured for validation, but `--collection` parameter not specified",
+            logger.fatal(
+                "Item Search configured for validation, but `--collection` parameter not specified"
             )
+            return False
         if geometry is None:
-            errors += (
-                "XXX",
-                "/: Item Search configured for validation, but `--geometry` parameter not specified",
+            logger.fatal(
+                " Item Search configured for validation, but `--geometry` parameter not specified"
             )
+            return False
+
+    return True
 
 
 def has_content_type(headers: Mapping[str, str], content_type: str) -> bool:
@@ -378,17 +388,15 @@ def validate_api(
     assert landing_page_body is not None
     assert landing_page_headers is not None
 
-    validate_core_landing_page_body(
+    # fail fast if there are errors with conformance or links so far
+    if not validate_core_landing_page_body(
         landing_page_body,
         landing_page_headers,
         errors,
         conformance_classes,
         collection,
         geometry,
-    )
-
-    # fail fast if there are errors with conformance or links so far
-    if errors:
+    ):
         return warnings, errors
 
     print("Validating STAC API - Core conformance class.")
