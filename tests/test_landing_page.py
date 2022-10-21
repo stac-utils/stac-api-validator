@@ -1,3 +1,6 @@
+from typing import Any
+from typing import Dict
+
 from stac_api_validator.validations import Errors
 from stac_api_validator.validations import validate_core_landing_page_body
 
@@ -97,7 +100,7 @@ def test_landing_page_1() -> None:
     )
 
     errors = Errors()
-    body = {
+    body: Dict[str, Any] = {
         "conformsTo": ["https://api.stacspec.org/v1.0.0-rc.2/core"],
         "links": [{"href": ""}],
     }
