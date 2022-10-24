@@ -23,11 +23,6 @@ from stac_api_validator.validations import validate_api
     help="STAC API Root / Landing Page URL",
 )
 @click.option(
-    "--post/--no-post",
-    default=True,
-    help="Test all validations with POST method for requests in addition to GET",
-)
-@click.option(
     "--collection",
     help="The name of the collection to use for item-search, collections, and features tests.",
 )
@@ -57,7 +52,6 @@ from stac_api_validator.validations import validate_api
 def main(
     log_level: str,
     root_url: str,
-    post: bool,
     conformance_classes: List[str],
     collection: Optional[str],
     geometry: Optional[str],
@@ -69,7 +63,6 @@ def main(
     try:
         (warnings, errors) = validate_api(
             root_url=root_url,
-            post=post,
             conformance_classes=conformance_classes,
             collection=collection,
             geometry=geometry,

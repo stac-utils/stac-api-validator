@@ -110,8 +110,6 @@ Options:
   --log-level TEXT                Logging level, one of DEBUG, INFO, WARN,
                                   ERROR, CRITICAL
   --root-url TEXT                 STAC API Root / Landing Page URL  [required]
-  --post / --no-post              Test all validations with POST method for
-                                  requests in addition to GET
   --collection TEXT               The name of the collection to use for item-
                                   search, collections, and features tests.
   --geometry TEXT                 The GeoJSON geometry to use for intersection
@@ -155,9 +153,6 @@ errors:
 - GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 400
 - POST Search with bbox:[100.0, 0.0, 0.0, 105.0, 1.0, 1.0] returned status code 400
 ```
-
-Additionally, the `--no-post` option can be specified to only test GET requests, instead of the default of using
-both GET and POST.
 
 ## Validating OGC API Features - Part 1 compliance
 

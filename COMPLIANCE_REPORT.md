@@ -183,7 +183,7 @@ Date: 06-Oct-2022
 Output
 
 ```
-$ poetry run stac-api-validator --root-url https://tamn.snapplanet.io  --conformance features --conformance item-search --conformance filter --collection S2 --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}' --no-post
+$ poetry run stac-api-validator --root-url https://tamn.snapplanet.io  --conformance features --conformance item-search --conformance filter --collection S2 --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
 Validating https://tamn.snapplanet.io
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
