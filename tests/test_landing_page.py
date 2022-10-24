@@ -71,7 +71,7 @@ def test_landing_page_1() -> None:
     assert "CORE-4" not in errors
 
     errors = Errors()
-    body = {
+    body: Dict[str, Any] = {
         "conformsTo": [
             "https://api.stacspec.org/v1.0.0-rc.2/core"
             "https://api.stacspec.org/v1.0.0-rc.2/ogcapi-features"
@@ -100,7 +100,7 @@ def test_landing_page_1() -> None:
     )
 
     errors = Errors()
-    body: Dict[str, Any] = {
+    body = {
         "conformsTo": ["https://api.stacspec.org/v1.0.0-rc.2/core"],
         "links": [{"href": ""}],
     }
