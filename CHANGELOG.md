@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Completed Features conformance class validation
 - Completed Collections conformance class validation
-- Added unit tests for part of Core
+- Added unit tests for part of Core validations
 
 ### Changed
 
