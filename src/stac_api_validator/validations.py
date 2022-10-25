@@ -17,6 +17,7 @@ from typing import Union
 import requests
 import yaml
 from more_itertools import take
+from pystac import Collection
 from pystac import STACValidationError
 from pystac_client import Client
 from requests import Request
@@ -580,19 +581,9 @@ def validate_collections(
     errors: Errors,
     r_session: Session,
 ) -> None:
-    print("WARNING: Collections validation is not yet fully implemented.")
-
     if not (data_link := link_by_rel(root_body["links"], "data")):
         errors += "[Collections] /: Link[rel=data] must href /collections"
     else:
-        _, body, _ = retrieve(
-            f"{data_link['href']}/{collection}",
-            errors,
-            "Collections",
-            r_session=r_session,
-        )
-        # todo: validate body
-
         retrieve(
             f"{data_link['href']}/non-existent-collection",
             errors,
@@ -601,6 +592,80 @@ def validate_collections(
             r_session=r_session,
             additional="non-existent collection",
         )
+
+        collections_url = f"{data_link['href']}"
+        _, body, resp_headers = retrieve(
+            collections_url,
+            errors,
+            "Collections",
+            r_session=r_session,
+        )
+
+        if not body:
+            errors += "[Collections] /collections body was empty"
+        else:
+            if (
+                not resp_headers
+                or resp_headers.get("content-type") != "application/json"
+            ):
+                errors += "[Collections] /collections content-type header was not application/json"
+
+            if not (self_link := link_by_rel(body.get("links", []), "self")):
+                errors += "[Collections] /collections does not have self link"
+            elif collections_url != self_link.get("href"):
+                errors += (
+                    "[Collections] /collections self link does not match requested url"
+                )
+
+            if not link_by_rel(body.get("links", []), "root"):
+                errors += "[Collections] /collections does not have root link"
+
+            if body.get("collections") is None:
+                errors += "[Collections] /collections does not have 'collections' field"
+
+            if not (collections_list := body.get("collections")):
+                errors += "[Collections] /collections 'collections' field is empty"
+            else:
+                try:
+                    for c in collections_list:
+                        Collection.from_dict(c)
+                except Exception as e:
+                    errors += f"[Collections] /collections Collection '{c['id']}' failed pystac hydration: {e}"
+
+            collection_url = f"{data_link['href']}/{collection}"
+            _, body, resp_headers = retrieve(
+                collection_url,
+                errors,
+                "Collections",
+                r_session=r_session,
+            )
+
+            if not body:
+                errors += f"[Collections] /collections/{collection} body was empty"
+            else:
+                if (
+                    not resp_headers
+                    or resp_headers.get("content-type") != "application/json"
+                ):
+                    errors += f"[Collections] /collections/{collection} content-type header was not application/json"
+
+                if not (self_link := link_by_rel(body.get("links", []), "self")):
+                    errors += f"[Collections] /collections/{collection} does not have self link"
+                elif collection_url != self_link.get("href"):
+                    errors += f"[Collections] /collections/{collection} self link does not match requested url"
+
+                if not link_by_rel(body.get("links", []), "root"):
+                    errors += f"[Collections] /collections/{collection} does not have root link"
+
+                if not link_by_rel(body.get("links", []), "parent"):
+                    errors += f"[Collections] /collections/{collection} does not have parent link"
+
+                try:
+                    Collection.from_dict(body)
+                except Exception as e:
+                    errors += f"[Collections] /collections/{collection} failed pystac hydration: {e}"
+
+        # todo: collection pagination
 
 
 def validate_features(
