@@ -937,12 +937,11 @@ def validate_item_search(
         search_url, errors, "Item Search", content_type=geojson_mt, r_session=r_session
     )
 
-    try:
-        ItemCollection.from_dict(body)
-    except Exception as e:
-        errors += (
-            f"[Item Search] {search_url} failed pystac hydration to ItemCollection: {e}"
-        )
+    if body:
+        try:
+            ItemCollection.from_dict(body)
+        except Exception as e:
+            errors += f"[Item Search] {search_url} failed pystac hydration to ItemCollection: {e}"
 
     validate_item_search_limit(search_url, methods, errors)
     validate_item_search_bbox_xor_intersects(search_url, methods, errors)
