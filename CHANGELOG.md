@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - TBD
 
+### Removed
+
+- Removed the `--post/--no-post` parameter in favor of looking in the landing page for the `method` field of the
+  search link relation
+
 ### Added
 
 - Added unit tests
