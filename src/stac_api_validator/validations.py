@@ -18,6 +18,8 @@ import requests
 import yaml
 from more_itertools import take
 from pystac import Collection
+from pystac import Item
+from pystac import ItemCollection
 from pystac import STACValidationError
 from pystac_client import Client
 from requests import Request
@@ -270,11 +272,17 @@ def retrieve(
     # todo: handle timeout
 
     if resp.status_code != status_code:
-        errors += f"[{context}] {method.value} {url} failed with status code {resp.status_code}: {additional}"
+        errors += (
+            f"[{context}] method={method.value} url={url} params={params} body={body}"
+            f" had unexpected status code {resp.status_code} instead of {status_code}: {additional}"
+        )
+
     elif status_code < 400:
         if content_type and not has_content_type(resp.headers, content_type):
             errors += f"[{context}] {method.value} {url} content-type header is not {content_type}"
-        if has_content_type(resp.headers, "application/json"):
+        if has_content_type(resp.headers, "application/json") or has_content_type(
+            resp.headers, geojson_mt
+        ):
             try:
                 return resp.status_code, resp.json(), resp.headers
             except json.decoder.JSONDecodeError:
@@ -405,31 +413,31 @@ def validate_api(
     ):
         return warnings, errors
 
-    print("Validating STAC API - Core conformance class.")
+    logger.info("Validating STAC API - Core conformance class.")
     validate_core(landing_page_body, warnings, errors, Session())
 
     if "browseable" in conformance_classes:
-        print("Validating STAC API - Browseable conformance class.")
+        logger.info("Validating STAC API - Browseable conformance class.")
         validate_browseable(landing_page_body, warnings, errors)
     else:
-        print("Skipping STAC API - Browseable conformance class.")
+        logger.info("Skipping STAC API - Browseable conformance class.")
 
     if "children" in conformance_classes:
-        print("Validating STAC API - Children conformance class.")
+        logger.info("Validating STAC API - Children conformance class.")
         validate_children(landing_page_body, warnings, errors)
     else:
-        print("Skipping STAC API - Children conformance class.")
+        logger.info("Skipping STAC API - Children conformance class.")
 
     if "collections" in conformance_classes:
-        print("Validating STAC API - Collections conformance class.")
+        logger.info("Validating STAC API - Collections conformance class.")
         validate_collections(landing_page_body, collection, errors, r_session)
     else:
-        print("Skipping STAC API - Collections conformance class.")
+        logger.info("Skipping STAC API - Collections conformance class.")
 
     conforms_to = landing_page_body.get("conformsTo", [])
 
     if "features" in conformance_classes:
-        print("Validating STAC API - Features conformance class.")
+        logger.info("Validating STAC API - Features conformance class.")
         validate_collections(landing_page_body, collection, errors, r_session)
         validate_features(
             landing_page_body,
@@ -441,10 +449,10 @@ def validate_api(
             r_session,
         )
     else:
-        print("Skipping STAC API - Features conformance class.")
+        logger.info("Skipping STAC API - Features conformance class.")
 
     if "item-search" in conformance_classes:
-        print("Validating STAC API - Item Search conformance class.")
+        logger.info("Validating STAC API - Item Search conformance class.")
         validate_item_search(
             root_url=root_url,
             root_body=landing_page_body,
@@ -457,7 +465,7 @@ def validate_api(
             r_session=r_session,
         )
     else:
-        print("Skipping STAC API - Item Search conformance class.")
+        logger.info("Skipping STAC API - Item Search conformance class.")
 
     if not errors:
         try:
@@ -566,13 +574,13 @@ def validate_core(
 def validate_browseable(
     root_body: Dict[str, Any], warnings: Warnings, errors: Errors
 ) -> None:
-    print("Browseable validation is not yet implemented.")
+    logger.info("Browseable validation is not yet implemented.")
 
 
 def validate_children(
     root_body: Dict[str, Any], warnings: Warnings, errors: Errors
 ) -> None:
-    print("Children validation is not yet implemented.")
+    logger.info("Children validation is not yet implemented.")
 
 
 def validate_collections(
@@ -677,14 +685,16 @@ def validate_features(
     errors: Errors,
     r_session: Session,
 ) -> None:
-    print("WARNING: Features validation is not yet fully implemented.")
-
     if not geometry:
-        errors += "Geometry parameter required for running Features validations."
+        errors += (
+            "[Features] Geometry parameter required for running Features validations."
+        )
         return
 
     if not collection:
-        errors += "Collection parameter required for running Features validations."
+        errors += (
+            "[Features] Collection parameter required for running Features validations."
+        )
         return
 
     if conforms_to and (
@@ -694,26 +704,29 @@ def validate_features(
             if x.startswith("http://www.opengis.net/spec/ogcapi-features-1/1.0/req/")
         ]
     ):
-        warnings += f"/ : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
+        warnings += f"[Features] / : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
 
     if "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core" not in conforms_to:
-        warnings += "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core'"
+        warnings += "[Features] STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core'"
 
     if (
         "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson"
         not in conforms_to
     ):
-        warnings += "STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson'"
+        warnings += "[Features] STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson'"
 
     # todo: add this one somewhere
-    #  "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/oas30",
+    # if service-desc type is the OAS 3.0 one, add a warning that this can be used also
+    # "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/oas30",
 
     root_links = root_body.get("links")
     conformance = link_by_rel(root_links, "conformance")
-    if not (
-        conformance is not None and conformance.get("href", "").endswith("/conformance")
-    ):
-        errors += "/ Link[rel=conformance] must href /conformance"
+    if conformance is None:
+        errors += "[Features] /: Landing page missing Link[rel=conformance]"
+    elif not conformance.get("href", "").endswith("/conformance"):
+        errors += (
+            "[Features] /: Landing page Link[rel=conformance] must href /conformance"
+        )
 
     if conformance:
         _, body, _ = retrieve(
@@ -723,27 +736,110 @@ def validate_features(
         if body and not (
             set(root_body.get("conformsTo", [])) == set(body.get("conformsTo", []))
         ):
-            warnings += (
-                "Landing Page conforms to and conformance conformsTo must be the same"
-            )
+            warnings += "[Features] Landing Page conforms to and conformance conformsTo must be the same"
 
     # This is likely a mistake, but most apis can't undo it for backwards-compat reasons, so only warn
     if not (link_by_rel(root_links, "collections") is None):
-        warnings += "/ Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
+        warnings += "[Features] /: Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
 
-    # todo: validate items exists in the collection
-
-    if not (collections_url := link_by_rel(root_links, "data")):
-        errors += "/: Link[rel=data] must href /collections"
+    if not (collections_link := link_by_rel(root_links, "data")):
+        errors += "[Features] /: Link[rel=data] must href /collections"
     else:
-        retrieve(
-            f"{collections_url['href']}/{collection}/items/non-existent-item",
+        collection_url = f"{collections_link['href']}/{collection}"
+        _, body, _ = retrieve(
+            collection_url,
             errors,
             FEATURES,
-            status_code=404,
             r_session=r_session,
         )
+        if body:
+            if not (collection_items_link := link_by_rel(body.get("links"), "items")):
+                errors += f"[Features] /collections/{collection} does not have Link[rel=items]"
+            else:
+                collection_items_url = collection_items_link["href"]
 
+                retrieve(
+                    f"{collection_items_url}/non-existent-item",
+                    errors,
+                    FEATURES,
+                    status_code=404,
+                    r_session=r_session,
+                )
+
+                _, body, _ = retrieve(
+                    collection_items_url,
+                    errors,
+                    FEATURES,
+                    content_type=geojson_mt,
+                    r_session=r_session,
+                )
+
+                if body:
+                    if not (self_link := link_by_rel(body.get("links", []), "self")):
+                        errors += (
+                            f"[Features] {collection_items_url} does not have self link"
+                        )
+                    elif collection_items_link["href"] != self_link.get("href"):
+                        errors += f"[Features] {collection_items_url} self link does not match requested url"
+
+                    if not link_by_rel(body.get("links", []), "root"):
+                        errors += (
+                            f"[Features] {collection_items_url} does not have root link"
+                        )
+
+                    if not link_by_rel(body.get("links", []), "parent"):
+                        errors += f"[Features] {collection_items_url} does not have parent link"
+
+                    try:
+                        ItemCollection.from_dict(body)
+                    except Exception as e:
+                        errors += f"[Features] {collection_items_url} failed pystac hydration to ItemCollection: {e}"
+
+                    item = next(iter(body.get("features", [])), None)
+
+                    if not item:
+                        errors += f"[Features] /collections/{collection}/items features array was empty"
+                    else:
+                        if not (
+                            item_self_link := link_by_rel(item.get("links", []), "self")
+                        ):
+                            errors += f"[Features] /collections/{collection}/items first item does not have self link"
+                        else:
+                            item_url = item_self_link["href"]
+                            _, body, _ = retrieve(
+                                item_url,
+                                errors,
+                                FEATURES,
+                                content_type=geojson_mt,
+                                r_session=r_session,
+                            )
+
+                            if body:
+                                if not (
+                                    self_link := link_by_rel(
+                                        body.get("links", []), "self"
+                                    )
+                                ):
+                                    errors += (
+                                        f"[Features] {item_url} does not have self link"
+                                    )
+                                elif item_url != self_link.get("href"):
+                                    errors += f"[Features] {item_url} self link does not match requested url"
+
+                                if not link_by_rel(body.get("links", []), "root"):
+                                    errors += (
+                                        f"[Features] {item_url} does not have root link"
+                                    )
+
+                                if not link_by_rel(body.get("links", []), "parent"):
+                                    errors += f"[Features] {item_url} does not have parent link"
+
+                                try:
+                                    Item.from_dict(body)
+                                except Exception as e:
+                                    errors += f"[Features] {item_url} failed pystac hydration to Item: {e}"
+
+    # Items pagination validation
     if not (collections_url := link_by_rel(root_links, "data")):
         errors += "/: Link[rel=data] must href /collections, cannot run pagination test"
     else:
@@ -761,22 +857,22 @@ def validate_features(
             )
 
     # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Features - Fields extension conformance class found.")
+    #     logger.info("STAC API - Features - Fields extension conformance class found.")
     #
     # if any(cc_features_context_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Features - Context extension conformance class found.")
+    #     logger.info("STAC API - Features - Context extension conformance class found.")
     #
     # if any(cc_features_sort_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Features - Sort extension conformance class found.")
+    #     logger.info("STAC API - Features - Sort extension conformance class found.")
     #
     # if any(cc_features_query_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Features - Query extension conformance class found.")
+    #     logger.info("STAC API - Features - Query extension conformance class found.")
     #
     # if any(cc_features_filter_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Features - Filter extension conformance class found.")
+    #     logger.info("STAC API - Features - Filter extension conformance class found.")
 
     if any(cc_features_filter_regex.fullmatch(x) for x in conforms_to):
-        print("STAC API - Features - Filter Extension conformance class found.")
+        logger.info("STAC API - Features - Filter Extension conformance class found.")
         validate_features_filter(
             root_body=root_body,
             collection=collection,
@@ -784,7 +880,9 @@ def validate_features(
             r_session=r_session,
         )
     else:
-        print("Skipping STAC API - Features - Filter Extension conformance class.")
+        logger.info(
+            "Skipping STAC API - Features - Filter Extension conformance class."
+        )
 
 
 def validate_item_search(
@@ -835,9 +933,15 @@ def validate_item_search(
         collections_url = None
 
     search_url = search_links[0]["href"]
-    retrieve(
+    _, body, _ = retrieve(
         search_url, errors, "Item Search", content_type=geojson_mt, r_session=r_session
     )
+
+    if body:
+        try:
+            ItemCollection.from_dict(body)
+        except Exception as e:
+            errors += f"[Item Search] {search_url} failed pystac hydration to ItemCollection: {e}"
 
     validate_item_search_limit(search_url, methods, errors)
     validate_item_search_bbox_xor_intersects(search_url, methods, errors)
@@ -866,16 +970,16 @@ def validate_item_search(
     )
 
     # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Item Search - Fields extension conformance class found.")
+    #     logger.info("STAC API - Item Search - Fields extension conformance class found.")
     #
     # if any(cc_item_search_context_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Item Search - Context extension conformance class found.")
+    #     logger.info("STAC API - Item Search - Context extension conformance class found.")
     #
     # if any(cc_item_search_sort_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Item Search - Sort extension conformance class found.")
+    #     logger.info("STAC API - Item Search - Sort extension conformance class found.")
     #
     # if any(cc_item_search_query_regex.fullmatch(x) for x in conforms_to):
-    #     print("STAC API - Item Search - Query extension conformance class found.")
+    #     logger.info("STAC API - Item Search - Query extension conformance class found.")
     #
 
     if any(
@@ -892,7 +996,9 @@ def validate_item_search(
         or x.endswith("item-search#filter:filter")
         for x in conforms_to
     ):
-        print("Validating STAC API - Item Search - Filter Extension conformance class.")
+        logger.info(
+            "Validating STAC API - Item Search - Filter Extension conformance class."
+        )
         validate_item_search_filter(
             root_url=root_url,
             root_body=root_body,
@@ -902,7 +1008,9 @@ def validate_item_search(
             r_session=r_session,
         )
     else:
-        print("Skipping STAC API - Item Search - Filter Extension conformance class.")
+        logger.info(
+            "Skipping STAC API - Item Search - Filter Extension conformance class."
+        )
 
 
 def validate_filter_queryables(
@@ -923,7 +1031,10 @@ def validate_filter_queryables(
             "http://json-schema.org/draft-07/schema#",
         ]
         if queryables_schema.get("$schema") not in json_schemas:
-            errors += f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$schema' value invalid, must be one of: '{','.join(json_schemas)}'"
+            errors += (
+                f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' "
+                f"'$schema' value invalid, must be one of: '{','.join(json_schemas)}'"
+            )
 
         if queryables_schema.get("$id") != queryables_url:
             errors += f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$id' value invalid, must be same as queryables url"
@@ -935,7 +1046,9 @@ def validate_filter_queryables(
 def validate_features_filter(
     root_body: Dict[str, Any], collection: str, errors: Errors, r_session: Session
 ) -> None:
-    print("WARNING: Features - Filter Ext validation is not yet fully implemented.")
+    logger.info(
+        "WARNING: Features - Filter Ext validation is not yet fully implemented."
+    )
 
     if not (collections_link := link_by_rel(root_body["links"], "data")):
         errors += "[Features] / : 'data' link relation missing"
@@ -994,11 +1107,11 @@ def validate_item_search_filter(
     )
 
     if cql2_text_supported:
-        print(
+        logger.info(
             "Validating STAC API - Item Search - Filter Extension - CQL2-Text conformance class."
         )
     else:
-        print(
+        logger.info(
             "Skipping STAC API - Item Search - Filter Extension - CQL2-Text conformance class."
         )
 
@@ -1010,11 +1123,11 @@ def validate_item_search_filter(
     )
 
     if cql2_json_supported:
-        print(
+        logger.info(
             "Validating STAC API - Item Search - Filter Extension - CQL2-JSON conformance class."
         )
     else:
-        print(
+        logger.info(
             "Skipping STAC API - Item Search - Filter Extension - CQL2-JSON conformance class."
         )
 
@@ -1026,11 +1139,11 @@ def validate_item_search_filter(
     )
 
     if basic_cql2_supported:
-        print(
+        logger.info(
             "Validating STAC API - Item Search - Filter Extension - Basic CQL2 conformance class."
         )
     else:
-        print(
+        logger.info(
             "Skipping STAC API - Item Search - Filter Extension - Basic CQL2 conformance class."
         )
 
@@ -1040,11 +1153,11 @@ def validate_item_search_filter(
     )
 
     if advanced_comparison_operators_supported:
-        print(
+        logger.info(
             "Validating STAC API - Item Search - Filter Extension - Advanced Comparison Operators conformance class."
         )
     else:
-        print(
+        logger.info(
             "Skipping STAC API - Item Search - Filter Extension - Advanced Comparison Operators conformance class."
         )
 
@@ -1054,11 +1167,11 @@ def validate_item_search_filter(
     )
 
     if basic_spatial_operators_supported:
-        print(
+        logger.info(
             "Validating STAC API - Item Search - Filter Extension - Basic Spatial Operators conformance class."
         )
     else:
-        print(
+        logger.info(
             "Skipping STAC API - Item Search - Filter Extension - Basic Spatial Operators conformance class."
         )
 
@@ -1067,11 +1180,11 @@ def validate_item_search_filter(
     )
 
     if temporal_operators_supported:
-        print(
+        logger.info(
             "Validating STAC API - Item Search - Filter Extension - Temporal Operators conformance class."
         )
     else:
-        print(
+        logger.info(
             "Skipping STAC API - Item Search - Filter Extension - Temporal Operators conformance class."
         )
 
@@ -1234,6 +1347,7 @@ def validate_item_search_datetime(
             r_session=r_session,
             errors=errors,
             context=ITEM_SEARCH,
+            additional="invalid datetime returned non-400 status code",
         )
         if status_code == 200:
             warnings += f"[Item Search] GET Search with datetime={dt} returned status code 200 instead of 400"
@@ -1316,7 +1430,7 @@ def validate_item_pagination(
 
         if len(items) > len({item["id"] for item in items}):
             errors += "STAC API - Item Search GET pagination - duplicate items returned from paginating items"
-    elif collection is None:
+    elif use_pystac_client and collection is None:
         errors += "STAC API - Item Search GET pagination - pystac-client tests not run, collection is not defined"
 
     # GET paging has a problem with intersects https://github.com/stac-utils/pystac-client/issues/335
