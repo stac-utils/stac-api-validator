@@ -259,7 +259,7 @@ def retrieve(
     body: Optional[Dict[str, Any]] = None,
     r_session: Optional[Session] = None,
     additional: Optional[str] = "",
-    content_type: Optional[str] = "application/json",
+    content_type: Optional[str] = None,
 ) -> Tuple[int, Optional[Dict[str, Any]], Optional[Mapping[str, str]]]:
     if not r_session:
         r_session = Session()
@@ -278,11 +278,17 @@ def retrieve(
         )
 
     elif status_code < 400:
-        if content_type and not has_content_type(resp.headers, content_type):
-            errors += f"[{context}] {method.value} {url} content-type header is not {content_type}"
-        if has_content_type(resp.headers, "application/json") or has_content_type(
-            resp.headers, geojson_mt
-        ):
+        if not content_type:
+            if (
+                url.endswith("/search") or url.endswith("/items")
+            ) and not has_content_type(resp.headers, geojson_mt):
+                errors += f"[{context}] {method.value} {url} content-type header is not '{geojson_mt}'"
+            elif not has_content_type(resp.headers, "application/json"):
+                errors += f"[{context}] {method.value} {url} content-type header is not 'application/json'"
+        elif not has_content_type(resp.headers, content_type):
+            errors += f"[{context}] {method.value} {url} content-type header is not '{content_type}'"
+
+        if resp.headers.get("content-type", "").split(";")[0].endswith("json"):
             try:
                 return resp.status_code, resp.json(), resp.headers
             except json.decoder.JSONDecodeError:
@@ -509,13 +515,13 @@ def validate_core(
         errors += "/ : Link[rel=root] must exist"
     else:
         if root.get("type") != "application/json":
-            errors += "root type is not application/json"
+            errors += "/ : Link[rel=root] type is not application/json"
 
     if not (_self := link_by_rel(links, "self")):
         warnings += "/ : Link[rel=self] must exist"
     else:
         if _self.get("type") != "application/json":
-            errors += "self type is not application/json"
+            errors += "/ : Link[rel=self] type is not application/json"
 
     if not (service_desc := link_by_rel(links, "service-desc")):
         errors += "/ : Link[rel=service-desc] must exist"
@@ -614,7 +620,8 @@ def validate_collections(
         else:
             if (
                 not resp_headers
-                or resp_headers.get("content-type") != "application/json"
+                or resp_headers.get("content-type", "").split(";")[0]
+                != "application/json"
             ):
                 errors += "[Collections] /collections content-type header was not application/json"
 
@@ -653,7 +660,8 @@ def validate_collections(
             else:
                 if (
                     not resp_headers
-                    or resp_headers.get("content-type") != "application/json"
+                    or resp_headers.get("content-type", "").split(";")[0]
+                    != "application/json"
                 ):
                     errors += f"[Collections] /collections/{collection} content-type header was not application/json"
 
@@ -730,7 +738,7 @@ def validate_features(
 
     if conformance:
         _, body, _ = retrieve(
-            conformance["href"], errors, "Collections", r_session=r_session
+            conformance["href"], errors, "Features", r_session=r_session
         )
 
         if body and not (
@@ -1282,6 +1290,7 @@ def validate_item_search_filter(
             search_url,
             errors,
             "Item Search - Filter Ext",
+            content_type=geojson_mt,
             r_session=r_session,
             params={"limit": 1, "filter-lang": "cql2-text", "filter": f_text},
         )
@@ -1293,6 +1302,7 @@ def validate_item_search_filter(
             body={"limit": 1, "filter-lang": "cql2-json", "filter": f_json},
             errors=errors,
             context="Item Search - Filter Ext",
+            content_type=geojson_mt,
             r_session=r_session,
         )
 
