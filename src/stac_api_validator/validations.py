@@ -74,6 +74,8 @@ from .filters import cql2_text_timestamp_comparisons
 
 logger = logging.getLogger(__name__)
 
+LATEST_STAC_API_VERSION = "https://api.stacspec.org/v1.0.0-rc.2"
+
 
 class Method(Enum):
     GET = "GET"
@@ -84,6 +86,13 @@ class Method(Enum):
 
 POST = "POST"
 GET = "GET"
+
+
+class Context(Enum):
+    CORE = "Core"
+    ITEM_SEARCH = "Item Search"
+    FEATURES = "Features"
+    COLLECTIONS = "Collections"
 
 
 class BaseErrors:
@@ -130,48 +139,48 @@ class Warnings(BaseErrors):
 FEATURES = "Features"
 ITEM_SEARCH = "Item Search"
 
-cc_core_regex = re.compile(r"https://api\.stacspec\.org/.+/core")
-cc_browseable_regex = re.compile(r"https://api\.stacspec\.org/.+/browseable")
-cc_children_regex = re.compile(r"https://api\.stacspec\.org/.+/children")
+cc_core_regex = re.compile(r"https://api\.stacspec\.org/(.+)/core")
+cc_browseable_regex = re.compile(r"https://api\.stacspec\.org/(.+)/browseable")
+cc_children_regex = re.compile(r"https://api\.stacspec\.org/(.+)/children")
 
-cc_collections_regex = re.compile(r"https://api\.stacspec\.org/.+/collections")
+cc_collections_regex = re.compile(r"https://api\.stacspec\.org/(.+)/collections")
 
-cc_features_regex = re.compile(r"https://api\.stacspec\.org/.+/ogcapi-features")
+cc_features_regex = re.compile(r"https://api\.stacspec\.org/(.+)/ogcapi-features")
 cc_features_transaction_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/ogcapi-features/extensions/transaction"
+    r"https://api\.stacspec\.org/(.+)/ogcapi-features/extensions/transaction"
 )
 cc_features_fields_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/ogcapi-features#fields"
+    r"https://api\.stacspec\.org/(.+)/ogcapi-features#fields"
 )
 cc_features_context_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/ogcapi-features#context"
+    r"https://api\.stacspec\.org/(.+)/ogcapi-features#context"
 )
 cc_features_sort_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/ogcapi-features#sort"
+    r"https://api\.stacspec\.org/(.+)/ogcapi-features#sort"
 )
 cc_features_query_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/ogcapi-features#query"
+    r"https://api\.stacspec\.org/(.+)/ogcapi-features#query"
 )
 cc_features_filter_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/ogcapi-features#filter"
+    r"https://api\.stacspec\.org/(.+)/ogcapi-features#filter"
 )
 
-cc_item_search_regex = re.compile(r"https://api\.stacspec\.org/.+/item-search")
+cc_item_search_regex = re.compile(r"https://api\.stacspec\.org/(.+)/item-search")
 
 cc_item_search_fields_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/item-search#fields"
+    r"https://api\.stacspec\.org/(.+)/item-search#fields"
 )
 cc_item_search_context_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/item-search#context"
+    r"https://api\.stacspec\.org/(.+)/item-search#context"
 )
 cc_item_search_sort_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/item-search#sort"
+    r"https://api\.stacspec\.org/(.+)/item-search#sort"
 )
 cc_item_search_query_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/item-search#query"
+    r"https://api\.stacspec\.org/(.+)/item-search#query"
 )
 cc_item_search_filter_regex = re.compile(
-    r"https://api\.stacspec\.org/.+/item-search#filter"
+    r"https://api\.stacspec\.org/(.+)/item-search#filter"
 )
 
 geojson_mt = "application/geo+json"
@@ -252,18 +261,15 @@ def retrieve(
     url: str,
     errors: Errors,
     context: str,
+    r_session: Session,
     method: Method = Method.GET,
     params: Optional[Dict[str, Any]] = None,
     headers: Optional[Dict[str, str]] = None,
     status_code: int = 200,
     body: Optional[Dict[str, Any]] = None,
-    r_session: Optional[Session] = None,
     additional: Optional[str] = "",
     content_type: Optional[str] = None,
 ) -> Tuple[int, Optional[Dict[str, Any]], Optional[Mapping[str, str]]]:
-    if not r_session:
-        r_session = Session()
-
     resp = r_session.send(
         Request(method.value, url, headers=headers, params=params, json=body).prepare()
     )
@@ -301,6 +307,7 @@ def validate_core_landing_page_body(
     body: Dict[str, Any],
     headers: Mapping[str, str],
     errors: Errors,
+    warnings: Warnings,
     conformance_classes: List[str],
     collection: Optional[str],
     geometry: Optional[str],
@@ -311,6 +318,9 @@ def validate_core_landing_page_body(
             "[Core] : Landing Page (/) response Content-Type header is not application/json",
         )
 
+    if not body.get("links"):
+        errors += ("CORE-3", "/ : 'links' field must be defined and non-empty.")
+
     conforms_to = body.get("conformsTo", [])
     if not conforms_to:
         errors += (
@@ -318,9 +328,14 @@ def validate_core_landing_page_body(
             "[Core] : Landing Page (/) 'conformsTo' field must be defined and non-empty."
             "This field is required as of 1.0.0.",
         )
-
-    if not body.get("links"):
-        errors += ("CORE-3", "/ : 'links' field must be defined and non-empty.")
+    else:
+        if any(
+            x
+            for x in conforms_to
+            if x.startswith("https://api.stacspec.org/v1.0.0")
+            and not x.startswith(LATEST_STAC_API_VERSION)
+        ):
+            warnings += "STAC API Specification v1.0.0-rc.2 is the latest version, but API advertises an older version or older versions."
 
     if not any(cc_core_regex.fullmatch(x) for x in conforms_to):
         errors += ("CORE-4", "/: STAC API - Core not contained in 'conformsTo'")
@@ -394,13 +409,22 @@ def validate_api(
     conformance_classes: List[str],
     collection: Optional[str],
     geometry: Optional[str],
+    auth_bearer_token: Optional[str],
+    auth_query_parameter: Optional[str],
 ) -> Tuple[Warnings, Errors]:
     warnings = Warnings()
     errors = Errors()
 
     r_session = Session()
+    if auth_bearer_token:
+        r_session.headers.update({"Authorization": f"Bearer {auth_bearer_token}"})
 
-    _, landing_page_body, landing_page_headers = retrieve(root_url, errors, "Core")
+    if auth_query_parameter and (xs := auth_query_parameter.split("=", 1)):
+        r_session.params = {xs[0]: xs[1]}
+
+    _, landing_page_body, landing_page_headers = retrieve(
+        root_url, errors, "Core", r_session
+    )
 
     if not landing_page_body:
         return warnings, errors
@@ -413,6 +437,7 @@ def validate_api(
         landing_page_body,
         landing_page_headers,
         errors,
+        warnings,
         conformance_classes,
         collection,
         geometry,
@@ -420,7 +445,7 @@ def validate_api(
         return warnings, errors
 
     logger.info("Validating STAC API - Core conformance class.")
-    validate_core(landing_page_body, warnings, errors, Session())
+    validate_core(landing_page_body, warnings, errors, r_session)
 
     if "browseable" in conformance_classes:
         logger.info("Validating STAC API - Browseable conformance class.")
@@ -480,7 +505,9 @@ def validate_api(
             for child in catalog.get_children():
                 child.validate()
         except STACValidationError as e:
-            errors += f"pystac error: {str(e)}"
+            errors += f"pystac validation error: {e}"
+        except Exception as e:
+            errors += f"Error with  pystac: {e}"
 
     return warnings, errors
 
@@ -784,24 +811,20 @@ def validate_features(
 
                 if body:
                     if not (self_link := link_by_rel(body.get("links", []), "self")):
-                        errors += (
-                            f"[Features] {collection_items_url} does not have self link"
-                        )
+                        errors += f"[Features] GET {collection_items_url} does not have self link"
                     elif collection_items_link["href"] != self_link.get("href"):
-                        errors += f"[Features] {collection_items_url} self link does not match requested url"
+                        errors += f"[Features] GET {collection_items_url} self link does not match requested url"
 
                     if not link_by_rel(body.get("links", []), "root"):
-                        errors += (
-                            f"[Features] {collection_items_url} does not have root link"
-                        )
+                        errors += f"[Features] GET {collection_items_url} does not have root link"
 
                     if not link_by_rel(body.get("links", []), "parent"):
-                        errors += f"[Features] {collection_items_url} does not have parent link"
+                        errors += f"[Features] GET {collection_items_url} does not have parent link"
 
                     try:
                         ItemCollection.from_dict(body)
                     except Exception as e:
-                        errors += f"[Features] {collection_items_url} failed pystac hydration to ItemCollection: {e}"
+                        errors += f"[Features] GET {collection_items_url} failed pystac hydration to ItemCollection: {e}"
 
                     item = next(iter(body.get("features", [])), None)
 
@@ -828,24 +851,20 @@ def validate_features(
                                         body.get("links", []), "self"
                                     )
                                 ):
-                                    errors += (
-                                        f"[Features] {item_url} does not have self link"
-                                    )
+                                    errors += f"[Features] GET {item_url} does not have self link"
                                 elif item_url != self_link.get("href"):
-                                    errors += f"[Features] {item_url} self link does not match requested url"
+                                    errors += f"[Features] GET {item_url} self link does not match requested url"
 
                                 if not link_by_rel(body.get("links", []), "root"):
-                                    errors += (
-                                        f"[Features] {item_url} does not have root link"
-                                    )
+                                    errors += f"[Features] GET {item_url} does not have root link"
 
                                 if not link_by_rel(body.get("links", []), "parent"):
-                                    errors += f"[Features] {item_url} does not have parent link"
+                                    errors += f"[Features] GET {item_url} does not have parent link"
 
                                 try:
                                     Item.from_dict(body)
                                 except Exception as e:
-                                    errors += f"[Features] {item_url} failed pystac hydration to Item: {e}"
+                                    errors += f"[Features] GET {item_url} failed pystac hydration to Item: {e}"
 
     # Items pagination validation
     if not (collections_url := link_by_rel(root_links, "data")):
@@ -862,6 +881,8 @@ def validate_features(
                 methods=["GET"],
                 errors=errors,
                 use_pystac_client=False,
+                context=FEATURES,
+                r_session=r_session,
             )
 
     # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
@@ -949,10 +970,10 @@ def validate_item_search(
         try:
             ItemCollection.from_dict(body)
         except Exception as e:
-            errors += f"[Item Search] {search_url} failed pystac hydration to ItemCollection: {e}"
+            errors += f"[Item Search] GET {search_url} failed pystac hydration to ItemCollection: {e}"
 
     validate_item_search_limit(search_url, methods, errors)
-    validate_item_search_bbox_xor_intersects(search_url, methods, errors)
+    validate_item_search_bbox_xor_intersects(search_url, methods, errors, r_session)
     validate_item_search_bbox(search_url, methods, errors)
     validate_item_search_datetime(search_url, methods, warnings, errors, r_session)
     validate_item_search_ids(search_url, methods, warnings, errors)
@@ -975,6 +996,9 @@ def validate_item_search(
         geometry=geometry,
         methods=methods,
         errors=errors,
+        use_pystac_client=True,
+        context=ITEM_SEARCH,
+        r_session=r_session,
     )
 
     # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
@@ -1070,7 +1094,7 @@ def validate_features_filter(
                 body["links"], "http://www.opengis.net/def/rel/ogc/1.0/queryables"
             )
         ):
-            errors += f"[Features - Filter Ext] {collection_url} : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
+            errors += f"[Features - Filter Ext] GET {collection_url} : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing"
 
         validate_filter_queryables(
             queryables_url=(queryables_link and queryables_link["href"])
@@ -1312,7 +1336,7 @@ def validate_item_search_datetime(
     methods: List[str],
     warnings: Warnings,
     errors: Errors,
-    r_session: Optional[Session],
+    r_session: Session,
 ) -> None:
     # find an Item and try to use its datetime value in a query
     _, body, _ = retrieve(
@@ -1327,6 +1351,7 @@ def validate_item_search_datetime(
         search_url,
         errors,
         ITEM_SEARCH,
+        r_session,
         content_type=geojson_mt,
         params={"datetime": dt},
         additional=f"with datetime={dt} extracted from an Item",
@@ -1335,9 +1360,6 @@ def validate_item_search_datetime(
         errors += f"[Item Search] GET Search with datetime={dt} extracted from an Item returned no results."
 
     for dt in valid_datetimes:
-        if not r_session:
-            r_session = Session()
-
         r = r_session.send(
             Request("GET", search_url, params={"datetime": dt}).prepare()
         )
@@ -1367,21 +1389,31 @@ def validate_item_search_datetime(
 
 
 def validate_item_search_bbox_xor_intersects(
-    search_url: str, methods: List[str], errors: Errors
+    search_url: str, methods: List[str], errors: Errors, r_session: Session
 ) -> None:
-    r = requests.get(
-        search_url, params={"bbox": "0,0,1,1", "intersects": json.dumps(polygon)}
-    )
-    if r.status_code != 400:
-        errors += f"[Item Search] GET Search with bbox and intersects returned status code {r.status_code}"
+    if GET in methods:
+        retrieve(
+            search_url,
+            errors,
+            method=Method.GET,
+            status_code=400,
+            params={"bbox": "0,0,1,1", "intersects": json.dumps(polygon)},
+            context=ITEM_SEARCH,
+            additional="Search with bbox and intersects",
+            r_session=r_session,
+        )
 
     if POST in methods:
-        # Valid POST query
-        r = requests.post(
-            search_url, json={"bbox": [0, 0, 1, 1], "intersects": polygon}
+        retrieve(
+            search_url,
+            errors,
+            method=Method.POST,
+            status_code=400,
+            body={"bbox": [0, 0, 1, 1], "intersects": polygon},
+            context=ITEM_SEARCH,
+            additional="Search with bbox and intersects",
+            r_session=r_session,
         )
-        if r.status_code != 400:
-            errors += f"[Item Search] POST Search with bbox and intersects returned status code {r.status_code}"
 
 
 def validate_item_pagination(
@@ -1391,57 +1423,69 @@ def validate_item_pagination(
     geometry: str,
     methods: List[str],
     errors: Errors,
-    use_pystac_client: bool = True,
+    use_pystac_client: bool,
+    context: str,
+    r_session: Session,
 ) -> None:
     url = f"{search_url}?limit=1"
     if collection is not None:
         url = f"{url}&collections={collection}"
 
-    r = requests.get(url)
-    if not r.status_code == 200:
-        errors += "STAC API - Item Search GET pagination get failed for initial request"
-    else:
-        try:
-            first_body = r.json()
-            if link := link_by_rel(first_body.get("links"), "next"):
-                if (method := link.get("method")) and method != "GET":
-                    errors += f"STAC API - Item Search GET pagination first request 'next' link relation has method {method} instead of 'GET'"
+    _, first_body, _ = retrieve(
+        url,
+        errors,
+        context,
+        r_session,
+        additional="pagination get failed for initial request",
+    )
+    if first_body:
+        if link := link_by_rel(first_body.get("links"), "next"):
+            if (method := link.get("method")) and method != "GET":
+                errors += f"[{context}] GET pagination first request 'next' link relation has method {method} instead of 'GET'"
 
-                next_url = link.get("href")
-                if next_url is None:
-                    errors += "STAC API - Item Search GET pagination first request 'next' link relation missing href"
-                else:
-                    if url == next_url:
-                        errors += "STAC API - Item Search GET pagination next href same as first url"
-
-                    r = requests.get(next_url)
-                    if not r.status_code == 200:
-                        errors += f"STAC API - Item Search GET pagination get failed for next url {next_url}"
+            next_url = link.get("href")
+            if next_url is None:
+                errors += f"[{context}] GET pagination first request 'next' link relation missing href"
             else:
-                errors += "STAC API - Item Search GET pagination first request had no 'next' link relation"
+                if url == next_url:
+                    errors += f"[{context}] GET pagination next href same as first url"
 
-        except json.decoder.JSONDecodeError:
-            errors += f"STAC API - Item Search GET pagination response failed {url}"
+                retrieve(
+                    next_url,
+                    errors,
+                    context,
+                    r_session,
+                    additional="pagination get failed for next url",
+                )
+        else:
+            errors += (
+                f"[{context}] GET pagination first request had no 'next' link relation"
+            )
 
     max_items = 100
 
     # todo: how to paginate over items, not just search?
 
     if use_pystac_client and collection is not None:
-        client = Client.open(root_url)
-        search = client.search(
-            method="GET", collections=[collection], max_items=max_items, limit=5
-        )
+        try:
+            client = Client.open(root_url)
+            search = client.search(
+                method="GET", collections=[collection], max_items=max_items, limit=5
+            )
 
-        items = list(search.items_as_dicts())
+            items = list(search.items_as_dicts())
 
-        if len(items) > max_items:
-            errors += "STAC API - Item Search GET pagination - more than max items returned from paginating"
+            if len(items) > max_items:
+                errors += f"[{context}] GET pagination - more than max items returned from paginating"
 
-        if len(items) > len({item["id"] for item in items}):
-            errors += "STAC API - Item Search GET pagination - duplicate items returned from paginating items"
+            if len(items) > len({item["id"] for item in items}):
+                errors += f"[{context}] GET pagination - duplicate items returned from paginating items"
+        except Exception as e:
+            errors += (
+                f"{context} pystac-client threw exception while testing pagination {e}"
+            )
     elif use_pystac_client and collection is None:
-        errors += "STAC API - Item Search GET pagination - pystac-client tests not run, collection is not defined"
+        errors += f"[{context}] GET pagination - pystac-client tests not run, collection is not defined"
 
     # GET paging has a problem with intersects https://github.com/stac-utils/pystac-client/issues/335
     # search = client.search(method="GET", collections=[collection], intersects=geometry)
@@ -1455,13 +1499,13 @@ def validate_item_pagination(
         initial_json_body = {"limit": 1, "collections": [collection]}
         r = requests.post(search_url, json=initial_json_body)
         if not r.status_code == 200:
-            errors += (
-                "STAC API - Item Search POST pagination get failed for initial request"
-            )
+            errors += f"[{context}] POST pagination get failed for initial request"
         else:
             try:
                 first_body = r.json()
-                if link := link_by_rel(first_body.get("links"), "next"):
+                if first_body and (
+                    link := link_by_rel(first_body.get("links"), "next")
+                ):
                     if (method := link.get("method")) and method != "POST":
                         errors += f"STAC API - Item Search POST pagination first request 'next' link relation has method {method} instead of 'POST'"
 
@@ -1481,40 +1525,46 @@ def validate_item_pagination(
 
                         r = requests.post(next_url, json=second_json_body)
                         if not r.status_code == 200:
-                            errors += f"STAC API - Item Search POST pagination get failed for next url {next_url} with body {second_json_body}"
+                            errors += f"[{context}] POST pagination get failed for next url {next_url} with body {second_json_body}"
                         else:
                             r.json()
                 else:
-                    errors += "STAC API - Item Search POST pagination first request had no 'next' link relation"
+                    errors += f"[{context}] POST pagination first request had no 'next' link relation"
 
             except json.decoder.JSONDecodeError:
-                errors += "STAC API - Item Search POST pagination response failed"
+                errors += f"[{context}] POST pagination response failed"
 
         if use_pystac_client and collection is not None:
             max_items = 100
-            client = Client.open(root_url)
-            search = client.search(
-                method="POST", collections=[collection], max_items=max_items, limit=5
-            )
-
-            items = list(search.items_as_dicts())
-
-            if len(items) > max_items:
-                errors += "STAC API - Item Search POST pagination - more than max items returned from paginating"
-
-            if len(items) > len({item["id"] for item in items}):
-                errors += "STAC API - Item Search POST pagination - duplicate items returned from paginating items"
-
-            search = client.search(
-                method="POST", collections=[collection], intersects=geometry
-            )
-            if len(list(take(20000, search.items_as_dicts()))) == 20000:
-                errors += (
-                    "STAC API - Item Search POST pagination - paged through 20,000 results. This could mean the last page "
-                    "of results references itself, or your collection and geometry combination has too many results."
+            try:
+                client = Client.open(root_url)
+                search = client.search(
+                    method="POST",
+                    collections=[collection],
+                    max_items=max_items,
+                    limit=5,
                 )
+
+                items = list(search.items_as_dicts())
+
+                if len(items) > max_items:
+                    errors += f"[{context}] POST pagination - more than max items returned from paginating"
+
+                if len(items) > len({item["id"] for item in items}):
+                    errors += f"[{context}] POST pagination - duplicate items returned from paginating items"
+
+                search = client.search(
+                    method="POST", collections=[collection], intersects=geometry
+                )
+                if len(list(take(20000, search.items_as_dicts()))) == 20000:
+                    errors += (
+                        f"[{context}] POST pagination - paged through 20,000 results. This could mean the last page "
+                        "of results references itself, or your collection and geometry combination has too many results."
+                    )
+            except Exception as e:
+                errors += f"pystac-client threw exception while testing pagination {e}"
         elif collection is not None:
-            errors += "STAC API - Item Search POST pagination - pystac-client tests not run, collection is undefined"
+            errors += f"[{context}] POST pagination - pystac-client tests not run, collection is undefined"
 
 
 def validate_item_search_intersects(
