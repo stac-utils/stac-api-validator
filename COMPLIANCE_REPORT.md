@@ -221,6 +221,23 @@ errors:
 - [Item Search - Filter Ext] method=GET url=https://tamn.snapplanet.io/search params={'limit': 1, 'filter-lang': 'cql2-text', 'filter': "collection <> 'S2'"} body=None had unexpected status code 504 instead of 200:
 ```
 
+### Radiant ML Hub
+
+URL: <https://api.radiant.earth/mlhub/v1>
+
+Date: 31-Oct-2022
+
+Output
+
+```
+$ poetry run stac-api-validator --root-url https://api.radiant.earth/mlhub/v1 \
+--conformance core --conformance features --conformance item-search \
+--auth-query-parameter 'key=xxx' \
+ --collection lacuna_fund_eotg_v1_labels \
+--geometry '{ "type": "Polygon", "coordinates": [ [ [ -6.873149632157182, 13.306361128851238 ], [ -6.8729475
+45317309, 13.329493867068924 ], [ -6.8965701520705105, 13.329690854131131 ], [ -6.896769998632048, 13.30655776190765 ], [ -6.873149632157182, 13.306361128851238 ] ] ] }'
+```
+
 ### Sentinel Hub 1.0.0 Catalog
 
 URL: <https://services.sentinel-hub.com/api/v1/catalog/1.0.0/>
