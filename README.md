@@ -117,6 +117,10 @@ Options:
   --conformance [core|browseable|item-search|features|collections|children|filter]
                                   The conformance classes to validate.
                                   [required]
+  --auth-bearer-token TEXT        Authorization Bearer token value to append
+                                  to all requests.
+  --auth-query-parameter TEXT     Query pararmeter key and value to pass for
+                                  authorization, e.g., 'key=xyz'.
   --help                          Show this message and exit.
 ```
 
@@ -152,6 +156,12 @@ errors:
 - POST Search with bbox:[100.0, 0.0, 105.0, 1.0] returned status code 502
 - GET Search with bbox=100.0,0.0,0.0,105.0,1.0,1.0 returned status code 400
 - POST Search with bbox:[100.0, 0.0, 0.0, 105.0, 1.0, 1.0] returned status code 400
+```
+
+Example with authorization using parameters:
+
+```
+stac-api-validator --root-url https://api.radiant.earth/mlhub/v1 --conformance core --auth-query-parameter 'key=xxx'
 ```
 
 ## Validating OGC API Features - Part 1 compliance

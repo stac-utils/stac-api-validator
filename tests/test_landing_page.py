@@ -2,15 +2,18 @@ from typing import Any
 from typing import Dict
 
 from stac_api_validator.validations import Errors
+from stac_api_validator.validations import Warnings
 from stac_api_validator.validations import validate_core_landing_page_body
 
 
 def test_landing_page_1() -> None:
     errors = Errors()
+    warnings = Warnings()
     validate_core_landing_page_body(
         body={},
         headers={},
         errors=errors,
+        warnings=warnings,
         conformance_classes=[],
         collection=None,
         geometry=None,
@@ -25,6 +28,7 @@ def test_landing_page_1() -> None:
         body={},
         headers={"content-type": "text/html"},
         errors=errors,
+        warnings=warnings,
         conformance_classes=[],
         collection=None,
         geometry=None,
@@ -36,6 +40,7 @@ def test_landing_page_1() -> None:
         body={},
         headers={"content-type": "application/json"},
         errors=errors,
+        warnings=warnings,
         conformance_classes=[],
         collection=None,
         geometry=None,
@@ -47,6 +52,7 @@ def test_landing_page_1() -> None:
         body={},
         headers={"content-type": "application/json; charset=utf-8"},
         errors=errors,
+        warnings=warnings,
         conformance_classes=[],
         collection=None,
         geometry=None,
@@ -61,6 +67,7 @@ def test_landing_page_1() -> None:
         },
         headers={"content-type": "application/json"},
         errors=errors,
+        warnings=warnings,
         conformance_classes=[],
         collection=None,
         geometry=None,
@@ -84,6 +91,7 @@ def test_landing_page_1() -> None:
         body=body,
         headers={"content-type": "application/json"},
         errors=errors,
+        warnings=warnings,
         conformance_classes=["collections"],
         collection=None,
         geometry=None,
@@ -94,6 +102,7 @@ def test_landing_page_1() -> None:
         body=body,
         headers={"content-type": "application/json"},
         errors=errors,
+        warnings=warnings,
         conformance_classes=["features"],
         collection=None,
         geometry=None,
@@ -108,6 +117,7 @@ def test_landing_page_1() -> None:
         body=body,
         headers={"content-type": "application/json"},
         errors=errors,
+        warnings=warnings,
         conformance_classes=["browseable", "children", "collections", "features"],
         collection="foobar",
         geometry=None,
@@ -130,6 +140,7 @@ def test_landing_page_1() -> None:
         body=body,
         headers={"content-type": "application/json"},
         errors=errors,
+        warnings=warnings,
         conformance_classes=["browseable"],
         collection=None,
         geometry=None,

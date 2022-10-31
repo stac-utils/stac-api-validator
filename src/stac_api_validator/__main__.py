@@ -49,12 +49,22 @@ from stac_api_validator.validations import validate_api
     ),
     help="The conformance classes to validate.",
 )
+@click.option(
+    "--auth-bearer-token",
+    help="Authorization Bearer token value to append to all requests.",
+)
+@click.option(
+    "--auth-query-parameter",
+    help="Query pararmeter key and value to pass for authorization, e.g., 'key=xyz'.",
+)
 def main(
     log_level: str,
     root_url: str,
     conformance_classes: List[str],
     collection: Optional[str],
     geometry: Optional[str],
+    auth_bearer_token: Optional[str] = None,
+    auth_query_parameter: Optional[str] = None,
 ) -> int:
     """STAC API Validator."""
 
@@ -66,6 +76,8 @@ def main(
             conformance_classes=conformance_classes,
             collection=collection,
             geometry=geometry,
+            auth_bearer_token=auth_bearer_token,
+            auth_query_parameter=auth_query_parameter,
         )
     except Exception as e:
         print(f"Failed.\nError {root_url}: {type(e)} {str(e)}")
