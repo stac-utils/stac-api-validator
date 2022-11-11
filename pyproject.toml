@@ -84,7 +84,7 @@ show_error_context = true
 #ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["shapely.geometry"]
+module = ["shapely.geometry", "stac_check.lint", "stac_validator.stac_validator"]
 ignore_missing_imports = true
 
 [build-system]
