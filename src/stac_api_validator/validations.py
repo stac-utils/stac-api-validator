@@ -11,6 +11,7 @@ from typing import List
 from typing import Mapping
 from typing import Optional
 from typing import Pattern
+from typing import Set
 from typing import Tuple
 from typing import Union
 
@@ -25,6 +26,8 @@ from pystac_client import Client
 from requests import Request
 from requests import Session
 from shapely.geometry import shape
+from stac_check.lint import Linter
+from stac_validator.stac_validator import StacValidate
 
 from stac_api_validator.geometries import geometry_collection
 from stac_api_validator.geometries import linestring
@@ -82,17 +85,13 @@ class Method(Enum):
     POST = "POST"
 
 
-# todo: maybe merge these?
-
-POST = "POST"
-GET = "GET"
-
-
 class Context(Enum):
     CORE = "Core"
     ITEM_SEARCH = "Item Search"
     FEATURES = "Features"
     COLLECTIONS = "Collections"
+    ITEM_SEARCH_FILTER = "Item Search - Filter Ext"
+    FEATURES_FILTER = "Features - Filter Ext"
 
 
 class BaseErrors:
@@ -135,9 +134,6 @@ class Warnings(BaseErrors):
             self.errors.append(x)
         return self
 
-
-FEATURES = "Features"
-ITEM_SEARCH = "Item Search"
 
 cc_core_regex = re.compile(r"https://api\.stacspec\.org/(.+)/core")
 cc_browseable_regex = re.compile(r"https://api\.stacspec\.org/(.+)/browseable")
@@ -257,10 +253,58 @@ def supports(conforms_to: List[str], pattern: Pattern[str]) -> bool:
     return any(pattern.fullmatch(x) for x in conforms_to)
 
 
+def stac_validate(
+    url: str,
+    body: Optional[Dict[str, Any]],
+    errors: Errors,
+    context: Context,
+    method: Method = Method.GET,
+) -> None:
+    if not body:
+        errors += f"[{context.value}] {method} {url} body was empty when running stac-validate and stac-check"
+    else:
+        if _type := body.get("type"):
+            try:
+                match _type:
+                    case "Collection":
+                        Collection.from_dict(body)
+                    case "FeatureCollection":
+                        ItemCollection.from_dict(body)
+                    case "Feature":
+                        Item.from_dict(body)
+                    case _:
+                        errors += f"[{context}] {method} {url} object with type '{_type}' could not be hydrated with pystac"
+            except Exception as e:
+                errors += f"[{context}] {method} {url} '{body.get('id')}' failed pystac hydration: {e}"
+        else:
+            errors += f"[{context}] {method} {url} missing 'type' attribute"
+
+        if not (stac_validator := StacValidate(links=True, assets=True)).validate_dict(
+            body
+        ):
+            errors += f"[{context}] {method} {url} failed stac-validator validation: {stac_validator.message}"
+
+
+def stac_check(
+    url: str,
+    errors: Errors,
+    warnings: Warnings,
+    context: Context,
+    method: Method = Method.GET,
+) -> None:
+    linter = Linter(url)
+    if not linter.valid_stac:
+        errors += (
+            f"[{context}] {method} {url} is not a valid STAC object: {linter.error_msg}"
+        )
+    if linter.best_practices_msg:
+        warnings += f"[{context}] {method} {url} has these stac-check recommendations: {linter.best_practices_msg}"
+
+
 def retrieve(
     url: str,
     errors: Errors,
-    context: str,
+    context: Context,
     r_session: Session,
     method: Method = Method.GET,
     params: Optional[Dict[str, Any]] = None,
@@ -279,7 +323,7 @@ def retrieve(
 
     if resp.status_code != status_code:
         errors += (
-            f"[{context}] method={method.value} url={url} params={params} body={body}"
+            f"[{context.value}] method={method.value} url={url} params={params} body={body}"
             f" had unexpected status code {resp.status_code} instead of {status_code}: {additional}"
         )
 
@@ -288,17 +332,19 @@ def retrieve(
             if (
                 url.endswith("/search") or url.endswith("/items")
             ) and not has_content_type(resp.headers, geojson_mt):
-                errors += f"[{context}] {method.value} {url} content-type header is not '{geojson_mt}'"
+                errors += f"[{context.value}] {method.value} {url} content-type header is not '{geojson_mt}'"
             elif not has_content_type(resp.headers, "application/json"):
-                errors += f"[{context}] {method.value} {url} content-type header is not 'application/json'"
+                errors += f"[{context.value}] {method.value} {url} content-type header is not 'application/json'"
         elif not has_content_type(resp.headers, content_type):
-            errors += f"[{context}] {method.value} {url} content-type header is not '{content_type}'"
+            errors += f"[{context.value}] {method.value} {url} content-type header is not '{content_type}'"
 
         if resp.headers.get("content-type", "").split(";")[0].endswith("json"):
             try:
                 return resp.status_code, resp.json(), resp.headers
             except json.decoder.JSONDecodeError:
-                errors += f"[{context}] {method.value} {url} returned non-JSON value"
+                errors += (
+                    f"[{context.value}] {method.value} {url} returned non-JSON value"
+                )
 
     return resp.status_code, None, resp.headers
 
@@ -423,7 +469,7 @@ def validate_api(
         r_session.params = {xs[0]: xs[1]}
 
     _, landing_page_body, landing_page_headers = retrieve(
-        root_url, errors, "Core", r_session
+        root_url, errors, Context.CORE, r_session
     )
 
     if not landing_page_body:
@@ -445,23 +491,23 @@ def validate_api(
         return warnings, errors
 
     logger.info("Validating STAC API - Core conformance class.")
-    validate_core(landing_page_body, warnings, errors, r_session)
+    validate_core(landing_page_body, errors, warnings, r_session)
 
     if "browseable" in conformance_classes:
         logger.info("Validating STAC API - Browseable conformance class.")
-        validate_browseable(landing_page_body, warnings, errors)
+        validate_browseable(landing_page_body, errors, warnings)
     else:
         logger.info("Skipping STAC API - Browseable conformance class.")
 
     if "children" in conformance_classes:
         logger.info("Validating STAC API - Children conformance class.")
-        validate_children(landing_page_body, warnings, errors)
+        validate_children(landing_page_body, errors, warnings)
     else:
         logger.info("Skipping STAC API - Children conformance class.")
 
     if "collections" in conformance_classes:
         logger.info("Validating STAC API - Collections conformance class.")
-        validate_collections(landing_page_body, collection, errors, r_session)
+        validate_collections(landing_page_body, collection, errors, warnings, r_session)
     else:
         logger.info("Skipping STAC API - Collections conformance class.")
 
@@ -469,7 +515,7 @@ def validate_api(
 
     if "features" in conformance_classes:
         logger.info("Validating STAC API - Features conformance class.")
-        validate_collections(landing_page_body, collection, errors, r_session)
+        validate_collections(landing_page_body, collection, errors, warnings, r_session)
         validate_features(
             landing_page_body,
             conforms_to,
@@ -531,7 +577,7 @@ def links_by_rel(
 
 
 def validate_core(
-    root_body: Dict[str, Any], warnings: Warnings, errors: Errors, r_session: Session
+    root_body: Dict[str, Any], errors: Errors, warnings: Warnings, r_session: Session
 ) -> None:
     links = root_body.get("links")
 
@@ -598,20 +644,24 @@ def validate_core(
         retrieve(
             service_doc["href"],
             errors,
-            "Core",
+            Context.CORE,
             content_type="text/html",
             r_session=r_session,
         )
 
 
 def validate_browseable(
-    root_body: Dict[str, Any], warnings: Warnings, errors: Errors
+    root_body: Dict[str, Any],
+    errors: Errors,
+    warnings: Warnings,
 ) -> None:
     logger.info("Browseable validation is not yet implemented.")
 
 
 def validate_children(
-    root_body: Dict[str, Any], warnings: Warnings, errors: Errors
+    root_body: Dict[str, Any],
+    errors: Errors,
+    warnings: Warnings,
 ) -> None:
     logger.info("Children validation is not yet implemented.")
 
@@ -620,15 +670,16 @@ def validate_collections(
     root_body: Dict[str, Any],
     collection: Optional[str],
     errors: Errors,
+    warnings: Warnings,
     r_session: Session,
 ) -> None:
     if not (data_link := link_by_rel(root_body["links"], "data")):
-        errors += "[Collections] /: Link[rel=data] must href /collections"
+        errors += f"[{Context.COLLECTIONS}] /: Link[rel=data] must href /collections"
     else:
         retrieve(
             f"{data_link['href']}/non-existent-collection",
             errors,
-            "Collections",
+            Context.COLLECTIONS,
             status_code=404,
             r_session=r_session,
             additional="non-existent collection",
@@ -638,75 +689,74 @@ def validate_collections(
         _, body, resp_headers = retrieve(
             collections_url,
             errors,
-            "Collections",
+            Context.COLLECTIONS,
             r_session=r_session,
         )
 
         if not body:
-            errors += "[Collections] /collections body was empty"
+            errors += f"[{Context.COLLECTIONS}] /collections body was empty"
         else:
             if (
                 not resp_headers
                 or resp_headers.get("content-type", "").split(";")[0]
                 != "application/json"
             ):
-                errors += "[Collections] /collections content-type header was not application/json"
+                errors += f"[{Context.COLLECTIONS}] /collections content-type header was not application/json"
 
             if not (self_link := link_by_rel(body.get("links", []), "self")):
-                errors += "[Collections] /collections does not have self link"
-            elif collections_url != self_link.get("href"):
                 errors += (
-                    "[Collections] /collections self link does not match requested url"
+                    f"[{Context.COLLECTIONS}] /collections does not have self link"
                 )
+            elif collections_url != self_link.get("href"):
+                errors += f"[{Context.COLLECTIONS}] /collections self link does not match requested url"
 
             if not link_by_rel(body.get("links", []), "root"):
-                errors += "[Collections] /collections does not have root link"
+                errors += (
+                    f"[{Context.COLLECTIONS}] /collections does not have root link"
+                )
 
             if body.get("collections") is None:
-                errors += "[Collections] /collections does not have 'collections' field"
+                errors += f"[{Context.COLLECTIONS}] /collections does not have 'collections' field"
 
             if not (collections_list := body.get("collections")):
-                errors += "[Collections] /collections 'collections' field is empty"
+                errors += (
+                    f"[{Context.COLLECTIONS}] /collections 'collections' field is empty"
+                )
             else:
-                try:
-                    for c in collections_list:
-                        Collection.from_dict(c)
-                except Exception as e:
-                    errors += f"[Collections] /collections Collection '{c['id']}' failed pystac hydration: {e}"
+                for body in collections_list:
+                    stac_validate(collections_url, body, errors, Context.COLLECTIONS)
 
             collection_url = f"{data_link['href']}/{collection}"
             _, body, resp_headers = retrieve(
                 collection_url,
                 errors,
-                "Collections",
+                Context.COLLECTIONS,
                 r_session=r_session,
             )
 
             if not body:
-                errors += f"[Collections] /collections/{collection} body was empty"
+                errors += f"[{Context.COLLECTIONS}] {collection_url} body was empty"
             else:
                 if (
                     not resp_headers
                     or resp_headers.get("content-type", "").split(";")[0]
                     != "application/json"
                 ):
-                    errors += f"[Collections] /collections/{collection} content-type header was not application/json"
+                    errors += f"[{Context.COLLECTIONS}] {collection_url} content-type header was not application/json"
 
                 if not (self_link := link_by_rel(body.get("links", []), "self")):
-                    errors += f"[Collections] /collections/{collection} does not have self link"
+                    errors += f"[{Context.COLLECTIONS}] {collection_url} does not have self link"
                 elif collection_url != self_link.get("href"):
-                    errors += f"[Collections] /collections/{collection} self link does not match requested url"
+                    errors += f"[{Context.COLLECTIONS}] {collection_url} self link does not match requested url"
 
                 if not link_by_rel(body.get("links", []), "root"):
-                    errors += f"[Collections] /collections/{collection} does not have root link"
+                    errors += f"[{Context.COLLECTIONS}] {collection_url} does not have root link"
 
                 if not link_by_rel(body.get("links", []), "parent"):
-                    errors += f"[Collections] /collections/{collection} does not have parent link"
+                    errors += f"[{Context.COLLECTIONS}] {collection_url} does not have parent link"
 
-                try:
-                    Collection.from_dict(body)
-                except Exception as e:
-                    errors += f"[Collections] /collections/{collection} failed pystac hydration: {e}"
+                stac_validate(collection_url, body, errors, Context.COLLECTIONS)
+                stac_check(collection_url, errors, warnings, Context.COLLECTIONS)
 
         # todo: collection pagination
 
@@ -721,15 +771,11 @@ def validate_features(
     r_session: Session,
 ) -> None:
     if not geometry:
-        errors += (
-            "[Features] Geometry parameter required for running Features validations."
-        )
+        errors += f"[{Context.FEATURES}] Geometry parameter required for running Features validations."
         return
 
     if not collection:
-        errors += (
-            "[Features] Collection parameter required for running Features validations."
-        )
+        errors += f"[{Context.FEATURES}] Collection parameter required for running Features validations."
         return
 
     if conforms_to and (
@@ -739,16 +785,16 @@ def validate_features(
             if x.startswith("http://www.opengis.net/spec/ogcapi-features-1/1.0/req/")
         ]
     ):
-        warnings += f"[Features] / : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
+        warnings += f"[{Context.FEATURES}] / : 'conformsTo' contains OGC API conformance classes using 'req' instead of 'conf': {req_ccs}."
 
     if "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core" not in conforms_to:
-        warnings += "[Features] STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core'"
+        warnings += f"[{Context.FEATURES}] STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core'"
 
     if (
         "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson"
         not in conforms_to
     ):
-        warnings += "[Features] STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson'"
+        warnings += f"[{Context.FEATURES}] STAC APIs conforming to the Features conformance class may also advertise the OGC API - Features Part 1 conformance class 'http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson'"
 
     # todo: add this one somewhere
     # if service-desc type is the OAS 3.0 one, add a warning that this can be used also
@@ -757,46 +803,74 @@ def validate_features(
     root_links = root_body.get("links")
     conformance = link_by_rel(root_links, "conformance")
     if conformance is None:
-        errors += "[Features] /: Landing page missing Link[rel=conformance]"
+        errors += f"[{Context.FEATURES}] /: Landing page missing Link[rel=conformance]"
     elif not conformance.get("href", "").endswith("/conformance"):
-        errors += (
-            "[Features] /: Landing page Link[rel=conformance] must href /conformance"
-        )
+        errors += f"[{Context.FEATURES}] /: Landing page Link[rel=conformance] must href /conformance"
 
     if conformance:
         _, body, _ = retrieve(
-            conformance["href"], errors, "Features", r_session=r_session
+            conformance["href"], errors, Context.FEATURES, r_session=r_session
         )
 
         if body and not (
             set(root_body.get("conformsTo", [])) == set(body.get("conformsTo", []))
         ):
-            warnings += "[Features] Landing Page conforms to and conformance conformsTo must be the same"
+            warnings += f"[{Context.FEATURES}] Landing Page conforms to and conformance conformsTo must be the same"
 
     # This is likely a mistake, but most apis can't undo it for backwards-compat reasons, so only warn
     if not (link_by_rel(root_links, "collections") is None):
-        warnings += "[Features] /: Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
+        warnings += f"[{Context.FEATURES}] /: Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
 
+    # todo: validate items exists in the collection
+    if collections_url := link_by_rel(root_links, "data"):
+        collection_items_url = f"{collections_url['href']}/{collection}/items"
+        _, body, _ = retrieve(
+            collection_items_url,
+            errors,
+            Context.FEATURES,
+            r_session=r_session,
+        )
+
+        if not body:
+            errors += f"[{Context.FEATURES}] GET {collection_items_url} returned an empty body"
+        else:
+            stac_validate(collection_items_url, body, errors, Context.FEATURES)
+
+            item_url = link_by_rel(body.get("features", [])[0]["links"], "self")[
+                "href"
+            ]  # type:ignore
+
+            _, body, _ = retrieve(
+                item_url,
+                errors,
+                Context.FEATURES,
+                r_session=r_session,
+            )
+
+            stac_validate(item_url, body, errors, Context.FEATURES)
+            stac_check(item_url, errors, warnings, Context.FEATURES)
+
+    # Validate Features non-existent item
     if not (collections_link := link_by_rel(root_links, "data")):
-        errors += "[Features] /: Link[rel=data] must href /collections"
+        errors += "/: Link[rel=data] must href /collections"
     else:
         collection_url = f"{collections_link['href']}/{collection}"
         _, body, _ = retrieve(
             collection_url,
             errors,
-            FEATURES,
+            Context.FEATURES,
             r_session=r_session,
         )
         if body:
             if not (collection_items_link := link_by_rel(body.get("links"), "items")):
-                errors += f"[Features] /collections/{collection} does not have Link[rel=items]"
+                errors += f"[{Context.FEATURES}] {collection_url} does not have Link[rel=items]"
             else:
                 collection_items_url = collection_items_link["href"]
 
                 retrieve(
                     f"{collection_items_url}/non-existent-item",
                     errors,
-                    FEATURES,
+                    Context.FEATURES,
                     status_code=404,
                     r_session=r_session,
                 )
@@ -804,43 +878,40 @@ def validate_features(
                 _, body, _ = retrieve(
                     collection_items_url,
                     errors,
-                    FEATURES,
+                    Context.FEATURES,
                     content_type=geojson_mt,
                     r_session=r_session,
                 )
 
                 if body:
                     if not (self_link := link_by_rel(body.get("links", []), "self")):
-                        errors += f"[Features] GET {collection_items_url} does not have self link"
+                        errors += f"[{Context.FEATURES}] GET {collection_items_url} does not have self link"
                     elif collection_items_link["href"] != self_link.get("href"):
-                        errors += f"[Features] GET {collection_items_url} self link does not match requested url"
+                        errors += f"[{Context.FEATURES}] GET {collection_items_url} self link does not match requested url"
 
                     if not link_by_rel(body.get("links", []), "root"):
-                        errors += f"[Features] GET {collection_items_url} does not have root link"
+                        errors += f"[{Context.FEATURES}] GET {collection_items_url} does not have root link"
 
                     if not link_by_rel(body.get("links", []), "parent"):
-                        errors += f"[Features] GET {collection_items_url} does not have parent link"
+                        errors += f"[{Context.FEATURES}] GET {collection_items_url} does not have parent link"
 
-                    try:
-                        ItemCollection.from_dict(body)
-                    except Exception as e:
-                        errors += f"[Features] GET {collection_items_url} failed pystac hydration to ItemCollection: {e}"
+                    stac_validate(collection_items_url, body, errors, Context.FEATURES)
 
                     item = next(iter(body.get("features", [])), None)
 
                     if not item:
-                        errors += f"[Features] /collections/{collection}/items features array was empty"
+                        errors += f"[{Context.FEATURES}] {collection_items_url} features array was empty"
                     else:
                         if not (
                             item_self_link := link_by_rel(item.get("links", []), "self")
                         ):
-                            errors += f"[Features] /collections/{collection}/items first item does not have self link"
+                            errors += f"[{Context.FEATURES}] {collection_items_url} first item does not have self link"
                         else:
                             item_url = item_self_link["href"]
                             _, body, _ = retrieve(
                                 item_url,
                                 errors,
-                                FEATURES,
+                                Context.FEATURES,
                                 content_type=geojson_mt,
                                 r_session=r_session,
                             )
@@ -851,20 +922,18 @@ def validate_features(
                                         body.get("links", []), "self"
                                     )
                                 ):
-                                    errors += f"[Features] GET {item_url} does not have self link"
+                                    errors += f"[{Context.FEATURES}] GET {item_url} does not have self link"
                                 elif item_url != self_link.get("href"):
-                                    errors += f"[Features] GET {item_url} self link does not match requested url"
+                                    errors += f"[{Context.FEATURES}] GET {item_url} self link does not match requested url"
 
                                 if not link_by_rel(body.get("links", []), "root"):
-                                    errors += f"[Features] GET {item_url} does not have root link"
+                                    errors += f"[{Context.FEATURES}] GET {item_url} does not have root link"
 
                                 if not link_by_rel(body.get("links", []), "parent"):
-                                    errors += f"[Features] GET {item_url} does not have parent link"
+                                    errors += f"[{Context.FEATURES}] GET {item_url} does not have parent link"
 
-                                try:
-                                    Item.from_dict(body)
-                                except Exception as e:
-                                    errors += f"[Features] GET {item_url} failed pystac hydration to Item: {e}"
+                                stac_validate(item_url, body, errors, Context.FEATURES)
+                                stac_check(item_url, errors, warnings, Context.FEATURES)
 
     # Items pagination validation
     if not (collections_url := link_by_rel(root_links, "data")):
@@ -878,13 +947,15 @@ def validate_features(
                 search_url=f"{collections_url['href']}/{collection}/items",
                 collection=None,
                 geometry=geometry,
-                methods=["GET"],
+                methods={Method.GET},
                 errors=errors,
                 use_pystac_client=False,
-                context=FEATURES,
+                context=Context.FEATURES,
                 r_session=r_session,
             )
 
+    # Validate Extensions
+    #
     # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
     #     logger.info("STAC API - Features - Fields extension conformance class found.")
     #
@@ -950,9 +1021,7 @@ def validate_item_search(
         ].get("href"):
             errors += "/: Link[rel=search] relations have different URLs"
 
-    methods = [sl.get("method", None) for sl in search_links]
-    if not methods:
-        methods = [GET]
+    methods: Set[Method] = {Method[sl.get("method", "GET")] for sl in search_links}
 
     # Collections may not be implemented, so set to None
     # and later get some collection ids another way
@@ -963,18 +1032,19 @@ def validate_item_search(
 
     search_url = search_links[0]["href"]
     _, body, _ = retrieve(
-        search_url, errors, "Item Search", content_type=geojson_mt, r_session=r_session
+        search_url,
+        errors,
+        Context.ITEM_SEARCH,
+        content_type=geojson_mt,
+        r_session=r_session,
     )
 
     if body:
-        try:
-            ItemCollection.from_dict(body)
-        except Exception as e:
-            errors += f"[Item Search] GET {search_url} failed pystac hydration to ItemCollection: {e}"
+        stac_validate(search_url, body, errors, Context.ITEM_SEARCH)
 
-    validate_item_search_limit(search_url, methods, errors)
+    validate_item_search_limit(search_url, methods, errors, r_session)
     validate_item_search_bbox_xor_intersects(search_url, methods, errors, r_session)
-    validate_item_search_bbox(search_url, methods, errors)
+    validate_item_search_bbox(search_url, methods, errors, r_session)
     validate_item_search_datetime(search_url, methods, warnings, errors, r_session)
     validate_item_search_ids(search_url, methods, warnings, errors)
     validate_item_search_ids_does_not_override_all_other_params(
@@ -987,6 +1057,7 @@ def validate_item_search(
         methods=methods,
         errors=errors,
         geometry=geometry,
+        r_session=r_session,
     )
 
     validate_item_pagination(
@@ -997,7 +1068,7 @@ def validate_item_search(
         methods=methods,
         errors=errors,
         use_pystac_client=True,
-        context=ITEM_SEARCH,
+        context=Context.ITEM_SEARCH,
         r_session=r_session,
     )
 
@@ -1046,12 +1117,12 @@ def validate_item_search(
 
 
 def validate_filter_queryables(
-    queryables_url: str, conformance_class: str, errors: Errors, r_session: Session
+    queryables_url: str, context: Context, errors: Errors, r_session: Session
 ) -> None:
     _, queryables_schema, _ = retrieve(
         queryables_url,
         errors,
-        f"{conformance_class} - Filter Ext",
+        context,
         content_type="application/schema+json",
         r_session=r_session,
         headers={"Accept": "application/schema+json"},
@@ -1064,15 +1135,15 @@ def validate_filter_queryables(
         ]
         if queryables_schema.get("$schema") not in json_schemas:
             errors += (
-                f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' "
+                f"[{context} - Filter Ext] Queryables '{queryables_url}' "
                 f"'$schema' value invalid, must be one of: '{','.join(json_schemas)}'"
             )
 
         if queryables_schema.get("$id") != queryables_url:
-            errors += f"[{conformance_class} - Filter Ext] Queryables '{queryables_url}' '$id' value invalid, must be same as queryables url"
+            errors += f"[{context} - Filter Ext] Queryables '{queryables_url}' '$id' value invalid, must be same as queryables url"
 
         if queryables_schema.get("type") != "object":
-            errors += f"[{conformance_class} Filter Ext] Queryables '{queryables_url}' 'type' value invalid, must be 'object'"
+            errors += f"[{context} Filter Ext] Queryables '{queryables_url}' 'type' value invalid, must be 'object'"
 
 
 def validate_features_filter(
@@ -1083,10 +1154,12 @@ def validate_features_filter(
     )
 
     if not (collections_link := link_by_rel(root_body["links"], "data")):
-        errors += "[Features] / : 'data' link relation missing"
+        errors += f"[{Context.FEATURES}] / : 'data' link relation missing"
     else:
         collection_url = f"{collections_link['href']}/{collection}"
-        _, body, _ = retrieve(collection_url, errors, FEATURES, r_session=r_session)
+        _, body, _ = retrieve(
+            collection_url, errors, Context.FEATURES, r_session=r_session
+        )
         assert body
 
         if not (
@@ -1099,7 +1172,7 @@ def validate_features_filter(
         validate_filter_queryables(
             queryables_url=(queryables_link and queryables_link["href"])
             or f"{collection_url}/queryables",
-            conformance_class=FEATURES,
+            context=Context.FEATURES,
             errors=errors,
             r_session=r_session,
         )
@@ -1124,7 +1197,7 @@ def validate_item_search_filter(
     validate_filter_queryables(
         queryables_url=(queryables_link and queryables_link["href"])
         or f"{root_url}/queryables",
-        conformance_class="Item Search",
+        context=Context.ITEM_SEARCH,
         errors=errors,
         r_session=r_session,
     )
@@ -1235,7 +1308,7 @@ def validate_item_search_filter(
         # todo: better error handling when the wrong collection name is given, so 0 results
         _, body, _ = retrieve(
             f"{search_url}?collections={collection}",
-            context="Item Search - Filter Ext",
+            context=Context.ITEM_SEARCH_FILTER,
             r_session=r_session,
             content_type=geojson_mt,
             errors=errors,
@@ -1313,7 +1386,7 @@ def validate_item_search_filter(
         retrieve(
             search_url,
             errors,
-            "Item Search - Filter Ext",
+            Context.ITEM_SEARCH_FILTER,
             content_type=geojson_mt,
             r_session=r_session,
             params={"limit": 1, "filter-lang": "cql2-text", "filter": f_text},
@@ -1325,7 +1398,7 @@ def validate_item_search_filter(
             method=Method.POST,
             body={"limit": 1, "filter-lang": "cql2-json", "filter": f_json},
             errors=errors,
-            context="Item Search - Filter Ext",
+            context=Context.ITEM_SEARCH_FILTER,
             content_type=geojson_mt,
             r_session=r_session,
         )
@@ -1333,14 +1406,18 @@ def validate_item_search_filter(
 
 def validate_item_search_datetime(
     search_url: str,
-    methods: List[str],
+    methods: Set[Method],
     warnings: Warnings,
     errors: Errors,
     r_session: Session,
 ) -> None:
     # find an Item and try to use its datetime value in a query
     _, body, _ = retrieve(
-        search_url, errors, ITEM_SEARCH, r_session=r_session, content_type=geojson_mt
+        search_url,
+        errors,
+        Context.ITEM_SEARCH,
+        r_session=r_session,
+        content_type=geojson_mt,
     )
     if not body:
         return
@@ -1350,26 +1427,26 @@ def validate_item_search_datetime(
     _, body, _ = retrieve(
         search_url,
         errors,
-        ITEM_SEARCH,
+        Context.ITEM_SEARCH,
         r_session,
         content_type=geojson_mt,
         params={"datetime": dt},
         additional=f"with datetime={dt} extracted from an Item",
     )
     if body and len(body["features"]) == 0:
-        errors += f"[Item Search] GET Search with datetime={dt} extracted from an Item returned no results."
+        errors += f"[{Context.ITEM_SEARCH}] GET Search with datetime={dt} extracted from an Item returned no results."
 
     for dt in valid_datetimes:
         r = r_session.send(
             Request("GET", search_url, params={"datetime": dt}).prepare()
         )
         if r.status_code != 200:
-            errors += f"[Item Search] GET Search with datetime={dt} returned status code {r.status_code}"
+            errors += f"[{Context.ITEM_SEARCH}] GET Search with datetime={dt} returned status code {r.status_code}"
             continue
         try:
             r.json()
         except json.decoder.JSONDecodeError:
-            errors += f"[Item Search] GET Search with datetime={dt} returned non-json response"
+            errors += f"[{Context.ITEM_SEARCH}] GET Search with datetime={dt} returned non-json response"
 
     for dt in invalid_datetimes:
         status_code, _, _ = retrieve(
@@ -1378,39 +1455,39 @@ def validate_item_search_datetime(
             status_code=400,
             r_session=r_session,
             errors=errors,
-            context=ITEM_SEARCH,
+            context=Context.ITEM_SEARCH,
             additional="invalid datetime returned non-400 status code",
         )
         if status_code == 200:
-            warnings += f"[Item Search] GET Search with datetime={dt} returned status code 200 instead of 400"
+            warnings += f"[{Context.ITEM_SEARCH}] GET Search with datetime={dt} returned status code 200 instead of 400"
             continue
 
     # todo: POST
 
 
 def validate_item_search_bbox_xor_intersects(
-    search_url: str, methods: List[str], errors: Errors, r_session: Session
+    search_url: str, methods: Set[Method], errors: Errors, r_session: Session
 ) -> None:
-    if GET in methods:
+    if Method.GET in methods:
         retrieve(
             search_url,
             errors,
             method=Method.GET,
             status_code=400,
             params={"bbox": "0,0,1,1", "intersects": json.dumps(polygon)},
-            context=ITEM_SEARCH,
+            context=Context.ITEM_SEARCH,
             additional="Search with bbox and intersects",
             r_session=r_session,
         )
 
-    if POST in methods:
+    if Method.POST in methods:
         retrieve(
             search_url,
             errors,
             method=Method.POST,
             status_code=400,
             body={"bbox": [0, 0, 1, 1], "intersects": polygon},
-            context=ITEM_SEARCH,
+            context=Context.ITEM_SEARCH,
             additional="Search with bbox and intersects",
             r_session=r_session,
         )
@@ -1421,10 +1498,10 @@ def validate_item_pagination(
     search_url: str,
     collection: Optional[str],
     geometry: str,
-    methods: List[str],
+    methods: Set[Method],
     errors: Errors,
     use_pystac_client: bool,
-    context: str,
+    context: Context,
     r_session: Session,
 ) -> None:
     url = f"{search_url}?limit=1"
@@ -1495,7 +1572,7 @@ def validate_item_pagination(
     #         f"of results references itself, or your collection and geometry combination has too many results."
     #     )
 
-    if POST in methods:
+    if Method.POST in methods:
         initial_json_body = {"limit": 1, "collections": [collection]}
         r = requests.post(search_url, json=initial_json_body)
         if not r.status_code == 200:
@@ -1568,7 +1645,12 @@ def validate_item_pagination(
 
 
 def validate_item_search_intersects(
-    search_url: str, collection: str, methods: List[str], errors: Errors, geometry: str
+    search_url: str,
+    collection: str,
+    methods: Set[Method],
+    errors: Errors,
+    geometry: str,
+    r_session: Session,
 ) -> None:
     # Validate that these GeoJSON Geometry types are accepted
     intersects_params = [
@@ -1583,140 +1665,133 @@ def validate_item_search_intersects(
     ]
 
     for param in intersects_params:
-        # Valid GET query
-        r = requests.get(search_url, params={"intersects": json.dumps(param)})
-        if r.status_code != 200:
-            errors += f"[Item Search] GET Search with intersects={param} returned status code {r.status_code}"
-        else:
-            try:
-                r.json()
-            except json.decoder.JSONDecodeError:
-                errors += f"[Item Search] GET Search with intersects={param} returned non-json response: {r.text}"
-        if POST in methods:
-            # Valid POST query
-            r = requests.post(search_url, json={"intersects": param})
-            if r.status_code != 200:
-                errors += f"[Item Search] POST Search with intersects:{param} returned status code {r.status_code}"
-            else:
-                try:
-                    r.json()
-                except json.decoder.JSONDecodeError:
-                    errors += f"[Item Search] POST Search with intersects:{param} returned non-json response: {r.text}"
+        if Method.GET in methods:
+            _, body, resp_headers = retrieve(
+                search_url,
+                errors,
+                Context.ITEM_SEARCH,
+                r_session=r_session,
+                params={"intersects": json.dumps(param)},
+            )
+
+        if Method.POST in methods:
+            _, body, resp_headers = retrieve(
+                search_url,
+                errors,
+                Context.ITEM_SEARCH,
+                method=Method.POST,
+                r_session=r_session,
+                params={"intersects": json.dumps(param)},
+            )
 
     intersects_shape = shape(json.loads(geometry))
 
-    # Validate GET query
-    r = requests.get(
-        search_url,
-        params={"collections": collection, "intersects": geometry},
-    )
-    if r.status_code != 200:
-        errors += f"[Item Search] GET Search with collections={collection}&intersects={geometry} returned status code {r.status_code}"
-    else:
-        try:
-            item_collection = r.json()
-            if not len(item_collection["features"]):
-                errors += f"[Item Search] GET Search result for intersects={geometry} returned no results"
+    if Method.GET in methods:
+        _, body, _ = retrieve(
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            params={"collections": collection, "intersects": geometry},
+            r_session=r_session,
+        )
+
+        if body:
+            if not len(body["features"]):
+                errors += f"[{Context.ITEM_SEARCH}] GET Search result for intersects={geometry} returned no results"
             if any(
                 not intersects_shape.intersects(shape(item["geometry"]))
-                for item in item_collection["features"]
+                for item in body["features"]
             ):
-                errors += f"[Item Search] GET Search results for intersects={geometry} do not all intersect"
-        except json.decoder.JSONDecodeError:
-            errors += f"[Item Search] GET Search with intersects={geometry} returned non-json response: {r.text}"
+                errors += f"[{Context.ITEM_SEARCH}] GET Search results for intersects={geometry} do not all intersect"
 
-    if POST in methods:
+    if Method.POST in methods:
         # Validate POST query
         r = requests.post(
             search_url, json={"collections": [collection], "intersects": geometry}
         )
         if r.status_code != 200:
-            errors += f"[Item Search] POST Search with intersects={geometry} returned status code {r.status_code}"
+            errors += f"[{Context.ITEM_SEARCH}] POST Search with intersects={geometry} returned status code {r.status_code}"
         else:
             try:
                 item_collection = r.json()
                 if not len(item_collection["features"]):
-                    errors += f"[Item Search] POST Search result for intersects={geometry} returned no results"
+                    errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry} returned no results"
                 for item in item_collection["features"]:
                     if not intersects_shape.intersects(shape(item["geometry"])):
-                        errors += f"[Item Search] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
+                        errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
             except json.decoder.JSONDecodeError:
-                errors += f"[Item Search] POST Search with intersects={geometry} returned non-json response: {r.text}"
+                errors += f"[{Context.ITEM_SEARCH}] POST Search with intersects={geometry} returned non-json response: {r.text}"
 
 
 def validate_item_search_bbox(
-    search_url: str, methods: List[str], errors: Errors
+    search_url: str, methods: Set[Method], errors: Errors, r_session: Session
 ) -> None:
-    # Valid GET query
-    param = "100.0,0.0,105.0,1.0"
-    r = requests.get(search_url, params={"bbox": param})
-    if r.status_code != 200:
-        errors += f"[Item Search] GET Search with bbox={param} returned status code {r.status_code}"
-    else:
-        try:
-            r.json()
-        except json.decoder.JSONDecodeError:
-            errors += f"[Item Search] GET Search with bbox={param} returned non-json response: {r.text}"
+    bbox_list = [100.0, 0.0, 105.0, 1.0]
 
-    if POST in methods:
+    if Method.GET in methods:
+        _, body, resp_headers = retrieve(
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            params={"bbox": ",".join([str(x) for x in bbox_list])},
+            r_session=r_session,
+        )
+
+    if Method.POST in methods:
         # Valid POST query
-        param_list = [100.0, 0.0, 105.0, 1.0]
-        r = requests.post(search_url, json={"bbox": param_list})
-        if r.status_code != 200:
-            errors += f"[Item Search] POST Search with bbox:{param_list} returned status code {r.status_code}"
-        else:
-            try:
-                r.json()
-            except json.decoder.JSONDecodeError:
-                errors += f"[Item Search] POST Search with bbox:{param_list} returned non-json response: {r.text}"
+        _, body, resp_headers = retrieve(
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            body={"bbox": bbox_list},
+            r_session=r_session,
+        )
 
-    # Valid 3D GET query
-    param = "100.0,0.0,0.0,105.0,1.0,1.0"
-    r = requests.get(search_url, params={"bbox": param})
-    if r.status_code != 200:
-        errors += f"[Item Search] GET Search with bbox={param} returned status code {r.status_code}"
-    else:
-        try:
-            r.json()
-        except json.decoder.JSONDecodeError:
-            errors += f"[Item Search] GET with bbox={param} returned non-json response: {r.text}"
+    bbox_list = [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]
 
-    if POST in methods:
-        # Valid 3D POST query
-        param_list = [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]
-        r = requests.post(search_url, json={"bbox": param_list})
-        if r.status_code != 200:
-            errors += f"[Item Search] POST Search with bbox:{param_list} returned status code {r.status_code}"
-        else:
-            try:
-                r.json()
-            except json.decoder.JSONDecodeError:
-                errors += f"[Item Search] POST with bbox:{param_list} returned non-json response: {r.text}"
+    if Method.GET in methods:
+        _, body, resp_headers = retrieve(
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            params={"bbox": ",".join([str(x) for x in bbox_list])},
+            r_session=r_session,
+        )
+
+    if Method.POST in methods:
+        # Valid POST query
+        _, body, resp_headers = retrieve(
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            body={"bbox": bbox_list},
+            r_session=r_session,
+        )
 
     # Invalid GET query with coordinates in brackets
     param = "[100.0, 0.0, 105.0, 1.0]"
     r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 400:
-        errors += f"[Item Search] GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
+        errors += f"[{Context.ITEM_SEARCH}] GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
 
-    if POST in methods:
+    if Method.POST in methods:
         # Invalid POST query with CSV string of coordinates
         param = "100.0, 0.0, 105.0, 1.0"
         r = requests.post(search_url, json={"bbox": param})
         if r.status_code != 400:
-            errors += f"[Item Search] POST Search with bbox:'{param}' returned status code {r.status_code}, instead of 400"
+            errors += f"[{Context.ITEM_SEARCH}] POST Search with bbox:'{param}' returned status code {r.status_code}, instead of 400"
 
     # Invalid bbox - lat 1 > lat 2
     param = "100.0, 1.0, 105.0, 0.0"
     r = requests.get(search_url, params={"bbox": param})
     if r.status_code != 400:
-        errors += f"[Item Search] GET Search with bbox=param (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
+        errors += f"[{Context.ITEM_SEARCH}] GET Search with bbox=param (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
 
-    if POST in methods:
+    if Method.POST in methods:
         param_list = [100.0, 1.0, 105.0, 0.0]
         r = requests.post(search_url, json={"bbox": param_list})
         if r.status_code != 400:
-            errors += f"[Item Search] POST Search with bbox: {param_list} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
+            errors += f"[{Context.ITEM_SEARCH}] POST Search with bbox: {param_list} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
 
     # Invalid bbox - 1, 2, 3, 5, and 7 element array
     bboxes = [[0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1]]
@@ -1725,15 +1800,15 @@ def validate_item_search_bbox(
         param = ",".join(str(c) for c in bbox)
         r = requests.get(search_url, params={"bbox": param})
         if r.status_code != 400:
-            errors += f"[Item Search] GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
-        if POST in methods:
+            errors += f"[{Context.ITEM_SEARCH}] GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
+        if Method.POST in methods:
             r = requests.post(search_url, json={"bbox": bbox})
             if r.status_code != 400:
-                errors += f"[Item Search] POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400"
+                errors += f"[{Context.ITEM_SEARCH}] POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400"
 
 
 def validate_item_search_limit(
-    search_url: str, methods: List[str], errors: Errors
+    search_url: str, methods: Set[Method], errors: Errors, r_session: Session
 ) -> None:
     valid_limits = [1, 2, 10]  # todo: pull actual limits from service description
     for limit in valid_limits:
@@ -1741,30 +1816,30 @@ def validate_item_search_limit(
         params = {"limit": limit}
         r = requests.get(search_url, params=params)
         if r.status_code != 200:
-            errors += f"[Item Search] GET Search with {params} returned status code {r.status_code}"
+            errors += f"[{Context.ITEM_SEARCH}] GET Search with {params} returned status code {r.status_code}"
         else:
             try:
                 body = r.json()
                 items = body.get("items")
                 if items and len(items) <= 1:
-                    errors += f"[Item Search] POST Search with {params} returned fewer than 1 result"
+                    errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned fewer than 1 result"
 
             except json.decoder.JSONDecodeError:
-                errors += f"[Item Search] GET Search with {params} returned non-json response: {r.text}"
+                errors += f"[{Context.ITEM_SEARCH}] GET Search with {params} returned non-json response: {r.text}"
 
-        if POST in methods:
+        if Method.POST in methods:
             # Valid POST query
             r = requests.post(search_url, json=params)
             if r.status_code != 200:
-                errors += f"[Item Search] POST Search with {params} returned status code {r.status_code}"
+                errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned status code {r.status_code}"
             else:
                 try:
                     body = r.json()
                     items = body.get("items")
                     if items and len(items) <= 1:
-                        errors += f"[Item Search] POST Search with {params} returned fewer than 1 result"
+                        errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned fewer than 1 result"
                 except json.decoder.JSONDecodeError:
-                    errors += f"[Item Search] POST Search with {params} returned non-json response: {r.text}"
+                    errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned non-json response: {r.text}"
 
     invalid_limits = [-1]  # todo: pull actual limits from service desc and test them
     for limit in invalid_limits:
@@ -1772,13 +1847,13 @@ def validate_item_search_limit(
         params = {"limit": limit}
         r = requests.get(search_url, params=params)
         if r.status_code != 400:
-            errors += f"[Item Search] GET Search with {params} returned status code {r.status_code}, must be 400"
+            errors += f"[{Context.ITEM_SEARCH}] GET Search with {params} returned status code {r.status_code}, must be 400"
 
-        if POST in methods:
+        if Method.POST in methods:
             # Valid POST query
             r = requests.post(search_url, json=params)
             if r.status_code != 400:
-                errors += f"[Item Search] POST Search with {params} returned status code {r.status_code}, must be 400"
+                errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned status code {r.status_code}, must be 400"
 
 
 def _validate_search_ids_request(
@@ -1804,7 +1879,7 @@ def _validate_search_ids_request(
 
 
 def _validate_search_ids_with_ids(
-    search_url: str, item_ids: List[str], methods: List[str], errors: Errors
+    search_url: str, item_ids: List[str], methods: Set[Method], errors: Errors
 ) -> None:
     get_params = {"ids": ",".join(item_ids)}
 
@@ -1816,7 +1891,7 @@ def _validate_search_ids_with_ids(
         errors=errors,
     )
 
-    if POST in methods:
+    if Method.POST in methods:
         post_params = {"ids": item_ids}
         _validate_search_ids_request(
             requests.post(search_url, json=post_params),
@@ -1828,7 +1903,7 @@ def _validate_search_ids_with_ids(
 
 
 def _validate_search_ids_with_ids_no_override(
-    search_url: str, item: Dict[str, Any], methods: List[str], errors: Errors
+    search_url: str, item: Dict[str, Any], methods: Set[Method], errors: Errors
 ) -> None:
     bbox = item["bbox"]
     get_params = {
@@ -1840,20 +1915,20 @@ def _validate_search_ids_with_ids_no_override(
     r = requests.get(search_url, params=get_params)
 
     if not (r.status_code == 200):
-        errors += f"[Item Search]  GET Search with id and other parameters returned status code {r.status_code}"
+        errors += f"[{Context.ITEM_SEARCH}]  GET Search with id and other parameters returned status code {r.status_code}"
     else:
 
         try:
             if len(r.json().get("features", [])) > 0:
                 errors += (
-                    "[Item Search] GET Search with ids and non-intersecting bbox returned results, indicating "
+                    f"[{Context.ITEM_SEARCH}] GET Search with ids and non-intersecting bbox returned results, indicating "
                     "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
                     "STAC API 1.0.0-beta.1"
                 )
         except json.decoder.JSONDecodeError:
-            errors += f"[Item Search] GET Search with {get_params} returned non-json response: {r.text}"
+            errors += f"[{Context.ITEM_SEARCH}] GET Search with {get_params} returned non-json response: {r.text}"
 
-    if POST in methods:
+    if Method.POST in methods:
         post_params = {
             "ids": [item["id"]],
             "collections": [item["collection"]],
@@ -1863,21 +1938,21 @@ def _validate_search_ids_with_ids_no_override(
         r = requests.post(search_url, json=post_params)
 
         if not (r.status_code == 200):
-            errors += f"[Item Search] POST Search with id and other parameters returned status code {r.status_code}"
+            errors += f"[{Context.ITEM_SEARCH}] POST Search with id and other parameters returned status code {r.status_code}"
         else:
             try:
                 if len(r.json().get("features", [])) > 0:
                     errors += (
-                        "[Item Search] POST Search with ids and non-intersecting bbox returned results, indicating "
+                        f"[{Context.ITEM_SEARCH}] POST Search with ids and non-intersecting bbox returned results, indicating "
                         "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
                         "STAC API 1.0.0-beta.1"
                     )
             except json.decoder.JSONDecodeError:
-                errors += f"[Item Search] POST Search with {get_params} returned non-json response: {r.text}"
+                errors += f"[{Context.ITEM_SEARCH}] POST Search with {get_params} returned non-json response: {r.text}"
 
 
 def validate_item_search_ids(
-    search_url: str, methods: List[str], warnings: Warnings, errors: Errors
+    search_url: str, methods: Set[Method], warnings: Warnings, errors: Errors
 ) -> None:
     r = requests.get(f"{search_url}?limit=2")
     items = r.json().get("features")
@@ -1890,12 +1965,12 @@ def validate_item_search_ids(
             search_url, [i["id"] for i in items], methods, errors
         )
     else:
-        warnings += "[Item Search] GET Search with no parameters returned < 2 results"
+        warnings += f"[{Context.ITEM_SEARCH}] GET Search with no parameters returned < 2 results"
 
 
 def validate_item_search_ids_does_not_override_all_other_params(
     search_url: str,
-    methods: List[str],
+    methods: Set[Method],
     collection: str,
     warnings: Warnings,
     errors: Errors,
@@ -1911,7 +1986,9 @@ def validate_item_search_ids_does_not_override_all_other_params(
     ):
         _validate_search_ids_with_ids_no_override(search_url, items[0], methods, errors)
     else:
-        warnings += "[Item Search] GET Search with no parameters returned 0 results"
+        warnings += (
+            f"[{Context.ITEM_SEARCH}] GET Search with no parameters returned 0 results"
+        )
 
 
 def _validate_search_collections_request(
@@ -1937,7 +2014,7 @@ def _validate_search_collections_request(
 
 
 def _validate_search_collections_with_ids(
-    search_url: str, coll_ids: List[str], methods: List[str], errors: Errors
+    search_url: str, coll_ids: List[str], methods: Set[Method], errors: Errors
 ) -> None:
     get_params = {"collections": ",".join(coll_ids)}
     _validate_search_collections_request(
@@ -1948,7 +2025,7 @@ def _validate_search_collections_with_ids(
         errors=errors,
     )
 
-    if POST in methods:
+    if Method.POST in methods:
         post_params = {"collections": coll_ids}
         _validate_search_collections_request(
             requests.post(search_url, json=post_params),
@@ -1960,7 +2037,10 @@ def _validate_search_collections_with_ids(
 
 
 def validate_item_search_collections(
-    search_url: str, collections_url: Optional[str], methods: List[str], errors: Errors
+    search_url: str,
+    collections_url: Optional[str],
+    methods: Set[Method],
+    errors: Errors,
 ) -> None:
     if collections_url:
         collections_entity = requests.get(collections_url).json()
