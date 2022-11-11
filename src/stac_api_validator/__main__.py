@@ -1,7 +1,6 @@
 """Command-line interface."""
 import logging
 import sys
-import traceback
 from typing import List
 from typing import Optional
 
@@ -80,23 +79,22 @@ def main(
             auth_query_parameter=auth_query_parameter,
         )
     except Exception as e:
-        print(f"Failed.\nError {root_url}: {type(e)} {str(e)}")
-        traceback.print_exc()
+        click.secho(f"Failed.\nError {root_url}: {type(e)} {str(e)}", fg="red")
         return 1
 
     if warnings:
-        print("warnings:")
+        click.secho("Warnings:", fg="yellow")
     else:
-        print("warnings: none")
+        click.secho("Warnings: none", fg="green")
     for warning in warnings:
-        print(f"- {warning}")
+        click.secho(f"- {warning}")
 
     if errors:
-        print("errors:")
+        click.secho("Errors:", fg="orange")
     else:
-        print("errors: none")
+        click.secho("Errors: none", fg="green")
     for error in errors:
-        print(f"- {error}")
+        click.secho(f"- {error}")
 
     if errors:
         return 1
