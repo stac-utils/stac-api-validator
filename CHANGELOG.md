@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Added
 
+- Add support for running stac-validator and stac-check on the objects returned from the API
 - Add support for Authorization Bearer and arbitrary query parameter authentication
 - Add warning about upgrading to 1.0.0-rc.2
 

@@ -302,11 +302,11 @@ def stac_check(
 
 
 def retrieve(
+    method: Method,
     url: str,
     errors: Errors,
     context: Context,
     r_session: Session,
-    method: Method = Method.GET,
     params: Optional[Dict[str, Any]] = None,
     headers: Optional[Dict[str, str]] = None,
     status_code: int = 200,
@@ -469,7 +469,7 @@ def validate_api(
         r_session.params = {xs[0]: xs[1]}
 
     _, landing_page_body, landing_page_headers = retrieve(
-        root_url, errors, Context.CORE, r_session
+        Method.GET, root_url, errors, Context.CORE, r_session
     )
 
     if not landing_page_body:
@@ -642,6 +642,7 @@ def validate_core(
             errors += "service-doc type is not text/html"
 
         retrieve(
+            Method.GET,
             service_doc["href"],
             errors,
             Context.CORE,
@@ -677,6 +678,7 @@ def validate_collections(
         errors += f"[{Context.COLLECTIONS}] /: Link[rel=data] must href /collections"
     else:
         retrieve(
+            Method.GET,
             f"{data_link['href']}/non-existent-collection",
             errors,
             Context.COLLECTIONS,
@@ -687,6 +689,7 @@ def validate_collections(
 
         collections_url = f"{data_link['href']}"
         _, body, resp_headers = retrieve(
+            Method.GET,
             collections_url,
             errors,
             Context.COLLECTIONS,
@@ -728,6 +731,7 @@ def validate_collections(
 
             collection_url = f"{data_link['href']}/{collection}"
             _, body, resp_headers = retrieve(
+                Method.GET,
                 collection_url,
                 errors,
                 Context.COLLECTIONS,
@@ -809,7 +813,11 @@ def validate_features(
 
     if conformance:
         _, body, _ = retrieve(
-            conformance["href"], errors, Context.FEATURES, r_session=r_session
+            Method.GET,
+            conformance["href"],
+            errors,
+            Context.FEATURES,
+            r_session=r_session,
         )
 
         if body and not (
@@ -825,6 +833,7 @@ def validate_features(
     if collections_url := link_by_rel(root_links, "data"):
         collection_items_url = f"{collections_url['href']}/{collection}/items"
         _, body, _ = retrieve(
+            Method.GET,
             collection_items_url,
             errors,
             Context.FEATURES,
@@ -841,6 +850,7 @@ def validate_features(
             ]  # type:ignore
 
             _, body, _ = retrieve(
+                Method.GET,
                 item_url,
                 errors,
                 Context.FEATURES,
@@ -856,6 +866,7 @@ def validate_features(
     else:
         collection_url = f"{collections_link['href']}/{collection}"
         _, body, _ = retrieve(
+            Method.GET,
             collection_url,
             errors,
             Context.FEATURES,
@@ -868,6 +879,7 @@ def validate_features(
                 collection_items_url = collection_items_link["href"]
 
                 retrieve(
+                    Method.GET,
                     f"{collection_items_url}/non-existent-item",
                     errors,
                     Context.FEATURES,
@@ -876,6 +888,7 @@ def validate_features(
                 )
 
                 _, body, _ = retrieve(
+                    Method.GET,
                     collection_items_url,
                     errors,
                     Context.FEATURES,
@@ -909,6 +922,7 @@ def validate_features(
                         else:
                             item_url = item_self_link["href"]
                             _, body, _ = retrieve(
+                                Method.GET,
                                 item_url,
                                 errors,
                                 Context.FEATURES,
@@ -1032,6 +1046,7 @@ def validate_item_search(
 
     search_url = search_links[0]["href"]
     _, body, _ = retrieve(
+        Method.GET,
         search_url,
         errors,
         Context.ITEM_SEARCH,
@@ -1120,6 +1135,7 @@ def validate_filter_queryables(
     queryables_url: str, context: Context, errors: Errors, r_session: Session
 ) -> None:
     _, queryables_schema, _ = retrieve(
+        Method.GET,
         queryables_url,
         errors,
         context,
@@ -1158,7 +1174,7 @@ def validate_features_filter(
     else:
         collection_url = f"{collections_link['href']}/{collection}"
         _, body, _ = retrieve(
-            collection_url, errors, Context.FEATURES, r_session=r_session
+            Method.GET, collection_url, errors, Context.FEATURES, r_session=r_session
         )
         assert body
 
@@ -1307,6 +1323,7 @@ def validate_item_search_filter(
     if basic_cql2_supported:
         # todo: better error handling when the wrong collection name is given, so 0 results
         _, body, _ = retrieve(
+            Method.GET,
             f"{search_url}?collections={collection}",
             context=Context.ITEM_SEARCH_FILTER,
             r_session=r_session,
@@ -1384,6 +1401,7 @@ def validate_item_search_filter(
 
     for f_text in filter_texts:
         retrieve(
+            Method.GET,
             search_url,
             errors,
             Context.ITEM_SEARCH_FILTER,
@@ -1394,8 +1412,8 @@ def validate_item_search_filter(
 
     for f_json in filter_jsons:
         retrieve(
+            Method.POST,
             search_url,
-            method=Method.POST,
             body={"limit": 1, "filter-lang": "cql2-json", "filter": f_json},
             errors=errors,
             context=Context.ITEM_SEARCH_FILTER,
@@ -1413,6 +1431,7 @@ def validate_item_search_datetime(
 ) -> None:
     # find an Item and try to use its datetime value in a query
     _, body, _ = retrieve(
+        Method.GET,
         search_url,
         errors,
         Context.ITEM_SEARCH,
@@ -1425,6 +1444,7 @@ def validate_item_search_datetime(
         dt = body["features"][0]["properties"]["datetime"]  # todo: if no results, fail
 
     _, body, _ = retrieve(
+        Method.GET,
         search_url,
         errors,
         Context.ITEM_SEARCH,
@@ -1450,6 +1470,7 @@ def validate_item_search_datetime(
 
     for dt in invalid_datetimes:
         status_code, _, _ = retrieve(
+            Method.GET,
             search_url,
             params={"datetime": dt},
             status_code=400,
@@ -1470,9 +1491,9 @@ def validate_item_search_bbox_xor_intersects(
 ) -> None:
     if Method.GET in methods:
         retrieve(
+            Method.GET,
             search_url,
             errors,
-            method=Method.GET,
             status_code=400,
             params={"bbox": "0,0,1,1", "intersects": json.dumps(polygon)},
             context=Context.ITEM_SEARCH,
@@ -1482,9 +1503,9 @@ def validate_item_search_bbox_xor_intersects(
 
     if Method.POST in methods:
         retrieve(
+            Method.POST,
             search_url,
             errors,
-            method=Method.POST,
             status_code=400,
             body={"bbox": [0, 0, 1, 1], "intersects": polygon},
             context=Context.ITEM_SEARCH,
@@ -1509,6 +1530,7 @@ def validate_item_pagination(
         url = f"{url}&collections={collection}"
 
     _, first_body, _ = retrieve(
+        Method.GET,
         url,
         errors,
         context,
@@ -1528,6 +1550,7 @@ def validate_item_pagination(
                     errors += f"[{context}] GET pagination next href same as first url"
 
                 retrieve(
+                    Method.GET,
                     next_url,
                     errors,
                     context,
@@ -1667,6 +1690,7 @@ def validate_item_search_intersects(
     for param in intersects_params:
         if Method.GET in methods:
             _, body, resp_headers = retrieve(
+                Method.GET,
                 search_url,
                 errors,
                 Context.ITEM_SEARCH,
@@ -1676,10 +1700,10 @@ def validate_item_search_intersects(
 
         if Method.POST in methods:
             _, body, resp_headers = retrieve(
+                Method.POST,
                 search_url,
                 errors,
                 Context.ITEM_SEARCH,
-                method=Method.POST,
                 r_session=r_session,
                 params={"intersects": json.dumps(param)},
             )
@@ -1688,6 +1712,7 @@ def validate_item_search_intersects(
 
     if Method.GET in methods:
         _, body, _ = retrieve(
+            Method.GET,
             search_url,
             errors,
             Context.ITEM_SEARCH,
@@ -1730,6 +1755,7 @@ def validate_item_search_bbox(
 
     if Method.GET in methods:
         _, body, resp_headers = retrieve(
+            Method.GET,
             search_url,
             errors,
             Context.ITEM_SEARCH,
@@ -1740,6 +1766,7 @@ def validate_item_search_bbox(
     if Method.POST in methods:
         # Valid POST query
         _, body, resp_headers = retrieve(
+            Method.GET,
             search_url,
             errors,
             Context.ITEM_SEARCH,
@@ -1751,6 +1778,7 @@ def validate_item_search_bbox(
 
     if Method.GET in methods:
         _, body, resp_headers = retrieve(
+            Method.GET,
             search_url,
             errors,
             Context.ITEM_SEARCH,
@@ -1761,6 +1789,7 @@ def validate_item_search_bbox(
     if Method.POST in methods:
         # Valid POST query
         _, body, resp_headers = retrieve(
+            Method.POST,
             search_url,
             errors,
             Context.ITEM_SEARCH,
@@ -1768,43 +1797,79 @@ def validate_item_search_bbox(
             r_session=r_session,
         )
 
-    # Invalid GET query with coordinates in brackets
-    param = "[100.0, 0.0, 105.0, 1.0]"
-    r = requests.get(search_url, params={"bbox": param})
-    if r.status_code != 400:
-        errors += f"[{Context.ITEM_SEARCH}] GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
+    if Method.GET in methods:
+        retrieve(
+            Method.GET,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            status_code=400,
+            params={"bbox": "[100.0, 0.0, 105.0, 1.0]"},
+            r_session=r_session,
+            additional="invalid GET query with coordinates in brackets",
+        )
 
     if Method.POST in methods:
-        # Invalid POST query with CSV string of coordinates
-        param = "100.0, 0.0, 105.0, 1.0"
-        r = requests.post(search_url, json={"bbox": param})
-        if r.status_code != 400:
-            errors += f"[{Context.ITEM_SEARCH}] POST Search with bbox:'{param}' returned status code {r.status_code}, instead of 400"
+        retrieve(
+            Method.POST,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            status_code=400,
+            body={"bbox": "100.0, 0.0, 105.0, 1.0"},
+            r_session=r_session,
+            additional="invalid POST search with CSV string of coordinates",
+        )
 
-    # Invalid bbox - lat 1 > lat 2
-    param = "100.0, 1.0, 105.0, 0.0"
-    r = requests.get(search_url, params={"bbox": param})
-    if r.status_code != 400:
-        errors += f"[{Context.ITEM_SEARCH}] GET Search with bbox=param (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
+    if Method.GET in methods:
+        retrieve(
+            Method.GET,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            status_code=400,
+            params={"bbox": "100.0, 1.0, 105.0, 0.0"},
+            r_session=r_session,
+            additional="bbox (lat 1 > lat 2)",
+        )
 
     if Method.POST in methods:
-        param_list = [100.0, 1.0, 105.0, 0.0]
-        r = requests.post(search_url, json={"bbox": param_list})
-        if r.status_code != 400:
-            errors += f"[{Context.ITEM_SEARCH}] POST Search with bbox: {param_list} (lat 1 > lat 2) returned status code {r.status_code}, instead of 400"
+        retrieve(
+            Method.POST,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            status_code=400,
+            body={"bbox": [100.0, 1.0, 105.0, 0.0]},
+            r_session=r_session,
+            additional="bbox (lat 1 > lat 2)",
+        )
 
     # Invalid bbox - 1, 2, 3, 5, and 7 element array
-    bboxes = [[0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1]]
+    for bbox in [[0], [0, 0], [0, 0, 0], [0, 0, 0, 1, 1], [0, 0, 0, 1, 1, 1, 1]]:
+        if Method.GET in methods:
+            retrieve(
+                Method.GET,
+                search_url,
+                errors,
+                Context.ITEM_SEARCH,
+                status_code=400,
+                params={"bbox": ",".join(str(c) for c in bbox)},
+                r_session=r_session,
+                additional="invalid bbox coordinate count",
+            )
 
-    for bbox in bboxes:
-        param = ",".join(str(c) for c in bbox)
-        r = requests.get(search_url, params={"bbox": param})
-        if r.status_code != 400:
-            errors += f"[{Context.ITEM_SEARCH}] GET Search with bbox={param} returned status code {r.status_code}, instead of 400"
         if Method.POST in methods:
-            r = requests.post(search_url, json={"bbox": bbox})
-            if r.status_code != 400:
-                errors += f"[{Context.ITEM_SEARCH}] POST Search with bbox:{bbox} returned status code {r.status_code}, instead of 400"
+            retrieve(
+                Method.POST,
+                search_url,
+                errors,
+                Context.ITEM_SEARCH,
+                status_code=400,
+                body={"bbox": bbox},
+                r_session=r_session,
+                additional="invalid bbox coordinate count",
+            )
 
 
 def validate_item_search_limit(
