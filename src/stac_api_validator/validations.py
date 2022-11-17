@@ -338,11 +338,11 @@ def retrieve(
         if not content_type:
             if url.endswith("/search") or url.endswith("/items"):
                 if not has_content_type(resp.headers, geojson_mt):
-                    errors += f"[{context}] {method} {url} content-type header is not '{geojson_mt}'"
+                    errors += f"[{context}] {method} {url} params={params} body={body} content-type header is not '{geojson_mt}'"
             elif not has_content_type(resp.headers, "application/json"):
-                errors += f"[{context}] {method} {url} content-type header is not 'application/json'"
+                errors += f"[{context}] {method} {url} params={params} body={body} content-type header is not 'application/json'"
         elif not has_content_type(resp.headers, content_type):
-            errors += f"[{context}] {method} {url} content-type header is not '{content_type}'"
+            errors += f"[{context}] {method} {url} params={params} body={body} content-type header is not '{content_type}'"
 
         if resp.headers.get("content-type", "").split(";")[0].endswith("json"):
             try:
@@ -858,6 +858,7 @@ def validate_features(
                 item_url,
                 errors,
                 Context.FEATURES,
+                content_type=geojson_mt,
                 r_session=r_session,
             )
 
