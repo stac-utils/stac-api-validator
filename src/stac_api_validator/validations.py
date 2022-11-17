@@ -15,7 +15,6 @@ from typing import Set
 from typing import Tuple
 from typing import Union
 
-import requests
 import yaml
 from more_itertools import take
 from pystac import Collection
@@ -84,6 +83,9 @@ class Method(Enum):
     GET = "GET"
     POST = "POST"
 
+    def __str__(self) -> str:
+        return self.value
+
 
 class Context(Enum):
     CORE = "Core"
@@ -92,6 +94,9 @@ class Context(Enum):
     COLLECTIONS = "Collections"
     ITEM_SEARCH_FILTER = "Item Search - Filter Ext"
     FEATURES_FILTER = "Features - Filter Ext"
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class BaseErrors:
@@ -261,7 +266,7 @@ def stac_validate(
     method: Method = Method.GET,
 ) -> None:
     if not body:
-        errors += f"[{context.value}] {method} {url} body was empty when running stac-validate and stac-check"
+        errors += f"[{context}] {method} {url} body was empty when running stac-validate and stac-check"
     else:
         if _type := body.get("type"):
             try:
@@ -276,13 +281,15 @@ def stac_validate(
                         errors += f"[{context}] {method} {url} object with type '{_type}' could not be hydrated with pystac"
             except Exception as e:
                 errors += f"[{context}] {method} {url} '{body.get('id')}' failed pystac hydration: {e}"
+
+            if _type in ["Collection", "Feature"]:
+                if not (
+                    stac_validator := StacValidate(links=True, assets=True)
+                ).validate_dict(body):
+                    errors += f"[{context}] {method} {url} failed stac-validator validation: {stac_validator.message}"
+
         else:
             errors += f"[{context}] {method} {url} missing 'type' attribute"
-
-        if not (stac_validator := StacValidate(links=True, assets=True)).validate_dict(
-            body
-        ):
-            errors += f"[{context}] {method} {url} failed stac-validator validation: {stac_validator.message}"
 
 
 def stac_check(
@@ -323,28 +330,25 @@ def retrieve(
 
     if resp.status_code != status_code:
         errors += (
-            f"[{context.value}] method={method.value} url={url} params={params} body={body}"
+            f"[{context}] {method} {url} params={params} body={body}"
             f" had unexpected status code {resp.status_code} instead of {status_code}: {additional}"
         )
 
     elif status_code < 400:
         if not content_type:
-            if (
-                url.endswith("/search") or url.endswith("/items")
-            ) and not has_content_type(resp.headers, geojson_mt):
-                errors += f"[{context.value}] {method.value} {url} content-type header is not '{geojson_mt}'"
+            if url.endswith("/search") or url.endswith("/items"):
+                if not has_content_type(resp.headers, geojson_mt):
+                    errors += f"[{context}] {method} {url} content-type header is not '{geojson_mt}'"
             elif not has_content_type(resp.headers, "application/json"):
-                errors += f"[{context.value}] {method.value} {url} content-type header is not 'application/json'"
+                errors += f"[{context}] {method} {url} content-type header is not 'application/json'"
         elif not has_content_type(resp.headers, content_type):
-            errors += f"[{context.value}] {method.value} {url} content-type header is not '{content_type}'"
+            errors += f"[{context}] {method} {url} content-type header is not '{content_type}'"
 
         if resp.headers.get("content-type", "").split(";")[0].endswith("json"):
             try:
                 return resp.status_code, resp.json(), resp.headers
             except json.decoder.JSONDecodeError:
-                errors += (
-                    f"[{context.value}] {method.value} {url} returned non-JSON value"
-                )
+                errors += f"[{context}] {method} {url} returned non-JSON value"
 
     return resp.status_code, None, resp.headers
 
@@ -1061,11 +1065,13 @@ def validate_item_search(
     validate_item_search_bbox_xor_intersects(search_url, methods, errors, r_session)
     validate_item_search_bbox(search_url, methods, errors, r_session)
     validate_item_search_datetime(search_url, methods, warnings, errors, r_session)
-    validate_item_search_ids(search_url, methods, warnings, errors)
+    validate_item_search_ids(search_url, methods, warnings, errors, r_session)
     validate_item_search_ids_does_not_override_all_other_params(
-        search_url, methods, collection, warnings, errors
+        search_url, methods, collection, warnings, errors, r_session
     )
-    validate_item_search_collections(search_url, collections_url, methods, errors)
+    validate_item_search_collections(
+        search_url, collections_url, methods, errors, r_session
+    )
     validate_item_search_intersects(
         search_url=search_url,
         collection=collection,
@@ -1457,16 +1463,16 @@ def validate_item_search_datetime(
         errors += f"[{Context.ITEM_SEARCH}] GET Search with datetime={dt} extracted from an Item returned no results."
 
     for dt in valid_datetimes:
-        r = r_session.send(
-            Request("GET", search_url, params={"datetime": dt}).prepare()
+        retrieve(
+            Method.GET,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            r_session,
+            content_type=geojson_mt,
+            params={"datetime": dt},
+            additional=f"with datetime={dt} extracted from an Item",
         )
-        if r.status_code != 200:
-            errors += f"[{Context.ITEM_SEARCH}] GET Search with datetime={dt} returned status code {r.status_code}"
-            continue
-        try:
-            r.json()
-        except json.decoder.JSONDecodeError:
-            errors += f"[{Context.ITEM_SEARCH}] GET Search with datetime={dt} returned non-json response"
 
     for dt in invalid_datetimes:
         status_code, _, _ = retrieve(
@@ -1479,9 +1485,6 @@ def validate_item_search_datetime(
             context=Context.ITEM_SEARCH,
             additional="invalid datetime returned non-400 status code",
         )
-        if status_code == 200:
-            warnings += f"[{Context.ITEM_SEARCH}] GET Search with datetime={dt} returned status code 200 instead of 400"
-            continue
 
     # todo: POST
 
@@ -1534,7 +1537,8 @@ def validate_item_pagination(
         url,
         errors,
         context,
-        r_session,
+        r_session=r_session,
+        content_type=geojson_mt,
         additional="pagination get failed for initial request",
     )
     if first_body:
@@ -1554,7 +1558,8 @@ def validate_item_pagination(
                     next_url,
                     errors,
                     context,
-                    r_session,
+                    r_session=r_session,
+                    content_type=geojson_mt,
                     additional="pagination get failed for next url",
                 )
         else:
@@ -1597,42 +1602,46 @@ def validate_item_pagination(
 
     if Method.POST in methods:
         initial_json_body = {"limit": 1, "collections": [collection]}
-        r = requests.post(search_url, json=initial_json_body)
-        if not r.status_code == 200:
-            errors += f"[{context}] POST pagination get failed for initial request"
-        else:
-            try:
-                first_body = r.json()
-                if first_body and (
-                    link := link_by_rel(first_body.get("links"), "next")
-                ):
-                    if (method := link.get("method")) and method != "POST":
-                        errors += f"STAC API - Item Search POST pagination first request 'next' link relation has method {method} instead of 'POST'"
 
-                    next_url = link.get("href")
-                    if next_url is None:
-                        errors += "STAC API - Item Search POST pagination first request 'next' link relation missing href"
-                    else:
-                        if url == next_url:
-                            errors += "STAC API - Item Search POST pagination next href same as first url"
+        _, first_body, _ = retrieve(
+            Method.POST,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            body=initial_json_body,
+            r_session=r_session,
+        )
 
-                        next_body: Dict[str, Any] = link.get("body", {})
-                        if not link.get("merge", False):
-                            second_json_body = next_body
-                        else:
-                            second_json_body = initial_json_body
-                            second_json_body.update(next_body)
+        if first_body and (link := link_by_rel(first_body.get("links"), "next")):
+            if (method := link.get("method")) and method != "POST":
+                errors += f"STAC API - Item Search POST pagination first request 'next' link relation has method {method} instead of 'POST'"
 
-                        r = requests.post(next_url, json=second_json_body)
-                        if not r.status_code == 200:
-                            errors += f"[{context}] POST pagination get failed for next url {next_url} with body {second_json_body}"
-                        else:
-                            r.json()
+            next_url = link.get("href")
+            if next_url is None:
+                errors += "STAC API - Item Search POST pagination first request 'next' link relation missing href"
+            else:
+                if url == next_url:
+                    errors += "STAC API - Item Search POST pagination next href same as first url"
+
+                next_body: Dict[str, Any] = link.get("body", {})
+                if not link.get("merge", False):
+                    second_json_body = next_body
                 else:
-                    errors += f"[{context}] POST pagination first request had no 'next' link relation"
+                    second_json_body = initial_json_body
+                    second_json_body.update(next_body)
 
-            except json.decoder.JSONDecodeError:
-                errors += f"[{context}] POST pagination response failed"
+                retrieve(
+                    Method.POST,
+                    next_url,
+                    errors,
+                    Context.ITEM_SEARCH,
+                    body=second_json_body,
+                    r_session=r_session,
+                )
+        else:
+            errors += (
+                f"[{context}] POST pagination first request had no 'next' link relation"
+            )
 
         if use_pystac_client and collection is not None:
             max_items = 100
@@ -1705,7 +1714,7 @@ def validate_item_search_intersects(
                 errors,
                 Context.ITEM_SEARCH,
                 r_session=r_session,
-                params={"intersects": json.dumps(param)},
+                body={"intersects": param},
             )
 
     intersects_shape = shape(json.loads(geometry))
@@ -1722,30 +1731,27 @@ def validate_item_search_intersects(
 
         if body:
             if not len(body["features"]):
-                errors += f"[{Context.ITEM_SEARCH}] GET Search result for intersects={geometry} returned no results"
+                errors += f"[{Context.ITEM_SEARCH}] GET {search_url} Search result for intersects={geometry} returned no results"
             if any(
                 not intersects_shape.intersects(shape(item["geometry"]))
                 for item in body["features"]
             ):
-                errors += f"[{Context.ITEM_SEARCH}] GET Search results for intersects={geometry} do not all intersect"
+                errors += f"[{Context.ITEM_SEARCH}] GET {search_url} Search results for intersects={geometry} do not all intersect"
 
     if Method.POST in methods:
-        # Validate POST query
-        r = requests.post(
-            search_url, json={"collections": [collection], "intersects": geometry}
+        _, item_collection, _ = retrieve(
+            Method.POST,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            body={"collections": [collection], "intersects": geometry},
+            r_session=r_session,
         )
-        if r.status_code != 200:
-            errors += f"[{Context.ITEM_SEARCH}] POST Search with intersects={geometry} returned status code {r.status_code}"
-        else:
-            try:
-                item_collection = r.json()
-                if not len(item_collection["features"]):
-                    errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry} returned no results"
-                for item in item_collection["features"]:
-                    if not intersects_shape.intersects(shape(item["geometry"])):
-                        errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
-            except json.decoder.JSONDecodeError:
-                errors += f"[{Context.ITEM_SEARCH}] POST Search with intersects={geometry} returned non-json response: {r.text}"
+        if not (item_collection and len(item_collection["features"])):
+            errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry} returned no results"
+        for item in item_collection["features"]:  # type: ignore
+            if not intersects_shape.intersects(shape(item["geometry"])):
+                errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
 
 
 def validate_item_search_bbox(
@@ -1875,100 +1881,131 @@ def validate_item_search_bbox(
 def validate_item_search_limit(
     search_url: str, methods: Set[Method], errors: Errors, r_session: Session
 ) -> None:
-    valid_limits = [1, 2, 10]  # todo: pull actual limits from service description
+    valid_limits = [1, 2, 10, 10000, 100000, 1000000]
     for limit in valid_limits:
-        # Valid GET query
         params = {"limit": limit}
-        r = requests.get(search_url, params=params)
-        if r.status_code != 200:
-            errors += f"[{Context.ITEM_SEARCH}] GET Search with {params} returned status code {r.status_code}"
-        else:
-            try:
-                body = r.json()
+        if Method.GET in methods:
+            _, body, _ = retrieve(
+                Method.GET,
+                search_url,
+                errors,
+                Context.ITEM_SEARCH,
+                params=params,
+                r_session=r_session,
+            )
+            if body:
                 items = body.get("items")
                 if items and len(items) <= 1:
                     errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned fewer than 1 result"
 
-            except json.decoder.JSONDecodeError:
-                errors += f"[{Context.ITEM_SEARCH}] GET Search with {params} returned non-json response: {r.text}"
-
         if Method.POST in methods:
-            # Valid POST query
-            r = requests.post(search_url, json=params)
-            if r.status_code != 200:
-                errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned status code {r.status_code}"
-            else:
-                try:
-                    body = r.json()
-                    items = body.get("items")
-                    if items and len(items) <= 1:
-                        errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned fewer than 1 result"
-                except json.decoder.JSONDecodeError:
-                    errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned non-json response: {r.text}"
+            _, body, _ = retrieve(
+                Method.POST,
+                search_url,
+                errors,
+                Context.ITEM_SEARCH,
+                body=params,
+                r_session=r_session,
+            )
+            if body:
+                items = body.get("items")
+                if items and len(items) <= 1:
+                    errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned fewer than 1 result"
 
-    invalid_limits = [-1]  # todo: pull actual limits from service desc and test them
+    invalid_limits = [-1]
     for limit in invalid_limits:
-        # Valid GET query
         params = {"limit": limit}
-        r = requests.get(search_url, params=params)
-        if r.status_code != 400:
-            errors += f"[{Context.ITEM_SEARCH}] GET Search with {params} returned status code {r.status_code}, must be 400"
+        if Method.GET in methods:
+            _, body, _ = retrieve(
+                Method.GET,
+                search_url,
+                errors,
+                Context.ITEM_SEARCH,
+                status_code=400,
+                params=params,
+                r_session=r_session,
+            )
 
         if Method.POST in methods:
-            # Valid POST query
-            r = requests.post(search_url, json=params)
-            if r.status_code != 400:
-                errors += f"[{Context.ITEM_SEARCH}] POST Search with {params} returned status code {r.status_code}, must be 400"
+            _, body, _ = retrieve(
+                Method.POST,
+                search_url,
+                errors,
+                Context.ITEM_SEARCH,
+                status_code=400,
+                body=params,
+                r_session=r_session,
+            )
+
+    # todo: pull actual limits from service desc and test them
 
 
 def _validate_search_ids_request(
-    r: requests.Response,
+    body: Optional[Dict[str, Any]],
     item_ids: List[str],
-    method: str,
+    method: Method,
     params: Dict[str, Any],
     errors: Errors,
 ) -> None:
-    if r.status_code != 200:
-        errors += f"{method} Search with {params} returned status code {r.status_code}"
+    if items := body.get("features"):  # type: ignore
+        if len(items) != len(list(filter(lambda x: x.get("id") in item_ids, items))):
+            errors += f"{method} Search with {params} returned items with ids other than specified one"
     else:
-        try:
-            items = r.json().get("features")
-            if len(items) != len(
-                list(filter(lambda x: x.get("id") in item_ids, items))
-            ):
-                errors += f"{method} Search with {params} returned items with ids other than specified one"
-        except json.decoder.JSONDecodeError:
-            errors += (
-                f"{method} Search with {params} returned non-json response: {r.text}"
-            )
+        errors += f"{method} Search with {params} returned no 'features' attribute"
 
 
 def _validate_search_ids_with_ids(
-    search_url: str, item_ids: List[str], methods: Set[Method], errors: Errors
+    search_url: str,
+    item_ids: List[str],
+    methods: Set[Method],
+    errors: Errors,
+    r_session: Session,
 ) -> None:
     get_params = {"ids": ",".join(item_ids)}
 
-    _validate_search_ids_request(
-        requests.get(search_url, params=get_params),
-        item_ids=item_ids,
-        method="GET",
-        params=get_params,
-        errors=errors,
-    )
+    if Method.GET in methods:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            params=get_params,
+            r_session=r_session,
+        )
+
+        _validate_search_ids_request(
+            body,
+            item_ids=item_ids,
+            method=Method.GET,
+            params=get_params,
+            errors=errors,
+        )
 
     if Method.POST in methods:
         post_params = {"ids": item_ids}
+        _, body, _ = retrieve(
+            Method.POST,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            body=post_params,
+            r_session=r_session,
+        )
         _validate_search_ids_request(
-            requests.post(search_url, json=post_params),
+            body,
             item_ids=item_ids,
-            method="POST",
+            method=Method.POST,
             params=post_params,
             errors=errors,
         )
 
 
 def _validate_search_ids_with_ids_no_override(
-    search_url: str, item: Dict[str, Any], methods: Set[Method], errors: Errors
+    search_url: str,
+    item: Dict[str, Any],
+    methods: Set[Method],
+    errors: Errors,
+    r_session: Session,
 ) -> None:
     bbox = item["bbox"]
     get_params = {
@@ -1977,21 +2014,22 @@ def _validate_search_ids_with_ids_no_override(
         "bbox": f"{bbox[2] + 1},{bbox[3] + 1},{bbox[2] + 2},{bbox[3] + 2}",
     }
 
-    r = requests.get(search_url, params=get_params)
-
-    if not (r.status_code == 200):
-        errors += f"[{Context.ITEM_SEARCH}]  GET Search with id and other parameters returned status code {r.status_code}"
-    else:
-
-        try:
-            if len(r.json().get("features", [])) > 0:
+    if Method.GET in methods:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            params=get_params,
+            r_session=r_session,
+        )
+        if body:
+            if len(body.get("features", [])) > 0:
                 errors += (
                     f"[{Context.ITEM_SEARCH}] GET Search with ids and non-intersecting bbox returned results, indicating "
                     "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
                     "STAC API 1.0.0-beta.1"
                 )
-        except json.decoder.JSONDecodeError:
-            errors += f"[{Context.ITEM_SEARCH}] GET Search with {get_params} returned non-json response: {r.text}"
 
     if Method.POST in methods:
         post_params = {
@@ -2000,34 +2038,53 @@ def _validate_search_ids_with_ids_no_override(
             "bbox": [bbox[2] + 1, bbox[3] + 1, bbox[2] + 2, bbox[3] + 2],
         }
 
-        r = requests.post(search_url, json=post_params)
+        _, body, _ = retrieve(
+            Method.POST,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            body=post_params,
+            r_session=r_session,
+        )
 
-        if not (r.status_code == 200):
-            errors += f"[{Context.ITEM_SEARCH}] POST Search with id and other parameters returned status code {r.status_code}"
-        else:
-            try:
-                if len(r.json().get("features", [])) > 0:
-                    errors += (
-                        f"[{Context.ITEM_SEARCH}] POST Search with ids and non-intersecting bbox returned results, indicating "
-                        "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
-                        "STAC API 1.0.0-beta.1"
-                    )
-            except json.decoder.JSONDecodeError:
-                errors += f"[{Context.ITEM_SEARCH}] POST Search with {get_params} returned non-json response: {r.text}"
+        if body and body.get("features", []):
+            errors += (
+                f"[{Context.ITEM_SEARCH}] POST Search with ids and non-intersecting bbox returned results, indicating "
+                "the ids parameter is overriding the bbox parameter. All parameters are applied equally since "
+                "STAC API 1.0.0-beta.1"
+            )
 
 
 def validate_item_search_ids(
-    search_url: str, methods: Set[Method], warnings: Warnings, errors: Errors
+    search_url: str,
+    methods: Set[Method],
+    warnings: Warnings,
+    errors: Errors,
+    r_session: Session,
 ) -> None:
-    r = requests.get(f"{search_url}?limit=2")
-    items = r.json().get("features")
+    _, body, _ = retrieve(
+        Method.GET,
+        search_url,
+        errors,
+        Context.ITEM_SEARCH,
+        params={"limit": 2},
+        r_session=r_session,
+    )
+
+    items = body.get("features")  # type: ignore
     if items and len(items) >= 2:
-        _validate_search_ids_with_ids(search_url, [items[0].get("id")], methods, errors)
         _validate_search_ids_with_ids(
-            search_url, [items[0].get("id"), items[1].get("id")], methods, errors
+            search_url, [items[0].get("id")], methods, errors, r_session
         )
         _validate_search_ids_with_ids(
-            search_url, [i["id"] for i in items], methods, errors
+            search_url,
+            [items[0].get("id"), items[1].get("id")],
+            methods,
+            errors,
+            r_session,
+        )
+        _validate_search_ids_with_ids(
+            search_url, [i["id"] for i in items], methods, errors, r_session
         )
     else:
         warnings += f"[{Context.ITEM_SEARCH}] GET Search with no parameters returned < 2 results"
@@ -2039,17 +2096,22 @@ def validate_item_search_ids_does_not_override_all_other_params(
     collection: str,
     warnings: Warnings,
     errors: Errors,
+    r_session: Session,
 ) -> None:
     # find one item that we can then query by id and a non-intersecting bbox to see if
     # we still get the item as a result
-    if (
-        items := requests.get(
-            f"{search_url}?limit=1&bbox=20,20,21,21&collections={collection}"
+    _, body, _ = retrieve(
+        Method.GET,
+        f"{search_url}?limit=1&bbox=20,20,21,21&collections={collection}",
+        errors,
+        Context.ITEM_SEARCH,
+        content_type=geojson_mt,
+        r_session=r_session,
+    )
+    if body.get("features"):  # type: ignore
+        _validate_search_ids_with_ids_no_override(
+            search_url, body["features"][0], methods, errors, r_session  # type: ignore
         )
-        .json()
-        .get("features")
-    ):
-        _validate_search_ids_with_ids_no_override(search_url, items[0], methods, errors)
     else:
         warnings += (
             f"[{Context.ITEM_SEARCH}] GET Search with no parameters returned 0 results"
@@ -2057,45 +2119,59 @@ def validate_item_search_ids_does_not_override_all_other_params(
 
 
 def _validate_search_collections_request(
-    r: requests.Response,
+    body: Optional[Dict[str, Any]],
     coll_ids: List[str],
-    method: str,
+    method: Method,
     params: Dict[str, Any],
     errors: Errors,
 ) -> None:
-    if r.status_code != 200:
-        errors += f"{method} Search with {params} returned status code {r.status_code}"
-    else:
-        try:
-            items = r.json().get("features")
-            if len(items) != len(
-                list(filter(lambda x: x.get("collection") in coll_ids, items))
-            ):
-                errors += f"{method} Search with {params} returned items with ids other than specified one"
-        except json.decoder.JSONDecodeError:
-            errors += (
-                f"{method} Search with {params} returned non-json response: {r.text}"
-            )
+    if body:
+        items = body.get("features", [])
+        if len(items) != len(
+            list(filter(lambda x: x.get("collection") in coll_ids, items))
+        ):
+            errors += f"{method} Search with {params} returned items with ids other than specified one"
 
 
 def _validate_search_collections_with_ids(
-    search_url: str, coll_ids: List[str], methods: Set[Method], errors: Errors
+    search_url: str,
+    coll_ids: List[str],
+    methods: Set[Method],
+    errors: Errors,
+    r_session: Session,
 ) -> None:
-    get_params = {"collections": ",".join(coll_ids)}
-    _validate_search_collections_request(
-        requests.get(search_url, params=get_params),
-        coll_ids=coll_ids,
-        method="GET",
-        params=get_params,
-        errors=errors,
-    )
+    if Method.GET in methods:
+        get_params = {"collections": ",".join(coll_ids)}
+        _, body, _ = retrieve(
+            Method.GET,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            params=get_params,
+            r_session=r_session,
+        )
+        _validate_search_collections_request(
+            body,
+            coll_ids=coll_ids,
+            method=Method.GET,
+            params=get_params,
+            errors=errors,
+        )
 
     if Method.POST in methods:
         post_params = {"collections": coll_ids}
+        _, body, _ = retrieve(
+            Method.POST,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            body=post_params,
+            r_session=r_session,
+        )
         _validate_search_collections_request(
-            requests.post(search_url, json=post_params),
+            body,
             coll_ids=coll_ids,
-            method="POST",
+            method=Method.POST,
             params=post_params,
             errors=errors,
         )
@@ -2106,27 +2182,52 @@ def validate_item_search_collections(
     collections_url: Optional[str],
     methods: Set[Method],
     errors: Errors,
+    r_session: Session,
 ) -> None:
+    collection_ids = None
     if collections_url:
-        collections_entity = requests.get(collections_url).json()
-        if isinstance(collections_entity, List):
-            errors += "/collections entity is an array rather than an object"
-            return
-        collections = collections_entity.get("collections")
-        if not collections:
+        _, collections_entity, _ = retrieve(
+            Method.GET,
+            collections_url,
+            errors,
+            Context.ITEM_SEARCH,
+            r_session=r_session,
+        )
+
+        if not (
+            collections_entity
+            and (collections := collections_entity.get("collections"))
+        ):
             errors += "/collections entity does not contain a 'collections' attribute"
-            return
-
-        collection_ids = [x["id"] for x in collections]
+        else:
+            collection_ids = [x["id"] for x in collections]
     else:  # if Collections is not implemented, get some from search
-        r = requests.get(search_url)
-        collection_ids = list({i["collection"] for i in r.json().get("features")})
+        _, body, _ = retrieve(
+            Method.GET,
+            search_url,
+            errors,
+            Context.ITEM_SEARCH,
+            r_session=r_session,
+        )
+        if body:
+            collection_ids = list({i["collection"] for i in body.get("features", [])})
 
-    _validate_search_collections_with_ids(search_url, collection_ids, methods, errors)
+    if not collection_ids:
+        errors += "Not running search validations with collections because could not get collection ids"
+    else:
+        _validate_search_collections_with_ids(
+            search_url, collection_ids, methods, errors, r_session
+        )
 
-    for cid in collection_ids:
-        _validate_search_collections_with_ids(search_url, [cid], methods, errors)
+        for cid in collection_ids:
+            _validate_search_collections_with_ids(
+                search_url, [cid], methods, errors, r_session
+            )
 
-    _validate_search_collections_with_ids(
-        search_url, list(itertools.islice(collection_ids, 3)), methods, errors
-    )
+        _validate_search_collections_with_ids(
+            search_url,
+            list(itertools.islice(collection_ids, 3)),
+            methods,
+            errors,
+            r_session,
+        )

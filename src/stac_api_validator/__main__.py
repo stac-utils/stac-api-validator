@@ -83,18 +83,18 @@ def main(
         return 1
 
     if warnings:
-        click.secho("Warnings:", fg="yellow")
+        click.secho("Warnings:", fg="blue")
     else:
         click.secho("Warnings: none", fg="green")
     for warning in warnings:
         click.secho(f"- {warning}")
 
     if errors:
-        click.secho("Errors:", fg="orange")
+        click.secho("Errors:", fg="red")
+        for error in errors:
+            click.secho(f"- {error}")
     else:
         click.secho("Errors: none", fg="green")
-    for error in errors:
-        click.secho(f"- {error}")
 
     if errors:
         return 1
