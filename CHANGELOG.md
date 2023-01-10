@@ -5,19 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2023-01-10
+
+### Changed
+
+- main now returns exit code 0 for success or 1 failure
+
 ## [0.4.0] - 2022-11-16
 
-## Added
+### Added
 
 - Add support for running stac-validator and stac-check on the objects returned from the API
 - Add support for Authorization Bearer and arbitrary query parameter authentication (experimental)
 - Add warning about upgrading to 1.0.0-rc.2
 
-## Fixed
+### Fixed
 
 - Handle pystac-client exceptions #152
 
-## Changed
+### Changed
 
 - Significant internal refactoring for invocation of HTTP requests
 
