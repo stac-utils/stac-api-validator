@@ -66,7 +66,6 @@ def main(
     auth_query_parameter: Optional[str] = None,
 ) -> int:
     """STAC API Validator."""
-
     logging.basicConfig(stream=sys.stdout, level=log_level)
 
     try:
@@ -97,9 +96,9 @@ def main(
         click.secho("Errors: none", fg="green")
 
     if errors:
-        return 1
+        sys.exit(1)
     else:
-        return 0
+        sys.exit(0)
 
 
 if __name__ == "__main__":
