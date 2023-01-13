@@ -258,6 +258,35 @@ def supports(conforms_to: List[str], pattern: Pattern[str]) -> bool:
     return any(pattern.fullmatch(x) for x in conforms_to)
 
 
+def is_json_type(maybe_type: Optional[str]) -> bool:
+    return maybe_type is not None and (
+        maybe_type == "application/json" or maybe_type.startswith("application/json;")
+    )
+
+
+def is_geojson_type(maybe_type: Optional[str]) -> bool:
+    return maybe_type is not None and (
+        maybe_type == "application/geo+json"
+        or maybe_type.startswith("application/geo+json;")
+    )
+
+
+# def is_json_or_geojson_type(maybe_type: Optional[str]) -> bool:
+#     return maybe_type and (is_json_type(maybe_type) or is_geojson_type(maybe_type))
+
+
+def has_content_type(headers: Mapping[str, str], content_type: str) -> bool:
+    return headers.get("content-type", "").split(";")[0] == content_type
+
+
+def has_json_content_type(headers: Mapping[str, str]) -> bool:
+    return is_json_type(headers.get("content-type"))
+
+
+def has_geojson_content_type(headers: Mapping[str, str]) -> bool:
+    return is_geojson_type(headers.get("content-type"))
+
+
 def stac_validate(
     url: str,
     body: Optional[Dict[str, Any]],
@@ -450,10 +479,6 @@ def validate_core_landing_page_body(
     return True
 
 
-def has_content_type(headers: Mapping[str, str], content_type: str) -> bool:
-    return headers.get("content-type", "").split(";")[0] == content_type
-
-
 def validate_api(
     root_url: str,
     conformance_classes: List[str],
@@ -591,14 +616,14 @@ def validate_core(
     if not (root := link_by_rel(links, "root")):
         errors += "/ : Link[rel=root] must exist"
     else:
-        if root.get("type") != "application/json":
-            errors += "/ : Link[rel=root] type is not application/json"
+        if not is_geojson_type(root.get("type")):
+            errors += f"/ : Link[rel=root] type is not application/geo+json, instead {root.get('type')}"
 
     if not (_self := link_by_rel(links, "self")):
         warnings += "/ : Link[rel=self] must exist"
     else:
-        if _self.get("type") != "application/json":
-            errors += "/ : Link[rel=self] type is not application/json"
+        if not is_geojson_type(_self.get("type")):
+            errors += f"/ : Link[rel=self] type is not application/geo+json, instead {_self.get('type')}"
 
     if not (service_desc := link_by_rel(links, "service-desc")):
         errors += "/ : Link[rel=service-desc] must exist"
@@ -703,11 +728,7 @@ def validate_collections(
         if not body:
             errors += f"[{Context.COLLECTIONS}] /collections body was empty"
         else:
-            if (
-                not resp_headers
-                or resp_headers.get("content-type", "").split(";")[0]
-                != "application/json"
-            ):
+            if not resp_headers or not is_json_type(resp_headers.get("content-type")):
                 errors += f"[{Context.COLLECTIONS}] /collections content-type header was not application/json"
 
             if not (self_link := link_by_rel(body.get("links", []), "self")):
@@ -909,9 +930,6 @@ def validate_features(
 
                     if not link_by_rel(body.get("links", []), "root"):
                         errors += f"[{Context.FEATURES}] GET {collection_items_url} does not have root link"
-
-                    if not link_by_rel(body.get("links", []), "parent"):
-                        errors += f"[{Context.FEATURES}] GET {collection_items_url} does not have parent link"
 
                     stac_validate(collection_items_url, body, errors, Context.FEATURES)
 
@@ -2115,7 +2133,8 @@ def validate_item_search_ids_does_not_override_all_other_params(
         )
     else:
         warnings += (
-            f"[{Context.ITEM_SEARCH}] GET Search with no parameters returned 0 results"
+            f"[{Context.ITEM_SEARCH}] GET Search within bbox=20,20,21,21 to validate ids does not override "
+            "all other parameters returned 0 results"
         )
 
 
