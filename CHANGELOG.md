@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - TBD
 
-## [0.4.2] - 2023-01-13
+## [0.4.2] - 2023-01-20
 
-### Changed
+### Fixed
 
+- Fixed unhandled exception when POST intersects query had no matching features.
 - Fixed several false positives on incorrect link types.
 
 ## [0.4.1] - 2023-01-10
