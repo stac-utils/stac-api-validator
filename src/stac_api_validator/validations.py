@@ -333,8 +333,10 @@ def stac_check(
         errors += (
             f"[{context}] {method} {url} is not a valid STAC object: {linter.error_msg}"
         )
-    if linter.best_practices_msg:
-        warnings += f"[{context}] {method} {url} has these stac-check recommendations: {linter.best_practices_msg}"
+    if msgs := linter.best_practices_msg[1:]:  # first msg is a header
+        warnings += (
+            f"[{context}] {method} {url} has these stac-check recommendations: {msgs}"
+        )
 
 
 def retrieve(
@@ -373,7 +375,9 @@ def retrieve(
         elif not has_content_type(resp.headers, content_type):
             errors += f"[{context}] {method} {url} params={params} body={body} content-type header is not '{content_type}'"
 
-        if resp.headers.get("content-type", "").split(";")[0].endswith("json"):
+        if has_json_content_type(resp.headers) or has_geojson_content_type(
+            resp.headers
+        ):
             try:
                 return resp.status_code, resp.json(), resp.headers
             except json.decoder.JSONDecodeError:
@@ -391,7 +395,7 @@ def validate_core_landing_page_body(
     collection: Optional[str],
     geometry: Optional[str],
 ) -> bool:
-    if not has_content_type(headers, "application/json"):
+    if not has_json_content_type(headers):
         errors += (
             "CORE-1",
             "[Core] : Landing Page (/) response Content-Type header is not application/json",
@@ -728,7 +732,7 @@ def validate_collections(
         if not body:
             errors += f"[{Context.COLLECTIONS}] /collections body was empty"
         else:
-            if not resp_headers or not is_json_type(resp_headers.get("content-type")):
+            if not resp_headers or not has_json_content_type(resp_headers):
                 errors += f"[{Context.COLLECTIONS}] /collections content-type header was not application/json"
 
             if not (self_link := link_by_rel(body.get("links", []), "self")):
@@ -766,11 +770,7 @@ def validate_collections(
             if not body:
                 errors += f"[{Context.COLLECTIONS}] {collection_url} body was empty"
             else:
-                if (
-                    not resp_headers
-                    or resp_headers.get("content-type", "").split(";")[0]
-                    != "application/json"
-                ):
+                if not resp_headers or not has_json_content_type(resp_headers):
                     errors += f"[{Context.COLLECTIONS}] {collection_url} content-type header was not application/json"
 
                 if not (self_link := link_by_rel(body.get("links", []), "self")):
@@ -1749,13 +1749,14 @@ def validate_item_search_intersects(
         )
 
         if body:
-            if not len(body["features"]):
+            if not body.get("features"):
                 errors += f"[{Context.ITEM_SEARCH}] GET {search_url} Search result for intersects={geometry} returned no results"
-            if any(
-                not intersects_shape.intersects(shape(item["geometry"]))
-                for item in body["features"]
-            ):
-                errors += f"[{Context.ITEM_SEARCH}] GET {search_url} Search results for intersects={geometry} do not all intersect"
+            else:
+                if any(
+                    not intersects_shape.intersects(shape(item.get("geometry", None)))
+                    for item in body.get("features", [])
+                ):
+                    errors += f"[{Context.ITEM_SEARCH}] GET {search_url} Search results for intersects={geometry} do not all intersect"
 
     if Method.POST in methods:
         _, item_collection, _ = retrieve(
@@ -1766,11 +1767,12 @@ def validate_item_search_intersects(
             body={"collections": [collection], "intersects": geometry},
             r_session=r_session,
         )
-        if not (item_collection and len(item_collection["features"])):
+        if not item_collection or not item_collection.get("features"):
             errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry} returned no results"
-        for item in item_collection["features"]:  # type: ignore
-            if not intersects_shape.intersects(shape(item["geometry"])):
-                errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry}, does not intersect {item['geometry']}"
+        else:
+            for item in item_collection.get("features", []):
+                if not intersects_shape.intersects(shape(item.get("geometry"))):
+                    errors += f"[{Context.ITEM_SEARCH}] POST Search result for intersects={geometry}, does not intersect {item.get('geometry')}"
 
 
 def validate_item_search_bbox(
