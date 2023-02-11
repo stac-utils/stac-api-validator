@@ -620,13 +620,13 @@ def validate_core(
     if not (root := link_by_rel(links, "root")):
         errors += "/ : Link[rel=root] must exist"
     else:
-        if not is_geojson_type(root.get("type")):
+        if not is_json_type(root.get("type")):
             errors += f"/ : Link[rel=root] type is not application/geo+json, instead {root.get('type')}"
 
     if not (_self := link_by_rel(links, "self")):
         warnings += "/ : Link[rel=self] must exist"
     else:
-        if not is_geojson_type(_self.get("type")):
+        if not is_json_type(_self.get("type")):
             errors += f"/ : Link[rel=self] type is not application/geo+json, instead {_self.get('type')}"
 
     if not (service_desc := link_by_rel(links, "service-desc")):
