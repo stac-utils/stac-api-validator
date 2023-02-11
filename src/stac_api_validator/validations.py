@@ -334,9 +334,7 @@ def stac_check(
             f"[{context}] {method} {url} is not a valid STAC object: {linter.error_msg}"
         )
     if msgs := linter.best_practices_msg[1:]:  # first msg is a header
-        warnings += (
-            f"[{context}] {method} {url} has these stac-check recommendations: {msgs}"
-        )
+        warnings += f"[{context}] {method} {url} has these stac-check recommendations: {''.join(msgs)}"
 
 
 def retrieve(
@@ -1399,7 +1397,6 @@ def validate_item_search_filter(
             filter_jsons.append(cql2_json_not_like)
 
     if basic_spatial_operators_supported:
-
         if cql2_text_supported:
             filter_texts.append(cql2_text_s_intersects)
             filter_texts.append(cql2_text_ex_2(collection))
