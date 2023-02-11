@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - TBD
 
+## [0.4.3] - 2023-02-10
+
+### Fixed
+
+- Fixed check of landing page link rels for self and root. These were incorrectly
+  checked for having a type of geojson, but they should just be json.
+
 ## [0.4.2] - 2023-01-20
 
 ### Fixed
@@ -124,6 +131,7 @@ Release is primarily to publish to Read the Docs as a version.
 - Fixed issue with item-search validation relying on collections behavior
 
 [unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.4.2...main
+[0.4.3]: https://github.com/stac-utils/stac-api-validator/tree/v0.4.3
 [0.4.2]: https://github.com/stac-utils/stac-api-validator/tree/v0.4.2
 [0.4.1]: https://github.com/stac-utils/stac-api-validator/tree/v0.4.1
 [0.4.0]: https://github.com/stac-utils/stac-api-validator/tree/v0.4.0
