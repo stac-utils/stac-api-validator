@@ -361,7 +361,7 @@ def retrieve(
 
     if resp.status_code != status_code:
         errors += (
-            f"[{context}] {method} {url} params={params} body={body}"
+            f"[{context}] {method} {url} params={params} body={json.dumps(body) if body else ''}"
             f" had unexpected status code {resp.status_code} instead of {status_code}: {additional}"
         )
 
@@ -1793,7 +1793,7 @@ def validate_item_search_bbox(
     if Method.POST in methods:
         # Valid POST query
         _, body, resp_headers = retrieve(
-            Method.GET,
+            Method.POST,
             search_url,
             errors,
             Context.ITEM_SEARCH,
