@@ -16,6 +16,7 @@ from typing import Tuple
 from typing import Union
 
 import yaml
+from deepdiff import DeepDiff
 from more_itertools import take
 from pystac import Collection
 from pystac import Item
@@ -94,6 +95,7 @@ class Context(Enum):
     COLLECTIONS = "Collections"
     ITEM_SEARCH_FILTER = "Item Search - Filter Ext"
     FEATURES_FILTER = "Features - Filter Ext"
+    CHILDREN = "Children Ext"
 
     def __str__(self) -> str:
         return self.value
@@ -532,7 +534,7 @@ def validate_api(
 
     if "children" in conformance_classes:
         logger.info("Validating STAC API - Children conformance class.")
-        validate_children(landing_page_body, errors, warnings)
+        validate_children(landing_page_body, errors, warnings, r_session)
     else:
         logger.info("Skipping STAC API - Children conformance class.")
 
@@ -694,8 +696,79 @@ def validate_children(
     root_body: Dict[str, Any],
     errors: Errors,
     warnings: Warnings,
+    r_session: Session,
 ) -> None:
-    logger.info("Children validation is not yet implemented.")
+    children_link = link_by_rel(root_body.get("links"), "children")
+    if (
+        not children_link
+        or not children_link.get("href", "").endswith("/children")
+        or not is_json_type(children_link.get("type"))
+    ):
+        errors += f"[{Context.CHILDREN}] /: Link[rel=children] must href /children"
+        return
+
+    if not (children_href := children_link.get("href")):
+        errors += f"[{Context.CHILDREN}] /: Link[rel=children] missing href"
+    else:
+        _, children_body, resp_headers = retrieve(
+            Method.GET,
+            children_href,
+            errors,
+            Context.CHILDREN,
+            r_session=r_session,
+        )
+        if not children_body:
+            errors += f"[{Context.CHILDREN}] /children body was empty"
+            return
+
+        if not resp_headers or not has_json_content_type(resp_headers):
+            errors += f"[{Context.CHILDREN}] /children content-type header was not application/json"
+
+        if not (self_link := link_by_rel(children_body.get("links", []), "self")):
+            errors += f"[{Context.CHILDREN}] /children does not have self link"
+        elif children_link.get("href") != self_link.get("href"):
+            errors += (
+                f"[{Context.CHILDREN}] /children self link does not match requested url"
+            )
+
+        if not link_by_rel(children_body.get("links", []), "root"):
+            errors += f"[{Context.CHILDREN}] /children does not have root link"
+
+        # each child link in Landing Page must have an entry in children
+        child_links = links_by_rel(root_body.get("links"), "child")
+
+        child_link_bodies = []
+        for child_link in child_links:
+            if child_href := child_link.get("href"):
+                _, child_body, child_resp_headers = retrieve(
+                    Method.GET,
+                    child_href,
+                    errors,
+                    Context.CHILDREN,
+                    r_session=r_session,
+                )
+                child_link_bodies.append(child_body)
+            else:
+                errors += f"[{Context.CHILDREN}] child link {json.dumps(child_link)} missing href field"
+
+        child_links_vs_children_diff = DeepDiff(
+            child_link_bodies, children_body.get("children"), ignore_order=True
+        )
+        if iterable_item_removed := child_links_vs_children_diff.get(
+            "iterable_item_removed"
+        ):
+            errors += (
+                f"[{Context.CHILDREN}] /: child links contained these objects that /children does not: "
+                f"{json.dumps(iterable_item_removed)}"
+            )
+
+        if iterable_item_added := child_links_vs_children_diff.get(
+            "iterable_item_added"
+        ):
+            errors += (
+                f"[{Context.CHILDREN}] /: child links missing these objects that /children contains: "
+                f"{json.dumps(iterable_item_added)}"
+            )
 
 
 def validate_collections(
@@ -743,6 +816,12 @@ def validate_collections(
             if not link_by_rel(body.get("links", []), "root"):
                 errors += (
                     f"[{Context.COLLECTIONS}] /collections does not have root link"
+                )
+
+            if collections_type := body.get("type"):
+                warnings += (
+                    f"[{Context.COLLECTIONS}] /collections entity has a field 'type: {collections_type}', "
+                    "but the STAC API entity schema does not define this field"
                 )
 
             if body.get("collections") is None:
