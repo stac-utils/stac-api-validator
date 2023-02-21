@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - TBD
 
+## [0.5.0] - 2023-02-21
+
+### Added
+
+- Added validation for Children Extension with `--conformance children`
+- Added validation for Browseable Extension with `--conformance browseable`
+- Added validation for traversal of Core child and item link relations with pystac Catalog
+
 ## [0.4.3] - 2023-02-10
 
 ### Fixed
@@ -130,7 +138,8 @@ Release is primarily to publish to Read the Docs as a version.
 
 - Fixed issue with item-search validation relying on collections behavior
 
-[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.4.2...main
+[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.5.0...main
+[0.5.0]: https://github.com/stac-utils/stac-api-validator/tree/v0.5.0
 [0.4.3]: https://github.com/stac-utils/stac-api-validator/tree/v0.4.3
 [0.4.2]: https://github.com/stac-utils/stac-api-validator/tree/v0.4.2
 [0.4.1]: https://github.com/stac-utils/stac-api-validator/tree/v0.4.1
