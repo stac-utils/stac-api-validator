@@ -15,9 +15,11 @@ from typing import Set
 from typing import Tuple
 from typing import Union
 
+import pystac
 import yaml
 from deepdiff import DeepDiff
 from more_itertools import take
+from pystac import Catalog
 from pystac import Collection
 from pystac import Item
 from pystac import ItemCollection
@@ -96,6 +98,7 @@ class Context(Enum):
     ITEM_SEARCH_FILTER = "Item Search - Filter Ext"
     FEATURES_FILTER = "Features - Filter Ext"
     CHILDREN = "Children Ext"
+    BROWSEABLE = "Browseable Ext"
 
     def __str__(self) -> str:
         return self.value
@@ -528,21 +531,15 @@ def validate_api(
 
     if "browseable" in conformance_classes:
         logger.info("Validating STAC API - Browseable conformance class.")
-        validate_browseable(landing_page_body, errors, warnings)
-    else:
-        logger.info("Skipping STAC API - Browseable conformance class.")
+        validate_browseable(landing_page_body, errors, warnings, r_session)
 
     if "children" in conformance_classes:
         logger.info("Validating STAC API - Children conformance class.")
         validate_children(landing_page_body, errors, warnings, r_session)
-    else:
-        logger.info("Skipping STAC API - Children conformance class.")
 
     if "collections" in conformance_classes:
         logger.info("Validating STAC API - Collections conformance class.")
         validate_collections(landing_page_body, collection, errors, warnings, r_session)
-    else:
-        logger.info("Skipping STAC API - Collections conformance class.")
 
     conforms_to = landing_page_body.get("conformsTo", [])
 
@@ -558,8 +555,6 @@ def validate_api(
             errors,
             r_session,
         )
-    else:
-        logger.info("Skipping STAC API - Features conformance class.")
 
     if "item-search" in conformance_classes:
         logger.info("Validating STAC API - Item Search conformance class.")
@@ -574,8 +569,6 @@ def validate_api(
             conformance_classes=conformance_classes,
             r_session=r_session,
         )
-    else:
-        logger.info("Skipping STAC API - Item Search conformance class.")
 
     if not errors:
         try:
@@ -683,13 +676,53 @@ def validate_core(
             r_session=r_session,
         )
 
+    # this validates, among other things, that the child and item link relations reference
+    # valid STAC Catalogs, Collections, and/or Items
+    try:
+        list(take(1000, Catalog.from_dict(root_body).get_all_items()))
+    except pystac.errors.STACTypeError as e:
+        errors += (
+            f"[{Context.CORE}] Error while traversing Catalog child/item links to find Items: {e} "
+            "This can be reproduced with 'list(pystac.Catalog.from_file(root_url).get_all_items())'"
+        )
+
 
 def validate_browseable(
     root_body: Dict[str, Any],
     errors: Errors,
     warnings: Warnings,
+    r_session: Session,
 ) -> None:
-    logger.info("Browseable validation is not yet implemented.")
+    # child or item links exist in the root
+    child_links = links_by_rel(root_body.get("links"), "child")
+    item_links = links_by_rel(root_body.get("links"), "item")
+    if not (child_links or item_links):
+        errors += f"[{Context.BROWSEABLE}] /: Root catalog does not contain any child or item link relations"
+
+    # check that at least a few of the items that can be reached from child/item link relations
+    # can be found through search
+    try:
+        for item in take(10, Catalog.from_dict(root_body).get_all_items()):
+            if link := link_by_rel(root_body.get("links"), "search"):
+                _, body, _ = retrieve(
+                    Method.GET,
+                    link["href"],
+                    errors,
+                    Context.BROWSEABLE,
+                    params={"ids": item.id, "collections": item.collection},
+                    r_session=r_session,
+                )
+                if body and len(body.get("features", [])) != 1:
+                    errors += f"[{Context.BROWSEABLE}] /: Link[rel=children] must href /children"
+            else:
+                errors += (
+                    f"[{Context.BROWSEABLE}] /: Link[rel=search] could not be found"
+                )
+    except pystac.errors.STACTypeError as e:
+        errors += (
+            f"[{Context.BROWSEABLE}] Error while traversing Catalog child/item links to find Items: {e}. "
+            "This can be reproduced with 'pystac.Catalog.from_file(root_url).get_all_items()'"
+        )
 
 
 def validate_children(
@@ -1093,10 +1126,6 @@ def validate_features(
             errors=errors,
             r_session=r_session,
         )
-    else:
-        logger.info(
-            "Skipping STAC API - Features - Filter Extension conformance class."
-        )
 
 
 def validate_item_search(
@@ -1227,10 +1256,6 @@ def validate_item_search(
             errors=errors,
             r_session=r_session,
         )
-    else:
-        logger.info(
-            "Skipping STAC API - Item Search - Filter Extension conformance class."
-        )
 
 
 def validate_filter_queryables(
@@ -1333,10 +1358,6 @@ def validate_item_search_filter(
         logger.info(
             "Validating STAC API - Item Search - Filter Extension - CQL2-Text conformance class."
         )
-    else:
-        logger.info(
-            "Skipping STAC API - Item Search - Filter Extension - CQL2-Text conformance class."
-        )
 
     cql2_json_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/cql2-json" in conforms_to
@@ -1348,10 +1369,6 @@ def validate_item_search_filter(
     if cql2_json_supported:
         logger.info(
             "Validating STAC API - Item Search - Filter Extension - CQL2-JSON conformance class."
-        )
-    else:
-        logger.info(
-            "Skipping STAC API - Item Search - Filter Extension - CQL2-JSON conformance class."
         )
 
     basic_cql2_supported = (
@@ -1365,10 +1382,6 @@ def validate_item_search_filter(
         logger.info(
             "Validating STAC API - Item Search - Filter Extension - Basic CQL2 conformance class."
         )
-    else:
-        logger.info(
-            "Skipping STAC API - Item Search - Filter Extension - Basic CQL2 conformance class."
-        )
 
     advanced_comparison_operators_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
@@ -1378,10 +1391,6 @@ def validate_item_search_filter(
     if advanced_comparison_operators_supported:
         logger.info(
             "Validating STAC API - Item Search - Filter Extension - Advanced Comparison Operators conformance class."
-        )
-    else:
-        logger.info(
-            "Skipping STAC API - Item Search - Filter Extension - Advanced Comparison Operators conformance class."
         )
 
     basic_spatial_operators_supported = (
@@ -1393,10 +1402,6 @@ def validate_item_search_filter(
         logger.info(
             "Validating STAC API - Item Search - Filter Extension - Basic Spatial Operators conformance class."
         )
-    else:
-        logger.info(
-            "Skipping STAC API - Item Search - Filter Extension - Basic Spatial Operators conformance class."
-        )
 
     temporal_operators_supported = (
         "http://www.opengis.net/spec/cql2/1.0/conf/temporal-operators" in conforms_to
@@ -1405,10 +1410,6 @@ def validate_item_search_filter(
     if temporal_operators_supported:
         logger.info(
             "Validating STAC API - Item Search - Filter Extension - Temporal Operators conformance class."
-        )
-    else:
-        logger.info(
-            "Skipping STAC API - Item Search - Filter Extension - Temporal Operators conformance class."
         )
 
     # todo: validate these
