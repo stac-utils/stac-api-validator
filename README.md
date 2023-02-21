@@ -15,7 +15,7 @@
 [pypi_]: https://pypi.org/project/stac-api-validator/
 [status]: https://pypi.org/project/stac-api-validator/
 [python version]: https://pypi.org/project/stac-api-validator
-[read the docs]: https://stac-api-validator.readthedocs.io/
+[read the docs]: https://stac-api-validator.readthedocs.io/en/latest
 [tests]: https://github.com/stac-utils/stac-api-validator/actions?workflow=Tests
 [codecov]: https://app.codecov.io/gh/stac-utils/stac-api-validator
 [pre-commit]: https://github.com/pre-commit/pre-commit
