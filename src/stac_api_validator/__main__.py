@@ -44,6 +44,13 @@ from stac_api_validator.validations import validate_api
             "collections",
             "children",
             "filter",
+            "item-search#sort",
+            "item-search#fields",
+            "item-search#query",
+            "features#sort",
+            "features#fields",
+            "features#query",
+            "transaction",
         ],
         case_sensitive=False,
     ),
@@ -55,7 +62,7 @@ from stac_api_validator.validations import validate_api
 )
 @click.option(
     "--auth-query-parameter",
-    help="Query pararmeter key and value to pass for authorization, e.g., 'key=xyz'.",
+    help="Query parameter key and value to pass for authorization, e.g., 'key=xyz'.",
 )
 def main(
     log_level: str,
@@ -72,7 +79,7 @@ def main(
     try:
         (warnings, errors) = validate_api(
             root_url=root_url,
-            conformance_classes=conformance_classes,
+            ccs_to_validate=conformance_classes,
             collection=collection,
             geometry=geometry,
             auth_bearer_token=auth_bearer_token,
