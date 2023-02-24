@@ -95,10 +95,17 @@ class Context(Enum):
     ITEM_SEARCH = "Item Search"
     FEATURES = "Features"
     COLLECTIONS = "Collections"
-    ITEM_SEARCH_FILTER = "Item Search - Filter Ext"
-    FEATURES_FILTER = "Features - Filter Ext"
     CHILDREN = "Children Ext"
     BROWSEABLE = "Browseable Ext"
+    ITEM_SEARCH_FILTER = "Item Search - Filter Ext"
+    ITEM_SEARCH_SORT = "Item Search - Sort Ext"
+    ITEM_SEARCH_FIELDS = "Item Search - Fields Ext"
+    ITEM_SEARCH_QUERY = "Item Search - Query Ext"
+    FEATURES_FILTER = "Features - Filter Ext"
+    FEATURES_SORT = "Features - Sort Ext"
+    FEATURES_FIELDS = "Features - Fields Ext"
+    FEATURES_QUERY = "Features - Query Ext"
+    FEATURES_TXN = "Features - Transaction Ext"
 
     def __str__(self) -> str:
         return self.value
@@ -148,18 +155,13 @@ class Warnings(BaseErrors):
 cc_core_regex = re.compile(r"https://api\.stacspec\.org/(.+)/core")
 cc_browseable_regex = re.compile(r"https://api\.stacspec\.org/(.+)/browseable")
 cc_children_regex = re.compile(r"https://api\.stacspec\.org/(.+)/children")
-
 cc_collections_regex = re.compile(r"https://api\.stacspec\.org/(.+)/collections")
-
 cc_features_regex = re.compile(r"https://api\.stacspec\.org/(.+)/ogcapi-features")
 cc_features_transaction_regex = re.compile(
     r"https://api\.stacspec\.org/(.+)/ogcapi-features/extensions/transaction"
 )
 cc_features_fields_regex = re.compile(
     r"https://api\.stacspec\.org/(.+)/ogcapi-features#fields"
-)
-cc_features_context_regex = re.compile(
-    r"https://api\.stacspec\.org/(.+)/ogcapi-features#context"
 )
 cc_features_sort_regex = re.compile(
     r"https://api\.stacspec\.org/(.+)/ogcapi-features#sort"
@@ -172,12 +174,8 @@ cc_features_filter_regex = re.compile(
 )
 
 cc_item_search_regex = re.compile(r"https://api\.stacspec\.org/(.+)/item-search")
-
 cc_item_search_fields_regex = re.compile(
     r"https://api\.stacspec\.org/(.+)/item-search#fields"
-)
-cc_item_search_context_regex = re.compile(
-    r"https://api\.stacspec\.org/(.+)/item-search#context"
 )
 cc_item_search_sort_regex = re.compile(
     r"https://api\.stacspec\.org/(.+)/item-search#sort"
@@ -333,13 +331,17 @@ def stac_check(
     context: Context,
     method: Method = Method.GET,
 ) -> None:
-    linter = Linter(url)
-    if not linter.valid_stac:
-        errors += (
-            f"[{context}] {method} {url} is not a valid STAC object: {linter.error_msg}"
-        )
-    if msgs := linter.best_practices_msg[1:]:  # first msg is a header
-        warnings += f"[{context}] {method} {url} has these stac-check recommendations: {''.join(msgs)}"
+    try:
+        linter = Linter(url)
+        if not linter.valid_stac:
+            errors += f"[{context}] {method} {url} is not a valid STAC object: {linter.error_msg}"
+        if msgs := linter.best_practices_msg[1:]:  # first msg is a header, so skip
+            warnings += f"[{context}] {method} {url} has these stac-check recommendations: {','.join([x.strip() for x in msgs])}"
+    except KeyError as e:
+        # see https://github.com/stac-utils/stac-check/issues/104
+        errors += f"[{Context.CORE}] Error running stac-check, probably because an item doesn't have a bbox defined, which is okay!: {e} "
+    except Exception as e:
+        errors += f"[{Context.CORE}] Error while running stac-check: {e} "
 
 
 def retrieve(
@@ -423,7 +425,7 @@ def validate_core_landing_page_body(
         ):
             warnings += "STAC API Specification v1.0.0-rc.2 is the latest version, but API advertises an older version or older versions."
 
-    if not any(cc_core_regex.fullmatch(x) for x in conforms_to):
+    if not supports(conforms_to, cc_core_regex):
         errors += ("CORE-4", "/: STAC API - Core not contained in 'conformsTo'")
 
     if "browseable" in conformance_classes and not any(
@@ -467,7 +469,7 @@ def validate_core_landing_page_body(
             return False
 
     if "item-search" in conformance_classes:
-        if not any(cc_item_search_regex.fullmatch(x) for x in conforms_to):
+        if not supports(conforms_to, cc_item_search_regex):
             errors += (
                 "CORE-9",
                 "/: Item Search configured for validation, but not contained in 'conformsTo'",
@@ -483,12 +485,20 @@ def validate_core_landing_page_body(
             )
             return False
 
+    if "children" in conformance_classes and not any(
+        cc_children_regex.fullmatch(x) for x in conforms_to
+    ):
+        errors += (
+            "CORE-6",
+            "/: Children configured for validation, but not contained in 'conformsTo'",
+        )
+
     return True
 
 
 def validate_api(
     root_url: str,
-    conformance_classes: List[str],
+    ccs_to_validate: List[str],
     collection: Optional[str],
     geometry: Optional[str],
     auth_bearer_token: Optional[str],
@@ -520,7 +530,7 @@ def validate_api(
         landing_page_headers,
         errors,
         warnings,
-        conformance_classes,
+        ccs_to_validate,
         collection,
         geometry,
     ):
@@ -529,21 +539,21 @@ def validate_api(
     logger.info("Validating STAC API - Core conformance class.")
     validate_core(landing_page_body, errors, warnings, r_session)
 
-    if "browseable" in conformance_classes:
+    if "browseable" in ccs_to_validate:
         logger.info("Validating STAC API - Browseable conformance class.")
         validate_browseable(landing_page_body, errors, warnings, r_session)
 
-    if "children" in conformance_classes:
+    if "children" in ccs_to_validate:
         logger.info("Validating STAC API - Children conformance class.")
         validate_children(landing_page_body, errors, warnings, r_session)
 
-    if "collections" in conformance_classes:
+    if "collections" in ccs_to_validate:
         logger.info("Validating STAC API - Collections conformance class.")
         validate_collections(landing_page_body, collection, errors, warnings, r_session)
 
     conforms_to = landing_page_body.get("conformsTo", [])
 
-    if "features" in conformance_classes:
+    if "features" in ccs_to_validate:
         logger.info("Validating STAC API - Features conformance class.")
         validate_collections(landing_page_body, collection, errors, warnings, r_session)
         validate_features(
@@ -556,7 +566,7 @@ def validate_api(
             r_session,
         )
 
-    if "item-search" in conformance_classes:
+    if "item-search" in ccs_to_validate:
         logger.info("Validating STAC API - Item Search conformance class.")
         validate_item_search(
             root_url=root_url,
@@ -566,7 +576,7 @@ def validate_api(
             warnings=warnings,
             errors=errors,
             geometry=geometry,  # type:ignore
-            conformance_classes=conformance_classes,
+            conformance_classes=ccs_to_validate,
             r_session=r_session,
         )
 
@@ -685,6 +695,11 @@ def validate_core(
             f"[{Context.CORE}] Error while traversing Catalog child/item links to find Items: {e} "
             "This can be reproduced with 'list(pystac.Catalog.from_file(root_url).get_all_items())'"
         )
+    except UnicodeEncodeError as e:
+        # see https://github.com/jjrom/resto/issues/356#issuecomment-1443818163
+        errors += f"[{Context.CORE}] Error while traversing Catalog, a non-ascii character is encoded incorrectly somewhere: {e} "
+    except Exception as e:
+        errors += f"[{Context.CORE}] Error while traversing Catalog with pystac: {e} "
 
 
 def validate_browseable(
@@ -1101,24 +1116,25 @@ def validate_features(
                 r_session=r_session,
             )
 
-    # Validate Extensions
-    #
-    # if any(cc_features_fields_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Features - Fields extension conformance class found.")
-    #
-    # if any(cc_features_context_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Features - Context extension conformance class found.")
-    #
-    # if any(cc_features_sort_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Features - Sort extension conformance class found.")
-    #
-    # if any(cc_features_query_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Features - Query extension conformance class found.")
-    #
-    # if any(cc_features_filter_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Features - Filter extension conformance class found.")
+    if supports(conforms_to, cc_features_fields_regex):
+        logger.info("STAC API - Features - Fields extension conformance class found.")
+        logger.info("STAC API - Features - Fields extension is not yet supported.")
 
-    if any(cc_features_filter_regex.fullmatch(x) for x in conforms_to):
+    if supports(conforms_to, cc_features_transaction_regex):
+        logger.info(
+            "STAC API - Features - Transaction extension conformance class found."
+        )
+        logger.info("STAC API - Features - Transaction extension is not yet supported.")
+
+    if supports(conforms_to, cc_features_sort_regex):
+        logger.info("STAC API - Features - Sort extension conformance class found.")
+        logger.info("STAC API - Features - Sort extension is not yet supported.")
+
+    if supports(conforms_to, cc_features_query_regex):
+        logger.info("STAC API - Features - Query extension conformance class found.")
+        logger.info("STAC API - Features - Query extension is not yet supported.")
+
+    if supports(conforms_to, cc_features_filter_regex):
         logger.info("STAC API - Features - Filter Extension conformance class found.")
         validate_features_filter(
             root_body=root_body,
@@ -1218,18 +1234,16 @@ def validate_item_search(
         r_session=r_session,
     )
 
-    # if any(cc_item_search_fields_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Item Search - Fields extension conformance class found.")
-    #
-    # if any(cc_item_search_context_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Item Search - Context extension conformance class found.")
-    #
-    # if any(cc_item_search_sort_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Item Search - Sort extension conformance class found.")
-    #
-    # if any(cc_item_search_query_regex.fullmatch(x) for x in conforms_to):
-    #     logger.info("STAC API - Item Search - Query extension conformance class found.")
-    #
+    if supports(conforms_to, cc_item_search_fields_regex):
+        logger.info(
+            "STAC API - Item Search - Fields extension conformance class found."
+        )
+
+    if supports(conforms_to, cc_item_search_sort_regex):
+        logger.info("STAC API - Item Search - Sort extension conformance class found.")
+
+    if supports(conforms_to, cc_item_search_query_regex):
+        logger.info("STAC API - Item Search - Query extension conformance class found.")
 
     if any(
         x.endswith("item-search#filter:basic-cql")
