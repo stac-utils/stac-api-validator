@@ -1853,31 +1853,16 @@ doc = ["sphinx-autodoc-typehints (>=1.2.0)", "sphinx-rtd-theme"]
 test = ["mypy", "pytest", "typing-extensions"]
 
 [[package]]
-name = "types-docutils"
-version = "0.19.1.5"
-description = "Typing stubs for docutils"
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "types-docutils-0.19.1.5.tar.gz", hash = "sha256:b8b489c2a0d1dd3e65bbd8b41e05f6bf1307553515dcda30197d63d1b576a5ee"},
-    {file = "types_docutils-0.19.1.5-py3-none-any.whl", hash = "sha256:e32b969b9226caf59e63630cac690eb6802a3e17e20a8a949c3c2b80e16af85d"},
-]
-
-[[package]]
 name = "types-setuptools"
-version = "67.3.0.2"
+version = "67.4.0.3"
 description = "Typing stubs for setuptools"
 category = "main"
 optional = false
 python-versions = "*"
 files = [
-    {file = "types-setuptools-67.3.0.2.tar.gz", hash = "sha256:18b27480bb48a405ab75e41506def1b9182d9f26521fb207de5f1a7908e06f51"},
-    {file = "types_setuptools-67.3.0.2-py3-none-any.whl", hash = "sha256:13ab419232fdaec8d9c33b31157577c7ea79ae013d693a53aed77292e8a44a0a"},
+    {file = "types-setuptools-67.4.0.3.tar.gz", hash = "sha256:19e958dfdbf1c5a628e54c2a7ee84935051afb7278d0c1cdb08ac194757ee3b1"},
+    {file = "types_setuptools-67.4.0.3-py3-none-any.whl", hash = "sha256:3c83c3a6363dd3ddcdd054796705605f0fa8b8e5a39390e07a05e5f7af054978"},
 ]
-
-[package.dependencies]
-types-docutils = "*"
 
 [[package]]
 name = "typing-extensions"
