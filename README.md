@@ -38,13 +38,13 @@ STAC API Validator requires Python 3.10.
 You can install _STAC API Validator_ via [pip] from [PyPI]:
 
 ```console
-$ pip install stac-api-validator
+pip install stac-api-validator
 ```
 
 and then run it:
 
 ```console
-$ stac-api-validator \
+stac-api-validator \
     --root-url https://planetarycomputer.microsoft.com/api/stac/v1/ \
     --conformance core \
     --conformance features \
