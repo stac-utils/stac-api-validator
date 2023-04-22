@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - TBD
 
+### Added
+
+- Added support for Fields Extension validation of Item Search with `--conformance item-search#fields` and `--fields-nested-property properties.eo:cloud_cover`
+- Add parameter set `--validate-pagination/--no-validate-pagination` to conditionally run the pagination tests, which may take a while to run.
+
 ## [0.5.0] - 2023-02-21
 
 ### Added
