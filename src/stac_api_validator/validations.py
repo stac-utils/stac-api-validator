@@ -1947,7 +1947,10 @@ def validate_item_search_datetime(
     if not body:
         return
     else:
-        dt = body["features"][0]["properties"]["datetime"]  # todo: if no results, fail
+        if len(body["features"]) == 0:
+            errors += f"[{Context.ITEM_SEARCH}] GET Search returned no results."
+            return
+        dt = body["features"][0]["properties"]["datetime"]
 
     _, body, _ = retrieve(
         Method.GET,
