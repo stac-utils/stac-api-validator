@@ -64,6 +64,15 @@ from stac_api_validator.validations import validate_api
     "--auth-query-parameter",
     help="Query parameter key and value to pass for authorization, e.g., 'key=xyz'.",
 )
+@click.option(
+    "--fields-nested-property",
+    help="Fields Extension: name of a field in Item Properties, e.g. 'properties.eo:cloud_cover'",
+)
+@click.option(
+    "--validate-pagination/--no-validate-pagination",
+    default=False,
+    help="Validate pagination behavior (can take a long time to run)",
+)
 def main(
     log_level: str,
     root_url: str,
@@ -72,6 +81,8 @@ def main(
     geometry: Optional[str],
     auth_bearer_token: Optional[str] = None,
     auth_query_parameter: Optional[str] = None,
+    fields_nested_property: Optional[str] = None,
+    validate_pagination: bool = False,
 ) -> int:
     """STAC API Validator."""
     logging.basicConfig(stream=sys.stdout, level=log_level)
@@ -84,6 +95,8 @@ def main(
             geometry=geometry,
             auth_bearer_token=auth_bearer_token,
             auth_query_parameter=auth_query_parameter,
+            fields_nested_property=fields_nested_property,
+            validate_pagination=validate_pagination,
         )
     except Exception as e:
         click.secho(

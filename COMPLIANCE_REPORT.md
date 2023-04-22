@@ -20,7 +20,7 @@ Date: 19-Jan-2022
 
 Output:
 
-```
+```text
 Validating http://0.0.0.0:8081
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
@@ -44,7 +44,7 @@ Date: 19-Jan-2022
 
 Output:
 
-```
+```text
 Validating http://0.0.0.0:8082
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
@@ -72,7 +72,7 @@ Date: 17-Mar-2022
 
 Output:
 
-```
+```text
 Validating http://localhost:8083
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
@@ -99,7 +99,7 @@ Date: 17-Mar-2022
 
 Output:
 
-```
+```text
 Validating http://localhost:3000
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
@@ -139,12 +139,14 @@ Date: 16-Nov-2022
 
 Output:
 
-```
+```text
 $ poetry run stac-api-validator --root-url https://planetarycomputer.microsoft.com/api/stac/v1 \
    --conformance features \
    --conformance item-search \
    --conformance filter \
+   --conformance item-search#fields \
    --collection sentinel-2-l2a \
+   --fields-nested-property properties.eo:cloud_cover \
    --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
 INFO:stac_api_validator.validations:Validating STAC API - Core conformance class.
 INFO:stac_api_validator.validations:Skipping STAC API - Browseable conformance class.
@@ -204,7 +206,7 @@ Date: 25-Oct-2022
 
 Output
 
-```
+```text
 $ poetry run stac-api-validator --root-url https://tamn.snapplanet.io \
     --conformance features \
     --conformance item-search \
@@ -259,7 +261,7 @@ Date: 31-Oct-2022
 
 Output
 
-```
+```text
 $ poetry run stac-api-validator --root-url https://api.radiant.earth/mlhub/v1 \
 --conformance core --conformance features --conformance item-search \
 --auth-query-parameter 'key=xxx' \
@@ -276,7 +278,7 @@ Date: 16-Nov-2022
 
 Output
 
-```
+```text
 $ poetry run stac-api-validator --root-url https://services.sentinel-hub.com/api/v1/catalog/1.0.0/  --conformance core
 INFO:stac_api_validator.validations:Validating STAC API - Core conformance class.
 INFO:stac_api_validator.validations:Skipping STAC API - Browseable conformance class.
@@ -301,11 +303,13 @@ Date: 16-Nov-2022
 
 Output:
 
-```
+```text
 $ poetry run stac-api-validator --root-url https://earth-search.aws.element84.com/v1 \
     --conformance features \
     --conformance item-search \
+    --conformance item-search#fields \
     --collection sentinel-2-l2a \
+    --fields-nested-property properties.eo:cloud_cover \
     --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
 INFO:stac_api_validator.validations:Validating STAC API - Core conformance class.
 INFO:stac_api_validator.validations:Skipping STAC API - Browseable conformance class.
@@ -341,7 +345,7 @@ Notes: Features is supported, but not advertised in conformsTo
 
 Output:
 
-```
+```text
 $  poetry run stac-api-validator --root-url https://cmr.earthdata.nasa.gov/stac/USGS_EROS --conformance item-search --collection Landsat1-5_MSS_C1.v1 --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
 
 INFO:stac_api_validator.validations:Validating STAC API - Core conformance class.
@@ -413,7 +417,7 @@ URL: <https://landsatlook.usgs.gov/stac-server>
 
 Date: 25-Oct-2022
 
-```
+```text
 $ poetry run stac-api-validator --root-url https://landsatlook.usgs.gov/stac-server --conformance features --conformance item-search \
 ∙ --collection landsat-c2l2-sr --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
 INFO:stac_api_validator.validations:Validating STAC API - Core conformance class.
@@ -439,7 +443,7 @@ URL: <https://franklin.nasa-hsi.azavea.com>
 
 Date: 19-Jan-2022
 
-```
+```text
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.
 STAC API - Item Search conformance class found.

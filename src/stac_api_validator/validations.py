@@ -298,7 +298,7 @@ def stac_validate(
     method: Method = Method.GET,
 ) -> None:
     if not body:
-        errors += f"[{context}] {method} {url} body was empty when running stac-validate and stac-check"
+        errors += f"[{context}] : {method} {url} body was empty when running stac-validate and stac-check"
     else:
         if _type := body.get("type"):
             try:
@@ -310,18 +310,18 @@ def stac_validate(
                     case "Feature":
                         Item.from_dict(body)
                     case _:
-                        errors += f"[{context}] {method} {url} object with type '{_type}' could not be hydrated with pystac"
+                        errors += f"[{context}] : {method} {url} object with type '{_type}' could not be hydrated with pystac"
             except Exception as e:
-                errors += f"[{context}] {method} {url} '{body.get('id')}' failed pystac hydration: {e}"
+                errors += f"[{context}] : {method} {url} '{body.get('id')}' failed pystac hydration: {e}"
 
             if _type in ["Collection", "Feature"]:
                 if not (
                     stac_validator := StacValidate(links=True, assets=True)
                 ).validate_dict(body):
-                    errors += f"[{context}] {method} {url} failed stac-validator validation: {stac_validator.message}"
+                    errors += f"[{context}] : {method} {url} failed stac-validator validation: {stac_validator.message}"
 
         else:
-            errors += f"[{context}] {method} {url} missing 'type' attribute"
+            errors += f"[{context}] : {method} {url} missing 'type' attribute"
 
 
 def stac_check(
@@ -334,9 +334,9 @@ def stac_check(
     try:
         linter = Linter(url)
         if not linter.valid_stac:
-            errors += f"[{context}] {method} {url} is not a valid STAC object: {linter.error_msg}"
+            errors += f"[{context}] : {method} {url} is not a valid STAC object: {linter.error_msg}"
         if msgs := linter.best_practices_msg[1:]:  # first msg is a header, so skip
-            warnings += f"[{context}] {method} {url} has these stac-check recommendations: {','.join([x.strip() for x in msgs])}"
+            warnings += f"[{context}] : {method} {url} has these stac-check recommendations: {','.join([x.strip() for x in msgs])}"
     except KeyError as e:
         # see https://github.com/stac-utils/stac-check/issues/104
         errors += f"[{Context.CORE}] Error running stac-check, probably because an item doesn't have a bbox defined, which is okay!: {e} "
@@ -366,7 +366,7 @@ def retrieve(
 
     if resp.status_code != status_code:
         errors += (
-            f"[{context}] {method} {url} params={params} body={json.dumps(body) if body else ''}"
+            f"[{context}] : {method} {url} params={params} body={json.dumps(body) if body else ''}"
             f" had unexpected status code {resp.status_code} instead of {status_code}: {additional}"
         )
 
@@ -374,11 +374,11 @@ def retrieve(
         if not content_type:
             if url.endswith("/search") or url.endswith("/items"):
                 if not has_content_type(resp.headers, geojson_mt):
-                    errors += f"[{context}] {method} {url} params={params} body={body} content-type header is not '{geojson_mt}'"
+                    errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is not '{geojson_mt}'"
             elif not has_content_type(resp.headers, "application/json"):
-                errors += f"[{context}] {method} {url} params={params} body={body} content-type header is not 'application/json'"
+                errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is not 'application/json'"
         elif not has_content_type(resp.headers, content_type):
-            errors += f"[{context}] {method} {url} params={params} body={body} content-type header is not '{content_type}'"
+            errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is not '{content_type}'"
 
         if has_json_content_type(resp.headers) or has_geojson_content_type(
             resp.headers
@@ -386,7 +386,7 @@ def retrieve(
             try:
                 return resp.status_code, resp.json(), resp.headers
             except json.decoder.JSONDecodeError:
-                errors += f"[{context}] {method} {url} returned non-JSON value"
+                errors += f"[{context}] : {method} {url} returned non-JSON value"
 
     return resp.status_code, None, resp.headers
 
@@ -503,6 +503,8 @@ def validate_api(
     geometry: Optional[str],
     auth_bearer_token: Optional[str],
     auth_query_parameter: Optional[str],
+    fields_nested_property: Optional[str],
+    validate_pagination: bool,
 ) -> Tuple[Warnings, Errors]:
     warnings = Warnings()
     errors = Errors()
@@ -524,20 +526,21 @@ def validate_api(
     assert landing_page_body is not None
     assert landing_page_headers is not None
 
-    # fail fast if there are errors with conformance or links so far
-    if not validate_core_landing_page_body(
-        landing_page_body,
-        landing_page_headers,
-        errors,
-        warnings,
-        ccs_to_validate,
-        collection,
-        geometry,
-    ):
-        return warnings, errors
+    if "core" in ccs_to_validate:
+        # fail fast if there are errors with conformance or links so far
+        if not validate_core_landing_page_body(
+            landing_page_body,
+            landing_page_headers,
+            errors,
+            warnings,
+            ccs_to_validate,
+            collection,
+            geometry,
+        ):
+            return warnings, errors
 
-    logger.info("Validating STAC API - Core conformance class.")
-    validate_core(landing_page_body, errors, warnings, r_session)
+        logger.info("Validating STAC API - Core conformance class.")
+        validate_core(landing_page_body, errors, warnings, r_session)
 
     if "browseable" in ccs_to_validate:
         logger.info("Validating STAC API - Browseable conformance class.")
@@ -564,6 +567,34 @@ def validate_api(
             warnings,
             errors,
             r_session,
+            validate_pagination=validate_pagination,
+        )
+
+    if "transaction" in ccs_to_validate:
+        logger.info(
+            "STAC API - Features - Transaction extension conformance class found."
+        )
+        logger.info("STAC API - Features - Transaction extension is not yet supported.")
+
+    if "features#fields" in ccs_to_validate:
+        logger.info("STAC API - Features - Fields extension conformance class found.")
+        logger.info("STAC API - Features - Fields extension is not yet supported.")
+
+    if "features#sort" in ccs_to_validate:
+        logger.info("STAC API - Features - Sort extension conformance class found.")
+        logger.info("STAC API - Features - Sort extension is not yet supported.")
+
+    if "features#query" in ccs_to_validate:
+        logger.info("STAC API - Features - Query extension conformance class found.")
+        logger.info("STAC API - Features - Query extension is not yet supported.")
+
+    if "features#filter" in ccs_to_validate:
+        logger.info("STAC API - Features - Filter Extension conformance class found.")
+        validate_features_filter(
+            root_body=landing_page_body,
+            collection=collection,
+            errors=errors,
+            r_session=r_session,
         )
 
     if "item-search" in ccs_to_validate:
@@ -577,6 +608,41 @@ def validate_api(
             errors=errors,
             geometry=geometry,  # type:ignore
             conformance_classes=ccs_to_validate,
+            r_session=r_session,
+            validate_pagination=validate_pagination,
+        )
+
+    if "item-search#fields" in ccs_to_validate:
+        logger.info(
+            "STAC API - Item Search - Fields extension conformance class found."
+        )
+        validate_fields(
+            context=Context.ITEM_SEARCH_FIELDS,
+            landing_page_body=landing_page_body,
+            collection=collection,
+            errors=errors,
+            warnings=warnings,
+            r_session=r_session,
+            fields_nested_property=fields_nested_property,
+        )
+
+    if "item-search#sort" in ccs_to_validate:
+        logger.info("STAC API - Item Search - Sort extension conformance class found.")
+        logger.info("STAC API - Item Search - Sort extension is not yet supported.")
+
+    if "item-search#query" in ccs_to_validate:
+        logger.info("STAC API - Item Search - Query extension conformance class found.")
+        logger.info("STAC API - Item Search - Query extension is not yet supported.")
+
+    if "item-search#filter" in ccs_to_validate:
+        logger.info(
+            "STAC API - Item Search - Filter Extension conformance class found."
+        )
+        validate_item_search_filter(
+            root_url=root_url,
+            root_body=landing_page_body,
+            collection=collection,
+            errors=errors,
             r_session=r_session,
         )
 
@@ -893,21 +959,21 @@ def validate_collections(
             )
 
             if not body:
-                errors += f"[{Context.COLLECTIONS}] {collection_url} body was empty"
+                errors += f"[{Context.COLLECTIONS}] : {collection_url} body was empty"
             else:
                 if not resp_headers or not has_json_content_type(resp_headers):
-                    errors += f"[{Context.COLLECTIONS}] {collection_url} content-type header was not application/json"
+                    errors += f"[{Context.COLLECTIONS}] : {collection_url} content-type header was not application/json"
 
                 if not (self_link := link_by_rel(body.get("links", []), "self")):
-                    errors += f"[{Context.COLLECTIONS}] {collection_url} does not have self link"
+                    errors += f"[{Context.COLLECTIONS}] : {collection_url} does not have self link"
                 elif collection_url != self_link.get("href"):
-                    errors += f"[{Context.COLLECTIONS}] {collection_url} self link does not match requested url"
+                    errors += f"[{Context.COLLECTIONS}] : {collection_url} self link does not match requested url"
 
                 if not link_by_rel(body.get("links", []), "root"):
-                    errors += f"[{Context.COLLECTIONS}] {collection_url} does not have root link"
+                    errors += f"[{Context.COLLECTIONS}] : {collection_url} does not have root link"
 
                 if not link_by_rel(body.get("links", []), "parent"):
-                    errors += f"[{Context.COLLECTIONS}] {collection_url} does not have parent link"
+                    errors += f"[{Context.COLLECTIONS}] : {collection_url} does not have parent link"
 
                 stac_validate(collection_url, body, errors, Context.COLLECTIONS)
                 stac_check(collection_url, errors, warnings, Context.COLLECTIONS)
@@ -923,6 +989,7 @@ def validate_features(
     warnings: Warnings,
     errors: Errors,
     r_session: Session,
+    validate_pagination: bool,
 ) -> None:
     if not geometry:
         errors += f"[{Context.FEATURES}] Geometry parameter required for running Features validations."
@@ -1025,7 +1092,7 @@ def validate_features(
         )
         if body:
             if not (collection_items_link := link_by_rel(body.get("links"), "items")):
-                errors += f"[{Context.FEATURES}] {collection_url} does not have Link[rel=items]"
+                errors += f"[{Context.FEATURES}] : {collection_url} does not have Link[rel=items]"
             else:
                 collection_items_url = collection_items_link["href"]
 
@@ -1061,12 +1128,12 @@ def validate_features(
                     item = next(iter(body.get("features", [])), None)
 
                     if not item:
-                        errors += f"[{Context.FEATURES}] {collection_items_url} features array was empty"
+                        errors += f"[{Context.FEATURES}] : {collection_items_url} features array was empty"
                     else:
                         if not (
                             item_self_link := link_by_rel(item.get("links", []), "self")
                         ):
-                            errors += f"[{Context.FEATURES}] {collection_items_url} first item does not have self link"
+                            errors += f"[{Context.FEATURES}] : {collection_items_url} first item does not have self link"
                         else:
                             item_url = item_self_link["href"]
                             _, body, _ = retrieve(
@@ -1097,51 +1164,27 @@ def validate_features(
                                 stac_validate(item_url, body, errors, Context.FEATURES)
                                 stac_check(item_url, errors, warnings, Context.FEATURES)
 
-    # Items pagination validation
-    if not (collections_url := link_by_rel(root_links, "data")):
-        errors += "/: Link[rel=data] must href /collections, cannot run pagination test"
-    else:
-        if not (self_link := link_by_rel(root_links, "self")):
-            errors += "/: Link[rel=self] missing"
-        else:
-            validate_item_pagination(
-                root_url=self_link.get("href", ""),
-                search_url=f"{collections_url['href']}/{collection}/items",
-                collection=None,
-                geometry=geometry,
-                methods={Method.GET},
-                errors=errors,
-                use_pystac_client=False,
-                context=Context.FEATURES,
-                r_session=r_session,
+    if validate_pagination:
+        # Items pagination validation
+        if not (collections_url := link_by_rel(root_links, "data")):
+            errors += (
+                "/: Link[rel=data] must href /collections, cannot run pagination test"
             )
-
-    if supports(conforms_to, cc_features_fields_regex):
-        logger.info("STAC API - Features - Fields extension conformance class found.")
-        logger.info("STAC API - Features - Fields extension is not yet supported.")
-
-    if supports(conforms_to, cc_features_transaction_regex):
-        logger.info(
-            "STAC API - Features - Transaction extension conformance class found."
-        )
-        logger.info("STAC API - Features - Transaction extension is not yet supported.")
-
-    if supports(conforms_to, cc_features_sort_regex):
-        logger.info("STAC API - Features - Sort extension conformance class found.")
-        logger.info("STAC API - Features - Sort extension is not yet supported.")
-
-    if supports(conforms_to, cc_features_query_regex):
-        logger.info("STAC API - Features - Query extension conformance class found.")
-        logger.info("STAC API - Features - Query extension is not yet supported.")
-
-    if supports(conforms_to, cc_features_filter_regex):
-        logger.info("STAC API - Features - Filter Extension conformance class found.")
-        validate_features_filter(
-            root_body=root_body,
-            collection=collection,
-            errors=errors,
-            r_session=r_session,
-        )
+        else:
+            if not (self_link := link_by_rel(root_links, "self")):
+                errors += "/: Link[rel=self] missing"
+            else:
+                validate_item_pagination(
+                    root_url=self_link.get("href", ""),
+                    search_url=f"{collections_url['href']}/{collection}/items",
+                    collection=None,
+                    geometry=geometry,
+                    methods={Method.GET},
+                    errors=errors,
+                    use_pystac_client=False,
+                    context=Context.FEATURES,
+                    r_session=r_session,
+                )
 
 
 def validate_item_search(
@@ -1154,10 +1197,12 @@ def validate_item_search(
     geometry: str,
     conformance_classes: List[str],
     r_session: Session,
+    validate_pagination: bool,
 ) -> None:
     links = root_body.get("links")
 
     search_links = links_by_rel(links, "search")
+
     if not search_links:
         errors += "/: Link[rel=search] must exist when Item Search is implemented"
         return
@@ -1222,17 +1267,18 @@ def validate_item_search(
         r_session=r_session,
     )
 
-    validate_item_pagination(
-        root_url=root_url,
-        search_url=search_url,
-        collection=collection,
-        geometry=geometry,
-        methods=methods,
-        errors=errors,
-        use_pystac_client=True,
-        context=Context.ITEM_SEARCH,
-        r_session=r_session,
-    )
+    if validate_pagination:
+        validate_item_pagination(
+            root_url=root_url,
+            search_url=search_url,
+            collection=collection,
+            geometry=geometry,
+            methods=methods,
+            errors=errors,
+            use_pystac_client=True,
+            context=Context.ITEM_SEARCH,
+            r_session=r_session,
+        )
 
     if supports(conforms_to, cc_item_search_fields_regex):
         logger.info(
@@ -1265,7 +1311,6 @@ def validate_item_search(
         validate_item_search_filter(
             root_url=root_url,
             root_body=root_body,
-            search_url=search_url,
             collection=collection,
             errors=errors,
             r_session=r_session,
@@ -1301,6 +1346,350 @@ def validate_filter_queryables(
 
         if queryables_schema.get("type") != "object":
             errors += f"[{context} Filter Ext] Queryables '{queryables_url}' 'type' value invalid, must be 'object'"
+
+
+def validate_default_fields(
+    item: Optional[dict[str, Any]], desc: str, context: Context, errors: Errors
+) -> None:
+    if not item:
+        errors += f"[{context}] : response had not items in response for '{desc}'"
+        return
+
+    for field in ["type", "stac_version", "id", "geometry", "bbox", "links", "assets"]:
+        if not item.get(field):
+            errors += f"[{context}] : {desc} response missing '{field}'"
+    if not (
+        item.get("properties", {}).get("datetime")
+        or (
+            item.get("properties", {}).get("start_datetime")
+            and item.get("properties", {}).get("end_datetime")
+        )
+    ):
+        errors += (
+            f"[{context}] : GET with empty 'fields' value response does not have either"
+            + "'properties.datetime' or (properties.start_datetime and properties.end_datetime)"
+        )
+
+
+def validate_fields(
+    landing_page_body: Dict[str, Any],
+    collection: str,
+    errors: Errors,
+    warnings: Warnings,
+    r_session: Session,
+    context: Context,
+    fields_nested_property: Optional[str],
+) -> None:
+    if not fields_nested_property:
+        errors += f"[{context}] : cannot validate Fields Extension because --fields-nested-property is not set"
+        return
+
+    # 1. If `fields` attribute is specified as an empty object (for POST requests),
+    # an empty string (for GET requests),
+    # or with both `include` and `exclude` set to null or an
+    # empty array, then the recommended behavior is to include only fields
+    # `type`, `stac_version`, `id`, `geometry`, `bbox`, `links`, `assets`, and `properties.datetime`.
+
+    search_method_to_url: dict[Method, str] = {
+        Method[x.get("method", "GET")]: x.get("href")
+        for x in links_by_rel(landing_page_body.get("links"), "search")
+    }
+
+    def first_item(body: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        if body:
+            return next(iter(body.get("features", [])), None)
+        else:
+            return None
+
+    def validate_include_field(
+        desc: str,
+        body: dict[str, Any],
+        field: str,
+        errors: Errors,
+        warnings: Warnings,
+        allow_extra: bool = False,
+    ):
+        if not body or not (item := first_item(body)):
+            errors += f"[{context}] : response had no items in response for {desc}"
+        else:
+            field = field if not field.startswith("+") else field[1:]
+            # todo: rewrite this to arbitrarily deep
+            if "." in field:
+                parts = field.split(".")
+                value = item.get(parts[0], {}).get(parts[1])
+            else:
+                value = item.get(field)
+
+            if not value:
+                errors += f"[{context}] : {desc} response missing '{field}'"
+
+            if not allow_extra:
+                if len(item) > 5:
+                    errors += f"[{context}] : {desc} response contained more than 5 extra fields {list(item.keys())}"
+
+                item.pop(field, None)
+                if item:
+                    warnings += f"[{context}] : {desc} response contained extra fields {list(item.keys())}"
+
+    def validate_exclude_field(
+        desc: str,
+        body: dict[str, Any],
+        field: str,
+        errors: Errors,
+        warnings: Warnings,
+        disallow_extra: bool = True,
+    ):
+        if not body or not (item := first_item(body)):
+            errors += f"[{context}] : response had no items in response for {desc}"
+        else:
+            # todo: rewrite this to arbitrarily deep
+            if "." in field:
+                parts = field.split(".")
+                value = item.get(parts[0], {}).get(parts[1])
+            else:
+                value = item.get(field)
+
+            if value:
+                errors += f"[{context}] : {desc} response contained '{field}', but should have been excluded"
+
+            if disallow_extra:
+                if len(item) < 5:
+                    errors += f"[{context}] : {desc} response contained fewer than 5 fields {list(item.keys())}"
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={"fields": "", "limit": 1, "collections": collection},
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        validate_default_fields(
+            first_item(body), "GET with empty 'fields' value", context, errors
+        )
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={"fields": None},
+            status_code=400,
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        def validate_post_case(fields: Any, msg: str):
+            _, body, _ = retrieve(
+                Method.POST,
+                search_method_to_url[Method.POST],
+                body={"fields": fields, "limit": 1, "collections": [collection]},
+                errors=errors,
+                context=context,
+                r_session=r_session,
+            )
+            validate_default_fields(
+                first_item(body), f"POST with {msg}", context, errors
+            )
+
+        validate_post_case({}, "empty 'fields' object value")
+        validate_post_case(
+            {"include": None, "exclude": None}, "null values for include and exclude"
+        )
+        validate_post_case(
+            {"include": [], "exclude": []}, "empty arrays for include and exclude"
+        )
+
+    # 2. include
+
+    fields_for_include = [
+        "type",
+        "stac_version",
+        "id",
+        "geometry",
+        "bbox",
+        "links",
+        "assets",
+    ]
+    # tbd: properties.datetime
+    # test GET with both including field name with and without the leading '+'
+    all_fields_for_include = fields_for_include + list(
+        map(lambda x: f"+{x}", fields_for_include)
+    )
+    if Method.GET in search_method_to_url:
+        for field in all_fields_for_include:
+            _, body, _ = retrieve(
+                Method.GET,
+                search_method_to_url[Method.GET],
+                params={"fields": field, "limit": 1, "collections": collection},
+                errors=errors,
+                context=context,
+                r_session=r_session,
+            )
+            desc = f"GET fields='{field}'"
+            validate_include_field(desc, body, field, errors, warnings)
+
+    # test POST only with the field name
+    if Method.POST in search_method_to_url:
+        for field in fields_for_include:
+            body_with_only_fields = {"fields": {"include": [field]}}
+            _, body, _ = retrieve(
+                Method.POST,
+                search_method_to_url[Method.POST],
+                body={**body_with_only_fields, "limit": 1, "collections": [collection]},
+                errors=errors,
+                context=context,
+                r_session=r_session,
+            )
+
+            desc = f"POST {body_with_only_fields}"
+            validate_include_field(desc, body, field, errors, warnings)
+
+    # 3. If only exclude is specified, the specified fields should not be included,
+    # but every other field available for the Item should be included.
+    # TODO: this is ambiguous for GET
+    if Method.GET in search_method_to_url:
+        field = "-geometry"
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={"fields": field, "limit": 1, "collections": collection},
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+        desc = f"GET fields='{field}'"
+        validate_exclude_field(desc, body, "geometry", errors, warnings)
+        validate_include_field(desc, body, "id", errors, warnings, True)
+        validate_include_field(desc, body, "assets", errors, warnings, True)
+
+    if Method.POST in search_method_to_url:
+        body_with_only_fields = {"fields": {"exclude": ["geometry"]}}
+
+        _, body, _ = retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={**body_with_only_fields, "limit": 1, "collections": [collection]},
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        desc = f"POST {body_with_only_fields}"
+        validate_exclude_field(desc, body, "geometry", errors, warnings)
+        validate_include_field(desc, body, "id", errors, warnings, True)
+        validate_include_field(desc, body, "assets", errors, warnings, True)
+        validate_include_field(
+            desc, body, fields_nested_property, errors, warnings, True
+        )
+
+    # 4. If `exclude` is specified and `include` is null or an empty
+    # array, then the `exclude` fields should be excluded from the default set.
+    # TODO: this is ambiguous for GET
+    if Method.GET in search_method_to_url:
+        field = "-geometry"
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={"fields": field, "limit": 1, "collections": collection},
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+        desc = f"GET fields='{field}'"
+        validate_exclude_field(desc, body, "geometry", errors, warnings)
+        validate_include_field(desc, body, "id", errors, warnings, True)
+        validate_include_field(desc, body, "assets", errors, warnings, True)
+
+    if Method.POST in search_method_to_url:
+        for include in [[], None]:
+            body_with_only_fields = {
+                "fields": {"exclude": ["geometry"], "include": include}
+            }
+            _, body, _ = retrieve(
+                Method.POST,
+                search_method_to_url[Method.POST],
+                body={**body_with_only_fields, "limit": 1, "collections": [collection]},
+                errors=errors,
+                context=context,
+                r_session=r_session,
+            )
+
+            desc = f"POST {body_with_only_fields}"
+            validate_exclude_field(desc, body, "geometry", errors, warnings)
+            validate_exclude_field(desc, body, fields_nested_property, errors, warnings)
+            validate_include_field(desc, body, "id", errors, warnings, True)
+            validate_include_field(desc, body, "assets", errors, warnings, True)
+
+    # 5. Nested
+    # todo: add more of these, as they can get very complicated!
+    if Method.GET in search_method_to_url:
+        field = f"-properties,+{fields_nested_property}"
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={"fields": field, "limit": 1, "collections": collection},
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+        desc = f"GET fields='{field}'"
+        validate_exclude_field(desc, body, "geometry", errors, warnings, False)
+        validate_include_field(
+            desc, body, fields_nested_property, errors, warnings, True
+        )
+
+    if Method.POST in search_method_to_url:
+        body_with_only_fields = {
+            "fields": {"exclude": ["properties"], "include": [fields_nested_property]}
+        }
+
+        _, body, _ = retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={**body_with_only_fields, "limit": 1, "collections": [collection]},
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        desc = f"POST {body_with_only_fields}"
+        validate_exclude_field(desc, body, "geometry", errors, warnings)
+        validate_include_field(
+            desc, body, fields_nested_property, errors, warnings, False
+        )
+
+    # 6. If the same field is present in both `include` and `exclude`, it should be included.
+    if Method.GET in search_method_to_url:
+        field = "+geometry,-geometry"
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={"fields": field, "limit": 1, "collections": collection},
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+        desc = f"GET fields='{field}'"
+        validate_include_field(desc, body, "geometry", errors, warnings)
+
+    if Method.POST in search_method_to_url:
+        body_with_only_fields = {
+            "fields": {"exclude": ["geometry"], "include": ["geometry"]}
+        }
+        _, body, _ = retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={**body_with_only_fields, "limit": 1, "collections": [collection]},
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        desc = f"POST {body_with_only_fields}"
+        validate_include_field(desc, body, "geometry", errors, warnings)
 
 
 def validate_features_filter(
@@ -1339,11 +1728,12 @@ def validate_features_filter(
 def validate_item_search_filter(
     root_url: str,
     root_body: Dict[str, Any],
-    search_url: str,
     collection: str,
     errors: Errors,
     r_session: Session,
 ) -> None:
+    search_links = links_by_rel(root_body["links"], "search")
+    search_url = search_links[0]["href"]
     if not (
         queryables_link := link_by_rel(
             root_body["links"], "http://www.opengis.net/def/rel/ogc/1.0/queryables"
@@ -1818,7 +2208,7 @@ def validate_item_search_intersects(
             )
 
         if Method.POST in methods:
-            _, body, resp_headers = retrieve(
+            _, body, _ = retrieve(
                 Method.POST,
                 search_url,
                 errors,
