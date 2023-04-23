@@ -3580,11 +3580,11 @@ def validate_sort(
                 )
 
             datetimes = [f["properties"]["datetime"] for f in body["features"]]
-            asc_sorted_datetimes = copy.deepcopy(datetimes)
-            asc_sorted_datetimes.sort()
+            sorted_datetimes = copy.deepcopy(datetimes)
+            sorted_datetimes.sort()
 
-            if datetimes != asc_sorted_datetimes:
-                errors += f"[{context}] : GET search with Sort '{sortby}' was not sorted in ascending order {datetimes} {asc_sorted_datetimes}"
+            if datetimes != sorted_datetimes:
+                errors += f"[{context}] : GET search with Sort '{sortby}' was not sorted in ascending order {datetimes} {sorted_datetimes}"
 
     if Method.POST in search_method_to_url:
         sortby_json = [{"field": "properties.datetime", "direction": "asc"}]
@@ -3605,10 +3605,10 @@ def validate_sort(
             errors += f"[{context}] : POST search with Sort '{json.dumps(sortby_json)}' had no results"
 
         datetimes = [f["properties"]["datetime"] for f in body["features"]]
-        asc_sorted_datetimes = copy.deepcopy(datetimes)
-        asc_sorted_datetimes.sort()
+        sorted_datetimes = copy.deepcopy(datetimes)
+        sorted_datetimes.sort()
 
-        if datetimes != asc_sorted_datetimes:
+        if datetimes != sorted_datetimes:
             errors += f"[{context}] : POST search with Sort '{json.dumps(sortby_json)}' was not sorted in ascending order"
 
     # descending
@@ -3631,11 +3631,11 @@ def validate_sort(
             errors += f"[{context}] : GET search with Sort '{sortby}' had no results"
 
         datetimes = [f["properties"]["datetime"] for f in body["features"]]
-        asc_sorted_datetimes = copy.deepcopy(datetimes)
-        asc_sorted_datetimes.sort(reverse=True)
+        sorted_datetimes = copy.deepcopy(datetimes)
+        sorted_datetimes.sort(reverse=True)
 
-        if datetimes != asc_sorted_datetimes:
-            errors += f"[{context}] : GET search with Sort '{sortby}' was not sorted in descending order {datetimes} {asc_sorted_datetimes}"
+        if datetimes != sorted_datetimes:
+            errors += f"[{context}] : GET search with Sort '{sortby}' was not sorted in descending order {datetimes} {sorted_datetimes}"
 
     if Method.POST in search_method_to_url:
         sortby_json = [{"field": "properties.datetime", "direction": "desc"}]
@@ -3656,8 +3656,8 @@ def validate_sort(
             errors += f"[{context}] : POST search with Sort '{json.dumps(sortby_json)}' had no results"
 
         datetimes = [f["properties"]["datetime"] for f in body["features"]]
-        asc_sorted_datetimes = copy.deepcopy(datetimes)
-        asc_sorted_datetimes.sort(reverse=True)
+        sorted_datetimes = copy.deepcopy(datetimes)
+        sorted_datetimes.sort(reverse=True)
 
-        if datetimes != asc_sorted_datetimes:
+        if datetimes != sorted_datetimes:
             errors += f"[{context}] : POST search with Sort '{json.dumps(sortby_json)}' was not sorted in descending order"
