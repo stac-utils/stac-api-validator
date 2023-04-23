@@ -304,13 +304,29 @@ Date: 16-Nov-2022
 Output:
 
 ```text
-$ poetry run stac-api-validator --root-url https://earth-search.aws.element84.com/v1 \
+poetry run stac-api-validator --root-url https://earth-search.aws.element84.com/v1 \
+    --conformance core \
     --conformance features \
     --conformance item-search \
     --conformance item-search#fields \
+    --conformance item-search#query \
     --collection sentinel-2-l2a \
     --fields-nested-property properties.eo:cloud_cover \
-    --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
+    --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}' \
+    --query-comparison-field eo:cloud_cover \
+    --query-eq-value 7.531843 \
+ --query-neq-value 7.531843 \
+ --query-lt-value 7 \
+ --query-lte-value 7.531843 \
+ --query-gt-value 75 \
+ --query-gte-value 7.531843 \
+--query-substring-field grid:code \
+ --query-starts-with-value MGRS-48 \
+ --query-ends-with-value UP \
+ --query-contains-value 8NU \
+--query-in-field mgrs:latitude_band \
+--query-in-values M,N
+
 INFO:stac_api_validator.validations:Validating STAC API - Core conformance class.
 INFO:stac_api_validator.validations:Skipping STAC API - Browseable conformance class.
 INFO:stac_api_validator.validations:Skipping STAC API - Children conformance class.
