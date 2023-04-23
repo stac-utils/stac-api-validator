@@ -1,8 +1,10 @@
 """Validations module."""
+import copy
 import itertools
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -86,6 +88,9 @@ LATEST_STAC_API_VERSION = "https://api.stacspec.org/v1.0.0-rc.2"
 class Method(Enum):
     GET = "GET"
     POST = "POST"
+    PUT = "PUT"
+    PATCH = "PATCH"
+    DELETE = "DELETE"
 
     def __str__(self) -> str:
         return self.value
@@ -392,11 +397,14 @@ def retrieve(
         if not content_type:
             if url.endswith("/search") or url.endswith("/items"):
                 if not has_content_type(resp.headers, geojson_mt):
-                    errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is not '{geojson_mt}'"
+                    errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is {resp.headers.get('content-type')} instead of '{geojson_mt}'"
             elif not has_content_type(resp.headers, "application/json"):
-                errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is not 'application/json'"
+                errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is {resp.headers.get('content-type')} instead of 'application/json'"
+        elif content_type == "undefined":
+            if resp.headers.get("content-type"):
+                errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is {resp.headers.get('content-type')} instead of undefined"
         elif not has_content_type(resp.headers, content_type):
-            errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is not '{content_type}'"
+            errors += f"[{context}] : {method} {url} params={params} body={body} content-type header is {resp.headers.get('content-type')} instead of '{content_type}'"
 
         if has_json_content_type(resp.headers) or has_geojson_content_type(
             resp.headers
@@ -524,6 +532,7 @@ def validate_api(
     fields_nested_property: Optional[str],
     validate_pagination: bool,
     query_config: QueryConfig,
+    transaction_collection: Optional[str],
 ) -> Tuple[Warnings, Errors]:
     warnings = Warnings()
     errors = Errors()
@@ -593,7 +602,15 @@ def validate_api(
         logger.info(
             "STAC API - Features - Transaction extension conformance class found."
         )
-        logger.info("STAC API - Features - Transaction extension is not yet supported.")
+        validate_transaction(
+            context=Context.FEATURES_TXN,
+            landing_page_body=landing_page_body,
+            collection=collection,
+            errors=errors,
+            warnings=warnings,
+            r_session=r_session,
+            transaction_collection=transaction_collection,
+        )
 
     if "features#fields" in ccs_to_validate:
         logger.info("STAC API - Features - Fields extension conformance class found.")
@@ -3315,3 +3332,203 @@ def validate_item_search_collections(
             errors,
             r_session,
         )
+
+
+def validate_transaction(
+    landing_page_body: Dict[str, Any],
+    collection: str,
+    errors: Errors,
+    warnings: Warnings,
+    r_session: Session,
+    context: Context,
+    transaction_collection: Optional[str],
+) -> None:
+    if not transaction_collection:
+        errors += f"[{context}] : cannot validate Transaction Extension because -- transaction-collection is not set"
+        return
+
+    # todo: spec should advertise this rather than it just being known
+
+    collections_url = [
+        x.get("href") for x in links_by_rel(landing_page_body.get("links"), "data")
+    ][0]
+
+    create_url = f"{collections_url}/{transaction_collection}/items"
+
+    item = {
+        "type": "Feature",
+        "stac_version": "1.0.0",
+        "id": "S2A_47XNF_20230423_0_L2A",
+        "properties": {
+            "eo:cloud_cover": 0.142999,
+            "datetime": "2023-04-23T06:47:03.048000Z",
+            "remove_me": "x",
+        },
+        "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [98.99921502683155, 77.47731704519707],
+                    [103.52623455002798, 77.4393697038252],
+                    [103.28971588368059, 76.73571563595313],
+                    [102.04264523308017, 76.47502013800678],
+                    [98.99927124149437, 76.4933939950606],
+                    [98.99921502683155, 77.47731704519707],
+                ]
+            ],
+        },
+        "assets": {
+            "aot": {
+                "href": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/47/X/NF/2023/4/S2A_47XNF_20230423_0_L2A/AOT.tif",
+                "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+                "title": "Aerosol optical thickness (AOT)",
+                "roles": ["data", "reflectance"],
+            },
+        },
+        "bbox": [
+            98.99921502683155,
+            76.47502013800678,
+            103.52623455002798,
+            77.47731704519707,
+        ],
+        "stac_extensions": [
+            "https://stac-extensions.github.io/eo/v1.0.0/schema.json",
+        ],
+        "collection": transaction_collection,
+    }
+
+    item_url = f"{create_url}/{item['id']}"
+
+    # DELETE the item if it exists
+    retrieve(
+        Method.DELETE,
+        item_url,
+        status_code=204,
+        content_type="undefined",
+        errors=errors,
+        context=context,
+        r_session=r_session,
+    )
+
+    # POST create
+    # todo: test ItemCollection creation
+    retrieve(
+        Method.POST,
+        create_url,
+        body=item,
+        status_code=201,
+        errors=errors,
+        context=context,
+        r_session=r_session,
+    )
+
+    time.sleep(2)
+
+    retrieve(
+        Method.GET,
+        item_url,
+        errors=errors,
+        context=context,
+        r_session=r_session,
+        content_type=geojson_mt,
+    )
+
+    # PUT - change and add a field
+    item_put = copy.deepcopy(item)
+    item_put["properties"]["eo:cloud_cover"] = "3.14"
+    item_put["properties"]["foo"] = "bar"
+    item_put["properties"].pop("remove_me")
+
+    retrieve(
+        Method.PUT,
+        item_url,
+        body=item_put,
+        errors=errors,
+        context=context,
+        r_session=r_session,
+        status_code=204,
+        content_type="undefined",
+    )
+
+    time.sleep(2)
+
+    _, body, _ = retrieve(
+        Method.GET,
+        item_url,
+        errors=errors,
+        context=context,
+        r_session=r_session,
+        content_type=geojson_mt,
+    )
+
+    if body.get("properties", {}).get("datetime") != item["properties"]["datetime"]:
+        errors += f"[{context}] : PUT - datetime value did not match"
+
+    if body["properties"]["eo:cloud_cover"] != item_put["properties"]["eo:cloud_cover"]:
+        errors += f"[{context}] : PUT - eo:cloud_cover value did not match"
+
+    if body["properties"]["foo"] != item_put["properties"]["foo"]:
+        errors += f"[{context}] : PUT - property 'foo' was not added"
+
+    if body["properties"].get("remove_me"):
+        errors += f"[{context}] : PUT - field 'remove_me' was not removed"
+
+    # PATCH - add one field, modify another field
+    item_patch = {"properties": {"eo:cloud_cover": "12.4", "a_patch_field": "bar"}}
+
+    retrieve(
+        Method.PATCH,
+        item_url,
+        body=item_patch,
+        errors=errors,
+        context=context,
+        r_session=r_session,
+        status_code=204,
+        content_type="undefined",
+    )
+
+    time.sleep(2)
+
+    _, body, _ = retrieve(
+        Method.GET,
+        item_url,
+        errors=errors,
+        context=context,
+        r_session=r_session,
+        content_type=geojson_mt,
+    )
+
+    if body["properties"]["datetime"] != item["properties"]["datetime"]:
+        errors += f"[{context}] : PUT - datetime value did not match"
+
+    if (
+        body["properties"]["eo:cloud_cover"]
+        != item_patch["properties"]["eo:cloud_cover"]
+    ):
+        errors += f"[{context}] : PUT - eo:cloud_cover value did not match"
+
+    if body["properties"]["a_patch_field"] != item_patch["properties"]["a_patch_field"]:
+        errors += f"[{context}] : PUT - property 'foo' was not added"
+
+    # DELETE
+
+    retrieve(
+        Method.DELETE,
+        item_url,
+        status_code=204,
+        errors=errors,
+        context=context,
+        r_session=r_session,
+        content_type="undefined",
+    )
+
+    time.sleep(2)
+
+    retrieve(
+        Method.GET,
+        item_url,
+        status_code=404,
+        errors=errors,
+        context=context,
+        r_session=r_session,
+    )

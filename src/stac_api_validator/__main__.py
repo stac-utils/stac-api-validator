@@ -126,6 +126,10 @@ from stac_api_validator.validations import validate_api
     "--query-in-values",
     help="Query Extension: comma-separated values of field to use for 'in' operator tests",
 )
+@click.option(
+    "--transaction-collection",
+    help="The name of the collection to use for Transaction Extension tests.",
+)
 def main(
     log_level: str,
     root_url: str,
@@ -149,6 +153,7 @@ def main(
     query_contains_value: Optional[str] = None,
     query_in_field: Optional[str] = None,
     query_in_values: Optional[str] = None,
+    transaction_collection: Optional[str] = None,
 ) -> int:
     """STAC API Validator."""
     logging.basicConfig(stream=sys.stdout, level=log_level)
@@ -178,6 +183,7 @@ def main(
                 query_in_field,
                 query_in_values,
             ),
+            transaction_collection=transaction_collection,
         )
     except Exception as e:
         click.secho(

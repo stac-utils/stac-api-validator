@@ -100,6 +100,9 @@ Date: 17-Mar-2022
 Output:
 
 ```text
+poetry run stac-api-validator --root-url http://localhost:3000 \
+    --conformance transaction \
+    --transaction-collection sentinel-2-l2a-test
 Validating http://localhost:3000
 STAC API - Core conformance class found.
 STAC API - Features conformance class found.

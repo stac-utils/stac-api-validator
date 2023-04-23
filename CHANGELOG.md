@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for Fields Extension validation of Item Search
 - Add parameter set `--validate-pagination/--no-validate-pagination` to conditionally run the pagination tests, which may take a while to run.
 - Added support for Query Extension validation of Item Search
+- Added support for Transaction Extension validation
 
 ## [0.5.0] - 2023-02-21
 
