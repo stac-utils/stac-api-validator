@@ -7,6 +7,7 @@ from typing import Optional
 
 import click
 
+from stac_api_validator.validations import QueryConfig
 from stac_api_validator.validations import validate_api
 
 
@@ -73,6 +74,58 @@ from stac_api_validator.validations import validate_api
     default=False,
     help="Validate pagination behavior (can take a long time to run)",
 )
+@click.option(
+    "--query-comparison-field",
+    help="Query Extension: name of field to use for comparison operators tests (eq, neq, lt, lte, gt, gte)",
+)
+@click.option(
+    "--query-eq-value",
+    help="Query Extension: value of field to use for eq",
+)
+@click.option(
+    "--query-neq-value",
+    help="Query Extension: value of field to use for neq",
+)
+@click.option(
+    "--query-lt-value",
+    help="Query Extension: value of field to use for lt",
+)
+@click.option(
+    "--query-lte-value",
+    help="Query Extension: value of field to use for lte",
+)
+@click.option(
+    "--query-gt-value",
+    help="Query Extension: value of field to use for gt",
+)
+@click.option(
+    "--query-gte-value",
+    help="Query Extension: value of field to use for gte",
+)
+@click.option(
+    "--query-substring-field",
+    help="Query Extension: name of field to use for substring operators tests (startsWith, endsWith, contains)",
+)
+@click.option(
+    "--query-starts-with-value",
+    help="Query Extension: value of field to use for startsWith",
+)
+@click.option(
+    "--query-ends-with-value",
+    help="Query Extension: value of field to use for endsWith",
+)
+@click.option(
+    "--query-contains-value",
+    help="Query Extension: value of field to use for contains",
+)
+@click.option(
+    "--query-in-field",
+    help="Query Extension: name of field to use for 'in' operator tests",
+)
+@click.option(
+    "--query-in-values",
+    help="Query Extension: comma-separated values of field to use for 'in' operator tests",
+)
 def main(
     log_level: str,
     root_url: str,
@@ -83,6 +136,19 @@ def main(
     auth_query_parameter: Optional[str] = None,
     fields_nested_property: Optional[str] = None,
     validate_pagination: bool = False,
+    query_comparison_field: Optional[str] = None,
+    query_eq_value: Optional[str] = None,
+    query_neq_value: Optional[str] = None,
+    query_lt_value: Optional[str] = None,
+    query_lte_value: Optional[str] = None,
+    query_gt_value: Optional[str] = None,
+    query_gte_value: Optional[str] = None,
+    query_substring_field: Optional[str] = None,
+    query_starts_with_value: Optional[str] = None,
+    query_ends_with_value: Optional[str] = None,
+    query_contains_value: Optional[str] = None,
+    query_in_field: Optional[str] = None,
+    query_in_values: Optional[str] = None,
 ) -> int:
     """STAC API Validator."""
     logging.basicConfig(stream=sys.stdout, level=log_level)
@@ -97,6 +163,21 @@ def main(
             auth_query_parameter=auth_query_parameter,
             fields_nested_property=fields_nested_property,
             validate_pagination=validate_pagination,
+            query_config=QueryConfig(
+                query_comparison_field,
+                query_eq_value,
+                query_neq_value,
+                query_lt_value,
+                query_lte_value,
+                query_gt_value,
+                query_gte_value,
+                query_substring_field,
+                query_starts_with_value,
+                query_ends_with_value,
+                query_contains_value,
+                query_in_field,
+                query_in_values,
+            ),
         )
     except Exception as e:
         click.secho(

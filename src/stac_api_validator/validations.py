@@ -3,6 +3,7 @@ import itertools
 import json
 import logging
 import re
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 from typing import Dict
@@ -150,6 +151,23 @@ class Warnings(BaseErrors):
         elif isinstance(x, tuple):
             self.errors.append(x)
         return self
+
+
+@dataclass
+class QueryConfig:
+    query_comparison_field: Optional[str]
+    query_eq_value: Optional[str]
+    query_neq_value: Optional[str]
+    query_lt_value: Optional[str]
+    query_lte_value: Optional[str]
+    query_gt_value: Optional[str]
+    query_gte_value: Optional[str]
+    query_substring_field: Optional[str]
+    query_starts_with_value: Optional[str]
+    query_ends_with_value: Optional[str]
+    query_contains_value: Optional[str]
+    query_in_field: Optional[str]
+    query_in_values: Optional[str]
 
 
 cc_core_regex = re.compile(r"https://api\.stacspec\.org/(.+)/core")
@@ -505,6 +523,7 @@ def validate_api(
     auth_query_parameter: Optional[str],
     fields_nested_property: Optional[str],
     validate_pagination: bool,
+    query_config: QueryConfig,
 ) -> Tuple[Warnings, Errors]:
     warnings = Warnings()
     errors = Errors()
@@ -632,7 +651,15 @@ def validate_api(
 
     if "item-search#query" in ccs_to_validate:
         logger.info("STAC API - Item Search - Query extension conformance class found.")
-        logger.info("STAC API - Item Search - Query extension is not yet supported.")
+        validate_query(
+            context=Context.ITEM_SEARCH_QUERY,
+            landing_page_body=landing_page_body,
+            collection=collection,
+            errors=errors,
+            warnings=warnings,
+            r_session=r_session,
+            query_config=query_config,
+        )
 
     if "item-search#filter" in ccs_to_validate:
         logger.info(
@@ -1369,6 +1396,557 @@ def validate_default_fields(
             f"[{context}] : GET with empty 'fields' value response does not have either"
             + "'properties.datetime' or (properties.start_datetime and properties.end_datetime)"
         )
+
+
+def validate_query(
+    landing_page_body: Dict[str, Any],
+    collection: str,
+    errors: Errors,
+    warnings: Warnings,
+    r_session: Session,
+    context: Context,
+    query_config: QueryConfig,
+) -> None:
+    # todo: validate that all the fields are configured
+    # if not query_config [all the fields]:
+    #     errors += f"[{context}] : cannot validate Query Extension because some configuration is not present"
+    #     return
+
+    limit = 20
+
+    search_method_to_url: dict[Method, str] = {
+        Method[x.get("method", "GET")]: x.get("href")
+        for x in links_by_rel(landing_page_body.get("links"), "search")
+    }
+
+    # eq
+    query = {query_config.query_comparison_field: {"eq": query_config.query_eq_value}}
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            == float(query_config.query_eq_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            == float(query_config.query_eq_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    # neq
+    query = {query_config.query_comparison_field: {"neq": query_config.query_neq_value}}
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            != float(query_config.query_neq_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            != float(query_config.query_neq_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    # lt
+    query = {query_config.query_comparison_field: {"lt": query_config.query_lt_value}}
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            < float(query_config.query_lt_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            < float(query_config.query_lt_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    # lte
+    query = {query_config.query_comparison_field: {"lte": query_config.query_lte_value}}
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            <= float(query_config.query_lte_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            <= float(query_config.query_lte_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    # gt
+    query = {query_config.query_comparison_field: {"gt": query_config.query_gt_value}}
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            > float(query_config.query_gt_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            > float(query_config.query_gt_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    # gte
+    query = {query_config.query_comparison_field: {"gte": query_config.query_gte_value}}
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            >= float(query_config.query_gte_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            f["properties"][query_config.query_comparison_field]
+            >= float(query_config.query_gte_value)
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_comparison_field] for f in body['features']]}"
+
+    # startsWith
+    query = {
+        query_config.query_substring_field: {
+            "startsWith": query_config.query_starts_with_value
+        }
+    }
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            str(f["properties"][query_config.query_substring_field]).startswith(
+                str(query_config.query_starts_with_value)
+            )
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_substring_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            str(f["properties"][query_config.query_substring_field]).startswith(
+                str(query_config.query_starts_with_value)
+            )
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_substring_field] for f in body['features']]}"
+
+    # endsWith
+    query = {
+        query_config.query_substring_field: {
+            "endsWith": query_config.query_ends_with_value
+        }
+    }
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            str(f["properties"][query_config.query_substring_field]).endswith(
+                str(query_config.query_ends_with_value)
+            )
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_substring_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            str(f["properties"][query_config.query_substring_field]).endswith(
+                str(query_config.query_ends_with_value)
+            )
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_substring_field] for f in body['features']]}"
+
+    # contains
+    query = {
+        query_config.query_substring_field: {
+            "contains": query_config.query_contains_value
+        }
+    }
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            str(query_config.query_contains_value)
+            in str(f["properties"][query_config.query_substring_field])
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_substring_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if not all(
+            str(query_config.query_contains_value)
+            in str(f["properties"][query_config.query_substring_field])
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_substring_field] for f in body['features']]}"
+
+    # in
+    query_in_values_array = query_config.query_in_values.split(",")
+    query = {query_config.query_in_field: {"in": query_in_values_array}}
+
+    if Method.GET in search_method_to_url:
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "query": json.dumps(query),
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had no results"
+
+        if any(
+            set(query_in_values_array).isdisjoint(
+                set(f["properties"][query_config.query_in_field])
+            )
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : GET search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_in_field] for f in body['features']]}"
+
+    if Method.POST in search_method_to_url:
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "query": query,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had no results"
+
+        if any(
+            set(query_in_values_array).isdisjoint(
+                set(f["properties"][query_config.query_in_field])
+            )
+            for f in body["features"]
+        ):
+            errors += f"[{context}] : POST search with Query '{json.dumps(query)}' had non-matching results: got {[f['properties'][query_config.query_in_field] for f in body['features']]}"
 
 
 def validate_fields(
