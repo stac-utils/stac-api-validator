@@ -28,7 +28,7 @@ nox.needs_version = ">= 2021.6.6"
 nox.options.sessions = (
     "pre-commit",
     "safety",
-    # "mypy",
+    "mypy",
     "tests",
     "typeguard",
     "xdoctest",
@@ -146,15 +146,15 @@ def safety(session: Session) -> None:
     session.run("safety", "check", "--full-report", f"--file={requirements}")
 
 
-# @session(python=python_versions)
-# def mypy(session: Session) -> None:
-#     """Type-check using mypy."""
-#     args = session.posargs or ["src", "tests", "docs/conf.py"]
-#     session.install(".")
-#     session.install("mypy", "pytest", "types-requests", "types-PyYAML")
-#     session.run("mypy", *args)
-#     if not session.posargs:
-#         session.run("mypy", f"--python-executable={sys.executable}", "noxfile.py")
+@session(python=python_versions)
+def mypy(session: Session) -> None:
+    """Type-check using mypy."""
+    args = session.posargs or ["src", "tests", "docs/conf.py"]
+    session.install(".")
+    session.install("mypy", "pytest", "types-requests", "types-PyYAML")
+    session.run("mypy", *args)
+    if not session.posargs:
+        session.run("mypy", f"--python-executable={sys.executable}", "noxfile.py")
 
 
 @session(python=python_versions)
