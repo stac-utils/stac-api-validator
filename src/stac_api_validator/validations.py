@@ -664,7 +664,15 @@ def validate_api(
 
     if "item-search#sort" in ccs_to_validate:
         logger.info("STAC API - Item Search - Sort extension conformance class found.")
-        logger.info("STAC API - Item Search - Sort extension is not yet supported.")
+        validate_sort(
+            context=Context.ITEM_SEARCH_SORT,
+            landing_page_body=landing_page_body,
+            collection=collection,
+            errors=errors,
+            warnings=warnings,
+            r_session=r_session,
+            query_config=query_config,
+        )
 
     if "item-search#query" in ccs_to_validate:
         logger.info("STAC API - Item Search - Query extension conformance class found.")
@@ -3532,3 +3540,124 @@ def validate_transaction(
         context=context,
         r_session=r_session,
     )
+
+
+def validate_sort(
+    landing_page_body: Dict[str, Any],
+    collection: str,
+    errors: Errors,
+    warnings: Warnings,
+    r_session: Session,
+    context: Context,
+    query_config: QueryConfig,
+) -> None:
+    limit = 100
+
+    search_method_to_url: dict[Method, str] = {
+        Method[x.get("method", "GET")]: x.get("href")
+        for x in links_by_rel(landing_page_body.get("links"), "search")
+    }
+
+    # ascending
+    if Method.GET in search_method_to_url:
+        for sortby in ["properties.datetime", "+properties.datetime"]:
+            _, body, _ = retrieve(
+                Method.GET,
+                search_method_to_url[Method.GET],
+                params={
+                    "sortby": sortby,
+                    "limit": limit,
+                    "collections": collection,
+                },
+                errors=errors,
+                context=context,
+                r_session=r_session,
+            )
+
+            if not len(body["features"]):
+                errors += (
+                    f"[{context}] : GET search with Sort '{sortby}' had no results"
+                )
+
+            datetimes = [f["properties"]["datetime"] for f in body["features"]]
+            sorted_datetimes = copy.deepcopy(datetimes)
+            sorted_datetimes.sort()
+
+            if datetimes != sorted_datetimes:
+                errors += f"[{context}] : GET search with Sort '{sortby}' was not sorted in ascending order {datetimes} {sorted_datetimes}"
+
+    if Method.POST in search_method_to_url:
+        sortby_json = [{"field": "properties.datetime", "direction": "asc"}]
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "sortby": sortby_json,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Sort '{json.dumps(sortby_json)}' had no results"
+
+        datetimes = [f["properties"]["datetime"] for f in body["features"]]
+        sorted_datetimes = copy.deepcopy(datetimes)
+        sorted_datetimes.sort()
+
+        if datetimes != sorted_datetimes:
+            errors += f"[{context}] : POST search with Sort '{json.dumps(sortby_json)}' was not sorted in ascending order"
+
+    # descending
+    if Method.GET in search_method_to_url:
+        sortby = "-properties.datetime"
+        _, body, _ = retrieve(
+            Method.GET,
+            search_method_to_url[Method.GET],
+            params={
+                "sortby": sortby,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : GET search with Sort '{sortby}' had no results"
+
+        datetimes = [f["properties"]["datetime"] for f in body["features"]]
+        sorted_datetimes = copy.deepcopy(datetimes)
+        sorted_datetimes.sort(reverse=True)
+
+        if datetimes != sorted_datetimes:
+            errors += f"[{context}] : GET search with Sort '{sortby}' was not sorted in descending order {datetimes} {sorted_datetimes}"
+
+    if Method.POST in search_method_to_url:
+        sortby_json = [{"field": "properties.datetime", "direction": "desc"}]
+        retrieve(
+            Method.POST,
+            search_method_to_url[Method.POST],
+            body={
+                "sortby": sortby_json,
+                "limit": limit,
+                "collections": collection,
+            },
+            errors=errors,
+            context=context,
+            r_session=r_session,
+        )
+
+        if not len(body["features"]):
+            errors += f"[{context}] : POST search with Sort '{json.dumps(sortby_json)}' had no results"
+
+        datetimes = [f["properties"]["datetime"] for f in body["features"]]
+        sorted_datetimes = copy.deepcopy(datetimes)
+        sorted_datetimes.sort(reverse=True)
+
+        if datetimes != sorted_datetimes:
+            errors += f"[{context}] : POST search with Sort '{json.dumps(sortby_json)}' was not sorted in descending order"

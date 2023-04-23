@@ -313,6 +313,7 @@ poetry run stac-api-validator --root-url https://earth-search.aws.element84.com/
     --conformance item-search \
     --conformance item-search#fields \
     --conformance item-search#query \
+    --conformance item-search#sort \
     --collection sentinel-2-l2a \
     --fields-nested-property properties.eo:cloud_cover \
     --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}' \
