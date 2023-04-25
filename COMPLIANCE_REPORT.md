@@ -142,63 +142,13 @@ Date: 16-Nov-2022
 
 Output:
 
-```text
-$ poetry run stac-api-validator --root-url https://planetarycomputer.microsoft.com/api/stac/v1 \
-   --conformance features \
-   --conformance item-search \
-   --conformance filter \
-   --conformance item-search#fields \
-   --collection sentinel-2-l2a \
-   --fields-nested-property properties.eo:cloud_cover \
-   --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'
-INFO:stac_api_validator.validations:Validating STAC API - Core conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Browseable conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Children conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Collections conformance class.
-INFO:stac_api_validator.validations:Validating STAC API - Features conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Features - Filter Extension conformance class.
-INFO:stac_api_validator.validations:Validating STAC API - Item Search conformance class.
-INFO:stac_api_validator.validations:Validating STAC API - Item Search - Filter Extension conformance class.
-INFO:stac_api_validator.validations:Validating STAC API - Item Search - Filter Extension - CQL2-Text conformance class.
-INFO:stac_api_validator.validations:Validating STAC API - Item Search - Filter Extension - CQL2-JSON conformance class.
-INFO:stac_api_validator.validations:Validating STAC API - Item Search - Filter Extension - Basic CQL2 conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Item Search - Filter Extension - Advanced Comparison Operators conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Item Search - Filter Extension - Basic Spatial Operators conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Item Search - Filter Extension - Temporal Operators conformance class.
-Warnings:
-- STAC API Specification v1.0.0-rc.2 is the latest version, but API advertises an older version or older versions.
-- [Collections] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a has these stac-check recommendations: ['STAC Best Practices: ', "    Object should be called 'collection.json' not 'sentinel-2-l2a.json'", '', "    Links in catalogs and collections should always have a 'title' field", '']
-- [Features] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20221116T051959_R119_T43MHN_20221116T182922 has these stac-check recommendations: ['STAC Best Practices: ', "    Item name 'S2B_MSIL2A_20221116T051959_R119_T43MHN_20221116T182922' should only contain Searchable identifiers", "    Identifiers should consist of only lowercase characters, numbers, '_', and '-'", '', '    You have 33 properties. Please consider using links to avoid bloated metadata', '']
-- [Features] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20221116T051959_R119_T43MHN_20221116T182922 has these stac-check recommendations: ['STAC Best Practices: ', "    Item name 'S2B_MSIL2A_20221116T051959_R119_T43MHN_20221116T182922' should only contain Searchable identifiers", "    Identifiers should consist of only lowercase characters, numbers, '_', and '-'", '', '    You have 33 properties. Please consider using links to avoid bloated metadata', '']
-- [Filter Ext] /: pre-1.0.0-rc.1 Filter Extension conformance classes are advertised.
-Errors:
-- [Features] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items content-type header is not 'application/geo+json'
-- [Features] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items content-type header is not 'application/geo+json'
-- [Features] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items self link does not match requested url
-- [Features] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20221116T051959_R119_T43MHN_20221116T182922 content-type header is not 'application/geo+json'
-- [Features] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items?limit=1 content-type header is not 'application/geo+json'
-- [Features] GET https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items?limit=1&token=next:S2B_MSIL2A_20221116T051959_R119_T43MHN_20221116T182922 content-type header is not 'application/geo+json'
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'limit': 10000} body=None had unexpected status code 400 instead of 200:
-- [Item Search] POST https://planetarycomputer.microsoft.com/api/stac/v1/search params=None body={'limit': 10000} had unexpected status code 400 instead of 200:
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'limit': 100000} body=None had unexpected status code 400 instead of 200:
-- [Item Search] POST https://planetarycomputer.microsoft.com/api/stac/v1/search params=None body={'limit': 100000} had unexpected status code 400 instead of 200:
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'limit': 1000000} body=None had unexpected status code 400 instead of 200:
-- [Item Search] POST https://planetarycomputer.microsoft.com/api/stac/v1/search params=None body={'limit': 1000000} had unexpected status code 400 instead of 200:
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'bbox': '0,0,1,1', 'intersects': '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'} body=None had unexpected status code 200 instead of 400: Search with bbox and intersects
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'bbox': '100.0,0.0,0.0,105.0,1.0,1.0'} body=None had unexpected status code 500 instead of 200:
-- [Item Search] POST https://planetarycomputer.microsoft.com/api/stac/v1/search params=None body={'bbox': [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]} had unexpected status code 500 instead of 200:
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'datetime': '/1985-04-12T23:20:50.52Z'} body=None had unexpected status code 400 instead of 200: with datetime=/1985-04-12T23:20:50.52Z extracted from an Item
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'datetime': '1985-04-12T23:20:50.52Z/'} body=None had unexpected status code 400 instead of 200: with datetime=1985-04-12T23:20:50.52Z/ extracted from an Item
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'datetime': '1985-04-12'} body=None had unexpected status code 200 instead of 400: invalid datetime returned non-400 status code
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'datetime': '1937-01-01T12:00:27.87+0100'} body=None had unexpected status code 200 instead of 400: invalid datetime returned non-400 status code
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search params={'datetime': '1985-12-12T23:20:50.52'} body=None had unexpected status code 200 instead of 400: invalid datetime returned non-400 status code
-- [Item Search] GET Search with ids and non-intersecting bbox returned results, indicating the ids parameter is overriding the bbox parameter. All parameters are applied equally since STAC API 1.0.0-beta.1
-- [Item Search] POST Search with ids and non-intersecting bbox returned results, indicating the ids parameter is overriding the bbox parameter. All parameters are applied equally since STAC API 1.0.0-beta.1
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/search Search results for intersects={"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]} do not all intersect
-- [Item Search - Filter Ext] / : 'http://www.opengis.net/def/rel/ogc/1.0/queryables' (Queryables) link relation missing
-- [Item Search] GET https://planetarycomputer.microsoft.com/api/stac/v1/queryables content-type header is not 'application/schema+json'
-- [Item Search - Filter Ext] Queryables 'https://planetarycomputer.microsoft.com/api/stac/v1/queryables' '$id' value invalid, must be same as queryables url
-
+```bash
+poetry run stac-api-validator --root-url https://planetarycomputer.microsoft.com/api/stac/v1 \
+    --conformance core     --conformance features     --conformance item-search     --conformance item-search#fields        --conformance item-search#sort \
+    --conformance filter \
+     --collection sentinel-2-l2a     --fields-nested-property properties.eo:cloud_cover     --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'     \
+     --conformance item-search#query 
+     --query-comparison-field eo:cloud_cover     --query-eq-value 7.531843     --query-neq-value 7.531843     --query-lt-value 7     --query-lte-value 7.531843     --query-gt-value 75     --query-gte-value 7.531843     --query-substring-field s2:mgrs_tile     --query-starts-with-value 48     --query-ends-with-value UP     --query-contains-value 8NU     --query-in-field sat:orbit_state      --query-in-values descending
 ```
 
 ### Snap Planet (resto)
@@ -307,52 +257,99 @@ Date: 16-Nov-2022
 Output:
 
 ```text
-poetry run stac-api-validator --root-url https://earth-search.aws.element84.com/v1 \
-    --conformance core \
-    --conformance features \
-    --conformance item-search \
-    --conformance item-search#fields \
-    --conformance item-search#query \
-    --conformance item-search#sort \
-    --collection sentinel-2-l2a \
-    --fields-nested-property properties.eo:cloud_cover \
-    --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}' \
-    --query-comparison-field eo:cloud_cover \
-    --query-eq-value 7.531843 \
-    --query-neq-value 7.531843 \
-    --query-lt-value 7 \
-    --query-lte-value 7.531843 \
-    --query-gt-value 75 \
-    --query-gte-value 7.531843 \
-    --query-substring-field grid:code \
-    --query-starts-with-value MGRS-48 \
-    --query-ends-with-value UP \
-    --query-contains-value 8NU \
-    --query-in-field mgrs:latitude_band \
-    --query-in-values M,N
-
+poetry run stac-api-validator --root-url https://earth-search.aws.element84.com/v1     --conformance core     --conformance features     --conformance item-search     --conformance item-search#fields     --conformance item-search#query     --conformance item-search#sort     --collection sentinel-2-l2a     --fields-nested-property properties.eo:cloud_cover     --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'     --query-comparison-field eo:cloud_cover     --query-eq-value 7.531843     --query-neq-value 7.531843     --query-lt-value 7     --query-lte-value 7.531843     --query-gt-value 75     --query-gte-value 7.531843     --query-substring-field grid:code     --query-starts-with-value MGRS-48     --query-ends-with-value UP     --query-contains-value 8NU     --query-in-field mgrs:latitude_band     --query-in-values M,N
 INFO:stac_api_validator.validations:Validating STAC API - Core conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Browseable conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Children conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Collections conformance class.
 INFO:stac_api_validator.validations:Validating STAC API - Features conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Features - Filter Extension conformance class.
 INFO:stac_api_validator.validations:Validating STAC API - Item Search conformance class.
-INFO:stac_api_validator.validations:Skipping STAC API - Item Search - Filter Extension conformance class.
+INFO:stac_api_validator.validations:STAC API - Item Search - Fields extension conformance class found.
+INFO:stac_api_validator.validations:STAC API - Item Search - Sort extension conformance class found.
+INFO:stac_api_validator.validations:STAC API - Item Search - Query extension conformance class found.
+INFO:stac_api_validator.validations:STAC API - Item Search - Fields extension conformance class found.
+INFO:stac_api_validator.validations:STAC API - Item Search - Sort extension conformance class found.
+INFO:stac_api_validator.validations:STAC API - Item Search - Query extension conformance class found.
 Warnings:
-- STAC API Specification v1.0.0-rc.2 is the latest version, but API advertises an older version or older versions.
-- [Collections] GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a has these stac-check recommendations: ['STAC Best Practices: ', "    Object should be called 'collection.json' not 'sentinel-2-l2a.json'", '', "    Links in catalogs and collections should always have a 'title' field", '']
-- [Features] GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/S2B_4UDE_20221116_0_L2A has these stac-check recommendations: ['STAC Best Practices: ', "    Item name 'S2B_4UDE_20221116_0_L2A' should only contain Searchable identifiers", "    Identifiers should consist of only lowercase characters, numbers, '_', and '-'", '', '    You have 41 properties. Please consider using links to avoid bloated metadata', '']
-- [Features] GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/S2B_4UDE_20221116_0_L2A has these stac-check recommendations: ['STAC Best Practices: ', "    Item name 'S2B_4UDE_20221116_0_L2A' should only contain Searchable identifiers", "    Identifiers should consist of only lowercase characters, numbers, '_', and '-'", '', '    You have 41 properties. Please consider using links to avoid bloated metadata', '']
+- [Collections] : GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a has these stac-check recommendations: Links in catalogs and collections should always have a 'title' field,
+- [Features] : GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/S2B_23ELK_20230424_0_L2A has these stac-check recommendations: Item name 'S2B_23ELK_20230424_0_L2A' should only contain Searchable identifiers,Identifiers should consist of only lowercase characters, numbers, '_', and '-',,You have 41 properties. Please consider using links to avoid bloated metadata,
+- [Features] : GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/S2B_23ELK_20230424_0_L2A has these stac-check recommendations: Item name 'S2B_23ELK_20230424_0_L2A' should only contain Searchable identifiers,Identifiers should consist of only lowercase characters, numbers, '_', and '-',,You have 41 properties. Please consider using links to avoid bloated metadata,
+- [Item Search - Fields Ext] : GET fields='type' response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'properties']
+- [Item Search - Fields Ext] : GET fields='stac_version' response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='id' response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='geometry' response contained extra fields ['assets', 'bbox', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='bbox' response contained extra fields ['assets', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='links' response contained extra fields ['assets', 'bbox', 'geometry', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='assets' response contained extra fields ['bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+type' response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'properties']
+- [Item Search - Fields Ext] : GET fields='+stac_version' response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+id' response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+geometry' response contained extra fields ['assets', 'bbox', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+bbox' response contained extra fields ['assets', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+links' response contained extra fields ['assets', 'bbox', 'geometry', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+assets' response contained extra fields ['bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['type']}} response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['stac_version']}} response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['id']}} response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['geometry']}} response contained extra fields ['assets', 'bbox', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['bbox']}} response contained extra fields ['assets', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['links']}} response contained extra fields ['assets', 'bbox', 'geometry', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['assets']}} response contained extra fields ['bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'exclude': ['properties'], 'include': ['properties.eo:cloud_cover']}} response contained extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type']
+- [Item Search - Fields Ext] : GET fields='+geometry,-geometry' response contained extra fields ['assets', 'bbox', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'exclude': ['geometry'], 'include': ['geometry']}} response contained extra fields ['assets', 'bbox', 'links', 'id', 'collection', 'type', 'properties']
 Errors:
-- [Collections] /collections does not have self link
-- [Collections] /collections does not have root link
-- [Features] GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items does not have self link
-- [Features] GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items does not have root link
-- [Features] GET https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items does not have parent link
-- [Item Search] GET https://earth-search.aws.element84.com/v1/search params={'limit': 10000} body=None had unexpected status code 502 instead of 200:
-- [Item Search] GET https://earth-search.aws.element84.com/v1/search params={'limit': 100000} body=None had unexpected status code 400 instead of 200:
-- [Item Search] GET https://earth-search.aws.element84.com/v1/search params={'limit': 1000000} body=None had unexpected status code 400 instead of 200:
+- / : Link[service-desc] must return 200
+- service-desc ({'rel': 'service-desc', 'type': 'application/vnd.oai.openapi', 'href': 'https://earth-search.aws.element84.com/v1/api'}): media type used in Accept header must get response with same Content-Type header: used 'application/vnd.oai.openapi', got 'application/json; charset=utf-8'
+- [Core] : GET https://earth-search.aws.element84.com/v1/api.html params=None body= had unexpected status code 500 instead of 200: 
+- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 10000} body= had unexpected status code 502 instead of 200: 
+- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 10000} had unexpected status code 502 instead of 200: 
+- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 100000} body= had unexpected status code 502 instead of 200: 
+- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 100000} had unexpected status code 502 instead of 200: 
+- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 1000000} body= had unexpected status code 502 instead of 200: 
+- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 1000000} had unexpected status code 502 instead of 200: 
+- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'bbox': '100.0,0.0,0.0,105.0,1.0,1.0'} body= had unexpected status code 502 instead of 200: 
+- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"bbox": [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]} had unexpected status code 502 instead of 200: 
+- [Item Search - Fields Ext] : GET with empty 'fields' value response missing 'stac_version'
+- [Item Search - Fields Ext] : POST https://earth-search.aws.element84.com/v1/search params=None body={"fields": null} had unexpected status code 200 instead of 400: 
+- [Item Search - Fields Ext] : POST with empty 'fields' object value response missing 'stac_version'
+- [Item Search - Fields Ext] : POST with null values for include and exclude response missing 'stac_version'
+- [Item Search - Fields Ext] : POST with empty arrays for include and exclude response missing 'stac_version'
+- [Item Search - Fields Ext] : GET fields='type' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='stac_version' response contained more than 5 extra fields ['stac_version', 'assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='id' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='geometry' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='bbox' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='links' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='assets' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+type' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+stac_version' response missing 'stac_version'
+- [Item Search - Fields Ext] : GET fields='+stac_version' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+id' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+geometry' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+bbox' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+links' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : GET fields='+assets' response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['type']}} response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['stac_version']}} response contained more than 5 extra fields ['stac_version', 'assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['id']}} response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['geometry']}} response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['bbox']}} response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['links']}} response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'include': ['assets']}} response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'exclude': ['geometry']}} response missing 'properties.eo:cloud_cover'
+- [Item Search - Fields Ext] : GET fields='-properties,+properties.eo:cloud_cover' response contained 'geometry', but should have been excluded
+- [Item Search - Fields Ext] : GET fields='-properties,+properties.eo:cloud_cover' response missing 'properties.eo:cloud_cover'
+- [Item Search - Fields Ext] : POST {'fields': {'exclude': ['properties'], 'include': ['properties.eo:cloud_cover']}} response contained 'geometry', but should have been excluded
+- [Item Search - Fields Ext] : POST {'fields': {'exclude': ['properties'], 'include': ['properties.eo:cloud_cover']}} response missing 'properties.eo:cloud_cover'
+- [Item Search - Fields Ext] : POST {'fields': {'exclude': ['properties'], 'include': ['properties.eo:cloud_cover']}} response contained more than 5 extra fields ['assets', 'bbox', 'geometry', 'links', 'id', 'collection', 'type']
+- [Item Search - Fields Ext] : GET fields='+geometry,-geometry' response missing 'geometry'
+- [Item Search - Fields Ext] : GET fields='+geometry,-geometry' response contained more than 5 extra fields ['assets', 'bbox', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Fields Ext] : POST {'fields': {'exclude': ['geometry'], 'include': ['geometry']}} response missing 'geometry'
+- [Item Search - Fields Ext] : POST {'fields': {'exclude': ['geometry'], 'include': ['geometry']}} response contained more than 5 extra fields ['assets', 'bbox', 'links', 'id', 'collection', 'type', 'properties']
+- [Item Search - Query Ext] : GET search with Query '{"grid:code": {"startsWith": "MGRS-48"}}' had non-matching results: got ['MGRS-37XDJ', 'MGRS-37XEJ', 'MGRS-38XNP', 'MGRS-38XNT', 'MGRS-39XWJ', 'MGRS-21DXF', 'MGRS-21DVJ', 'MGRS-22EFQ', 'MGRS-23ELK', 'MGRS-22ECT', 'MGRS-22ECU', 'MGRS-22EFT', 'MGRS-22EDU', 'MGRS-25MFQ', 'MGRS-25MES', 'MGRS-25NFA', 'MGRS-25NGA', 'MGRS-25NHA', 'MGRS-29VLC', 'MGRS-29VMD']
+- [Item Search - Query Ext] : POST search with Query '{"grid:code": {"startsWith": "MGRS-48"}}' had non-matching results: got ['MGRS-37XDJ', 'MGRS-37XEJ', 'MGRS-38XNP', 'MGRS-38XNT', 'MGRS-39XWJ', 'MGRS-21DXF', 'MGRS-21DVJ', 'MGRS-22EFQ', 'MGRS-23ELK', 'MGRS-22ECT', 'MGRS-22ECU', 'MGRS-22EFT', 'MGRS-22EDU', 'MGRS-25MFQ', 'MGRS-25MES', 'MGRS-25NFA', 'MGRS-25NGA', 'MGRS-25NHA', 'MGRS-29VLC', 'MGRS-29VMD']
+- [Item Search - Query Ext] : GET search with Query '{"grid:code": {"endsWith": "UP"}}' had non-matching results: got ['MGRS-37XDJ', 'MGRS-37XEJ', 'MGRS-38XNP', 'MGRS-38XNT', 'MGRS-39XWJ', 'MGRS-21DXF', 'MGRS-21DVJ', 'MGRS-22EFQ', 'MGRS-23ELK', 'MGRS-22ECT', 'MGRS-22ECU', 'MGRS-22EFT', 'MGRS-22EDU', 'MGRS-25MFQ', 'MGRS-25MES', 'MGRS-25NFA', 'MGRS-25NGA', 'MGRS-25NHA', 'MGRS-29VLC', 'MGRS-29VMD']
+- [Item Search - Query Ext] : POST search with Query '{"grid:code": {"endsWith": "UP"}}' had non-matching results: got ['MGRS-37XDJ', 'MGRS-37XEJ', 'MGRS-38XNP', 'MGRS-38XNT', 'MGRS-39XWJ', 'MGRS-21DXF', 'MGRS-21DVJ', 'MGRS-22EFQ', 'MGRS-23ELK', 'MGRS-22ECT', 'MGRS-22ECU', 'MGRS-22EFT', 'MGRS-22EDU', 'MGRS-25MFQ', 'MGRS-25MES', 'MGRS-25NFA', 'MGRS-25NGA', 'MGRS-25NHA', 'MGRS-29VLC', 'MGRS-29VMD']
+- [Item Search - Query Ext] : GET search with Query '{"grid:code": {"contains": "8NU"}}' had non-matching results: got ['MGRS-37XDJ', 'MGRS-37XEJ', 'MGRS-38XNP', 'MGRS-38XNT', 'MGRS-39XWJ', 'MGRS-21DXF', 'MGRS-21DVJ', 'MGRS-22EFQ', 'MGRS-23ELK', 'MGRS-22ECT', 'MGRS-22ECU', 'MGRS-22EFT', 'MGRS-23ELN', 'MGRS-22EDU', 'MGRS-25MFQ', 'MGRS-25MES', 'MGRS-25NFA', 'MGRS-25NGA', 'MGRS-25NHA', 'MGRS-29VLC']
+- [Item Search - Query Ext] : POST search with Query '{"grid:code": {"contains": "8NU"}}' had non-matching results: got ['MGRS-37XDJ', 'MGRS-37XEJ', 'MGRS-38XNP', 'MGRS-38XNT', 'MGRS-39XWJ', 'MGRS-21DXF', 'MGRS-21DVJ', 'MGRS-22EFQ', 'MGRS-23ELK', 'MGRS-22ECT', 'MGRS-22ECU', 'MGRS-22EFT', 'MGRS-23ELN', 'MGRS-22EDU', 'MGRS-25MFQ', 'MGRS-25MES', 'MGRS-25NFA', 'MGRS-25NGA', 'MGRS-25NHA', 'MGRS-29VLC']
 ```
 
 ### EarthData CMR (stac-cmr)
