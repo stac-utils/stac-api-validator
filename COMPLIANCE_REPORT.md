@@ -147,7 +147,7 @@ poetry run stac-api-validator --root-url https://planetarycomputer.microsoft.com
     --conformance core     --conformance features     --conformance item-search     --conformance item-search#fields        --conformance item-search#sort \
     --conformance filter \
      --collection sentinel-2-l2a     --fields-nested-property properties.eo:cloud_cover     --geometry '{"type": "Polygon", "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]}'     \
-     --conformance item-search#query 
+     --conformance item-search#query
      --query-comparison-field eo:cloud_cover     --query-eq-value 7.531843     --query-neq-value 7.531843     --query-lt-value 7     --query-lte-value 7.531843     --query-gt-value 75     --query-gte-value 7.531843     --query-substring-field s2:mgrs_tile     --query-starts-with-value 48     --query-ends-with-value UP     --query-contains-value 8NU     --query-in-field sat:orbit_state      --query-in-values descending
 ```
 
@@ -298,17 +298,17 @@ Warnings:
 Errors:
 - / : Link[service-desc] must return 200
 - service-desc ({'rel': 'service-desc', 'type': 'application/vnd.oai.openapi', 'href': 'https://earth-search.aws.element84.com/v1/api'}): media type used in Accept header must get response with same Content-Type header: used 'application/vnd.oai.openapi', got 'application/json; charset=utf-8'
-- [Core] : GET https://earth-search.aws.element84.com/v1/api.html params=None body= had unexpected status code 500 instead of 200: 
-- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 10000} body= had unexpected status code 502 instead of 200: 
-- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 10000} had unexpected status code 502 instead of 200: 
-- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 100000} body= had unexpected status code 502 instead of 200: 
-- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 100000} had unexpected status code 502 instead of 200: 
-- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 1000000} body= had unexpected status code 502 instead of 200: 
-- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 1000000} had unexpected status code 502 instead of 200: 
-- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'bbox': '100.0,0.0,0.0,105.0,1.0,1.0'} body= had unexpected status code 502 instead of 200: 
-- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"bbox": [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]} had unexpected status code 502 instead of 200: 
+- [Core] : GET https://earth-search.aws.element84.com/v1/api.html params=None body= had unexpected status code 500 instead of 200:
+- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 10000} body= had unexpected status code 502 instead of 200:
+- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 10000} had unexpected status code 502 instead of 200:
+- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 100000} body= had unexpected status code 502 instead of 200:
+- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 100000} had unexpected status code 502 instead of 200:
+- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'limit': 1000000} body= had unexpected status code 502 instead of 200:
+- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"limit": 1000000} had unexpected status code 502 instead of 200:
+- [Item Search] : GET https://earth-search.aws.element84.com/v1/search params={'bbox': '100.0,0.0,0.0,105.0,1.0,1.0'} body= had unexpected status code 502 instead of 200:
+- [Item Search] : POST https://earth-search.aws.element84.com/v1/search params=None body={"bbox": [100.0, 0.0, 0.0, 105.0, 1.0, 1.0]} had unexpected status code 502 instead of 200:
 - [Item Search - Fields Ext] : GET with empty 'fields' value response missing 'stac_version'
-- [Item Search - Fields Ext] : POST https://earth-search.aws.element84.com/v1/search params=None body={"fields": null} had unexpected status code 200 instead of 400: 
+- [Item Search - Fields Ext] : POST https://earth-search.aws.element84.com/v1/search params=None body={"fields": null} had unexpected status code 200 instead of 400:
 - [Item Search - Fields Ext] : POST with empty 'fields' object value response missing 'stac_version'
 - [Item Search - Fields Ext] : POST with null values for include and exclude response missing 'stac_version'
 - [Item Search - Fields Ext] : POST with empty arrays for include and exclude response missing 'stac_version'

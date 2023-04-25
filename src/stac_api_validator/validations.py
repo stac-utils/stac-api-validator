@@ -84,6 +84,7 @@ logger = logging.getLogger(__name__)
 
 LATEST_STAC_API_FOUNDATION_VERSION = "https://api.stacspec.org/v1.0.0/"
 
+
 class Method(Enum):
     GET = "GET"
     POST = "POST"
@@ -445,7 +446,10 @@ def validate_core_landing_page_body(
         if any(
             x
             for x in conforms_to
-            if re.match("https://api\.stacspec\.org/v1\.0\.0.*/(core|item-search|ogcapi-features|collections)", x)
+            if re.match(
+                r"https://api\.stacspec\.org/v1\.0\.0.*/(core|item-search|ogcapi-features|collections)",
+                x,
+            )
             and not x.startswith(LATEST_STAC_API_FOUNDATION_VERSION)
         ):
             warnings += f"STAC API Specification {LATEST_STAC_API_FOUNDATION_VERSION} is the latest version, but API advertises an older version or older versions."
