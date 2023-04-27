@@ -82,7 +82,7 @@ from .filters import cql2_text_timestamp_comparisons
 
 logger = logging.getLogger(__name__)
 
-LATEST_STAC_API_VERSION = "https://api.stacspec.org/v1.0.0-rc.2"
+LATEST_STAC_API_FOUNDATION_VERSION = "https://api.stacspec.org/v1.0.0/"
 
 
 class Method(Enum):
@@ -440,16 +440,19 @@ def validate_core_landing_page_body(
         errors += (
             "CORE-2",
             "[Core] : Landing Page (/) 'conformsTo' field must be defined and non-empty."
-            "This field is required as of 1.0.0.",
+            "This field is required as of STAC 1.0.0",
         )
     else:
         if any(
             x
             for x in conforms_to
-            if x.startswith("https://api.stacspec.org/v1.0.0")
-            and not x.startswith(LATEST_STAC_API_VERSION)
+            if re.match(
+                r"https://api\.stacspec\.org/v1\.0\.0.*/(core|item-search|ogcapi-features|collections)",
+                x,
+            )
+            and not x.startswith(LATEST_STAC_API_FOUNDATION_VERSION)
         ):
-            warnings += "STAC API Specification v1.0.0-rc.2 is the latest version, but API advertises an older version or older versions."
+            warnings += f"STAC API Specification {LATEST_STAC_API_FOUNDATION_VERSION} is the latest version, but API advertises an older version or older versions."
 
     if not supports(conforms_to, cc_core_regex):
         errors += ("CORE-4", "/: STAC API - Core not contained in 'conformsTo'")
