@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Don't warn about old versions for extensions ([#365](https://github.com/stac-utils/stac-api-validator/pull/365))
+
 ## [0.6.1] - 2023-04-24
 
 ### Changed
@@ -152,7 +158,8 @@ Release is primarily to publish to Read the Docs as a version.
 
 - Fixed issue with item-search validation relying on collections behavior
 
-[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.0...main
+[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.1...main
+[0.6.1]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.1
 [0.6.0]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.0
 [0.5.0]: https://github.com/stac-utils/stac-api-validator/tree/v0.5.0
 [0.4.3]: https://github.com/stac-utils/stac-api-validator/tree/v0.4.3
