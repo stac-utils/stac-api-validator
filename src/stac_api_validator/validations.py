@@ -447,7 +447,7 @@ def validate_core_landing_page_body(
             x
             for x in conforms_to
             if re.match(
-                r"https://api\.stacspec\.org/v1\.0\.0.*/(core|item-search|ogcapi-features|collections)",
+                r"^https://api\.stacspec\.org/v1\.0\.0.*/(core|item-search|ogcapi-features|collections)$",
                 x,
             )
             and not x.startswith(LATEST_STAC_API_FOUNDATION_VERSION)

@@ -1,5 +1,8 @@
+import copy
 from typing import Any
 from typing import Dict
+
+import pytest
 
 from stac_api_validator.validations import Errors
 from stac_api_validator.validations import Warnings
@@ -151,3 +154,56 @@ def test_landing_page_1() -> None:
     assert "CORE-8" not in errors
 
     # todo: item-search
+
+
+@pytest.fixture
+def perfect_core_landing_page() -> Dict[str, Any]:
+    return copy.deepcopy(
+        {
+            "conformsTo": [
+                "https://api.stacspec.org/v1.0.0/core",
+                "https://api.stacspec.org/v1.0.0/collections",
+                "https://api.stacspec.org/v1.0.0/ogcapi-features",
+            ],
+            "links": [
+                {"rel": "data", "href": "http://stac-api-validator.test/collections"}
+            ],
+        }
+    )
+
+
+def test_perfect_core_landing_page(perfect_core_landing_page: Dict[str, Any]) -> None:
+    errors = Errors()
+    warnings = Warnings()
+    validate_core_landing_page_body(
+        body=perfect_core_landing_page,
+        headers={"content-type": "application/json"},
+        errors=errors,
+        warnings=warnings,
+        conformance_classes=[],
+        collection=None,
+        geometry=None,
+    )
+    assert not errors
+    assert not warnings
+
+
+def test_perfect_core_landing_page_with_extension(
+    perfect_core_landing_page: Dict[str, Any]
+) -> None:
+    errors = Errors()
+    warnings = Warnings()
+    perfect_core_landing_page["conformsTo"].append(
+        "https://api.stacspec.org/v1.0.0-rc.3/ogcapi-features#fields",
+    )
+    validate_core_landing_page_body(
+        body=perfect_core_landing_page,
+        headers={"content-type": "application/json"},
+        errors=errors,
+        warnings=warnings,
+        conformance_classes=[],
+        collection=None,
+        geometry=None,
+    )
+    assert not errors
+    assert not warnings
