@@ -1251,13 +1251,13 @@ cli = ["click (>=5.0)"]
 
 [[package]]
 name = "pyupgrade"
-version = "3.11.0"
+version = "3.12.0"
 description = "A tool to automatically upgrade syntax for newer versions."
 optional = false
 python-versions = ">=3.8.1"
 files = [
-    {file = "pyupgrade-3.11.0-py2.py3-none-any.whl", hash = "sha256:7bd8b83bc1a61b3a4c8fea5e16313b7b29e5cdf1be6184f8c6c467557e9cfab3"},
-    {file = "pyupgrade-3.11.0.tar.gz", hash = "sha256:1d0bf0dbadf179ff8952d92d52759a5984526597a055d1626884397c46f94003"},
+    {file = "pyupgrade-3.12.0-py2.py3-none-any.whl", hash = "sha256:c6f9c129560b9538e75b93fb0aee20508faae454714e8373d462e408985bd96a"},
+    {file = "pyupgrade-3.12.0.tar.gz", hash = "sha256:defc292ffaf402942b8fccaa97491964063e343fc1993230e44890b971dc1234"},
 ]
 
 [package.dependencies]
@@ -1846,13 +1846,13 @@ files = [
 
 [[package]]
 name = "urllib3"
-version = "2.0.4"
+version = "2.0.5"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "urllib3-2.0.4-py3-none-any.whl", hash = "sha256:de7df1803967d2c2a98e4b11bb7d6bd9210474c46e8a0401514e3a42a75ebde4"},
-    {file = "urllib3-2.0.4.tar.gz", hash = "sha256:8d22f86aae8ef5e410d4f539fde9ce6b2113a001bb4d189e0aed70642d602b11"},
+    {file = "urllib3-2.0.5-py3-none-any.whl", hash = "sha256:ef16afa8ba34a1f989db38e1dbbe0c302e4289a47856990d0682e374563ce35e"},
+    {file = "urllib3-2.0.5.tar.gz", hash = "sha256:13abf37382ea2ce6fb744d4dad67838eec857c9f4f57009891805e0b5e123594"},
 ]
 
 [package.extras]
@@ -1913,4 +1913,4 @@ tests-strict = ["codecov (==2.0.15)", "pytest (==4.6.0)", "pytest (==4.6.0)", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "19754be1c49e1f7146c5b578011c7870cf7784256e9a5c5724120c0ae8d2a0ee"
+content-hash = "f7678b6fce2418fff20b8a49213cc378a124f5174a6146bd98ce2574e61aa468"
