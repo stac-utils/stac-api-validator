@@ -2854,7 +2854,7 @@ def validate_item_search_intersects(
             search_url,
             errors,
             Context.ITEM_SEARCH,
-            body={"collections": [collection], "intersects": geometry},
+            body={"collections": [collection], "intersects": json.loads(geometry)},
             r_session=r_session,
         )
         if not item_collection or not item_collection.get("features"):
