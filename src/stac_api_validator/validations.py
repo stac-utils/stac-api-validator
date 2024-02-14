@@ -26,7 +26,6 @@ from pystac import Catalog
 from pystac import Collection
 from pystac import Item
 from pystac import ItemCollection
-from pystac import StacIO
 from pystac import STACValidationError
 from pystac_client import Client
 from requests import Request
@@ -298,16 +297,6 @@ def is_geojson_type(maybe_type: Optional[str]) -> bool:
     )
 
 
-def get_catalog(data_dict: Dict[str, Any], r_session: Session) -> Catalog:
-    stac_io = StacIO.default()
-    if r_session.headers and r_session.headers.get("Authorization"):
-        stac_io.headers = r_session.headers  # noqa, type: ignore
-        stac_io.headers["Accept-Encoding"] = "*"
-    catalog = Catalog.from_dict(data_dict)
-    catalog._stac_io = stac_io
-    return catalog
-
-
 # def is_json_or_geojson_type(maybe_type: Optional[str]) -> bool:
 #     return maybe_type and (is_json_type(maybe_type) or is_geojson_type(maybe_type))
 
@@ -391,8 +380,9 @@ def retrieve(
     additional: Optional[str] = "",
     content_type: Optional[str] = None,
 ) -> Tuple[int, Optional[Dict[str, Any]], Optional[Mapping[str, str]]]:
-    request = Request(method.value, url, headers=headers, params=params, json=body)
-    resp = r_session.send(r_session.prepare_request(request))
+    resp = r_session.send(
+        Request(method.value, url, headers=headers, params=params, json=body).prepare()
+    )
 
     # todo: handle connection exception, etc.
     # todo: handle timeout
@@ -546,7 +536,6 @@ def validate_api(
     validate_pagination: bool,
     query_config: QueryConfig,
     transaction_collection: Optional[str],
-    headers: Optional[Dict[str, str]],
 ) -> Tuple[Warnings, Errors]:
     warnings = Warnings()
     errors = Errors()
@@ -557,9 +546,6 @@ def validate_api(
 
     if auth_query_parameter and (xs := auth_query_parameter.split("=", 1)):
         r_session.params = {xs[0]: xs[1]}
-
-    if headers:
-        r_session.headers.update(headers)
 
     _, landing_page_body, landing_page_headers = retrieve(
         Method.GET, root_url, errors, Context.CORE, r_session
@@ -717,7 +703,7 @@ def validate_api(
 
     if not errors:
         try:
-            catalog = Client.open(root_url, headers=headers)
+            catalog = Client.open(root_url)
             catalog.validate()
             for child in catalog.get_children():
                 child.validate()
@@ -824,8 +810,7 @@ def validate_core(
     # this validates, among other things, that the child and item link relations reference
     # valid STAC Catalogs, Collections, and/or Items
     try:
-        catalog = get_catalog(root_body, r_session)
-        list(take(1000, catalog.get_all_items()))
+        list(take(1000, Catalog.from_dict(root_body).get_all_items()))
     except pystac.errors.STACTypeError as e:
         errors += (
             f"[{Context.CORE}] Error while traversing Catalog child/item links to find Items: {e} "
@@ -853,15 +838,14 @@ def validate_browseable(
     # check that at least a few of the items that can be reached from child/item link relations
     # can be found through search
     try:
-        catalog = get_catalog(root_body, r_session)
-        for item in take(10, catalog.get_all_items()):
+        for item in take(10, Catalog.from_dict(root_body).get_all_items()):
             if link := link_by_rel(root_body.get("links"), "search"):
                 _, body, _ = retrieve(
                     Method.GET,
                     link["href"],
                     errors,
                     Context.BROWSEABLE,
-                    params={"ids": item.id, "collections": item.collection_id},
+                    params={"ids": item.id, "collections": item.collection},
                     r_session=r_session,
                 )
                 if body and len(body.get("features", [])) != 1:
