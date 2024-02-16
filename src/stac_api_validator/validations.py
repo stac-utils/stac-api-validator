@@ -1,4 +1,5 @@
 """Validations module."""
+
 import copy
 import itertools
 import json
