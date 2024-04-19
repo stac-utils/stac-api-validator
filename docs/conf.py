@@ -1,4 +1,5 @@
 """Sphinx configuration."""
+
 project = "STAC API Validator"
 author = "Phil Varner"
 copyright = "2022, Phil Varner"
