@@ -1,4 +1,5 @@
 """Validations module."""
+
 import copy
 import itertools
 import json
@@ -745,13 +746,13 @@ def validate_core(
         errors += "/ : Link[rel=root] must exist"
     else:
         if not is_json_type(root.get("type")):
-            errors += f"/ : Link[rel=root] type is not application/geo+json, instead {root.get('type')}"
+            errors += f"/ : Link[rel=root] type is not application/json, instead {root.get('type')}"
 
     if not (_self := link_by_rel(links, "self")):
         warnings += "/ : Link[rel=self] must exist"
     else:
         if not is_json_type(_self.get("type")):
-            errors += f"/ : Link[rel=self] type is not application/geo+json, instead {_self.get('type')}"
+            errors += f"/ : Link[rel=self] type is not application/json, instead {_self.get('type')}"
 
     if not (service_desc := link_by_rel(links, "service-desc")):
         errors += "/ : Link[rel=service-desc] must exist"
@@ -2854,7 +2855,7 @@ def validate_item_search_intersects(
             search_url,
             errors,
             Context.ITEM_SEARCH,
-            body={"collections": [collection], "intersects": geometry},
+            body={"collections": [collection], "intersects": json.loads(geometry)},
             r_session=r_session,
         )
         if not item_collection or not item_collection.get("features"):
