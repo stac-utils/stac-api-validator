@@ -23,7 +23,7 @@ pystac = { extras = ["orjson"], version = "^1.8.3" }
 jsonschema = "^4.16.0"
 PyYAML = "^6.0.1"
 Shapely = ">=1.8.4"
-more_itertools = "^8.14.0"
+more_itertools = ">=8.14,<11.0"
 stac-check = "^1.3.1"
 stac-validator = "^3.2.0"
 deepdiff = "^6.2.3"
