@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2024-04-29
+
 ### Fixed
 
 - Don't warn about old versions for extensions ([#365](https://github.com/stac-utils/stac-api-validator/pull/365))
+- Convert intersects geometry to dictionary for POST ([#390](https://github.com/stac-utils/stac-api-validator/pull/390))
 
 ## [0.6.1] - 2023-04-24
 
@@ -158,7 +161,8 @@ Release is primarily to publish to Read the Docs as a version.
 
 - Fixed issue with item-search validation relying on collections behavior
 
-[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.1...main
+[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.2...main
+[0.6.2]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.2
 [0.6.1]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.1
 [0.6.0]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.0
 [0.5.0]: https://github.com/stac-utils/stac-api-validator/tree/v0.5.0
