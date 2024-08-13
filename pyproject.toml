@@ -17,7 +17,7 @@ Changelog = "https://github.com/stac-utils/stac-api-validator/releases"
 python = "^3.10"
 click = "^8.1.3"
 certifi = "^2024.2.2"
-pystac-client = "^0.7.5"
+pystac-client = ">=0.7.5,<0.9.0"
 requests = "^2.31.0"
 pystac = { extras = ["orjson"], version = "^1.8.3" }
 jsonschema = "^4.16.0"
