@@ -26,7 +26,7 @@ Shapely = ">=1.8.4"
 more_itertools = ">=8.14,<11.0"
 stac-check = "^1.3.1"
 stac-validator = "^3.2.0"
-deepdiff = ">=6.2.3,<8.0.0"
+deepdiff = ">=6.2.3,<9.0.0"
 
 [tool.poetry.dev-dependencies]
 Pygments = ">=2.10.0"
