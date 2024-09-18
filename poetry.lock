@@ -2193,17 +2193,17 @@ test = ["cython (>=3.0)", "defusedxml (>=0.7.1)", "pytest (>=8.0)", "setuptools 
 
 [[package]]
 name = "sphinx-autobuild"
-version = "2024.4.16"
+version = "2024.9.17"
 description = "Rebuild Sphinx documentation on changes, with hot reloading in the browser."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "sphinx_autobuild-2024.4.16-py3-none-any.whl", hash = "sha256:f2522779d30fcbf0253e09714f274ce8c608cb6ebcd67922b1c54de59faba702"},
-    {file = "sphinx_autobuild-2024.4.16.tar.gz", hash = "sha256:1c0ed37a1970eed197f9c5a66d65759e7c4e4cba7b5a5d77940752bf1a59f2c7"},
+    {file = "sphinx_autobuild-2024.9.17-py3-none-any.whl", hash = "sha256:18f74618ad434018b9c52eab2526dfeb813e89fc14021361f26d8ca84c98458d"},
+    {file = "sphinx_autobuild-2024.9.17.tar.gz", hash = "sha256:a8e6e888283c2cc599d0dbc073f89be95628ca2d6c5c41ed086ab206bb7c9b99"},
 ]
 
 [package.dependencies]
-colorama = "*"
+colorama = ">=0.4.6"
 sphinx = "*"
 starlette = ">=0.35"
 uvicorn = ">=0.25"
@@ -2211,7 +2211,7 @@ watchfiles = ">=0.20"
 websockets = ">=11"
 
 [package.extras]
-test = ["pytest (>=6)"]
+test = ["httpx", "pytest (>=6)"]
 
 [[package]]
 name = "sphinx-basic-ng"
