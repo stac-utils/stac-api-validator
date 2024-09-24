@@ -2025,18 +2025,18 @@ typing-extensions = ">=4.7.1"
 
 [[package]]
 name = "setuptools"
-version = "74.0.0"
+version = "75.1.0"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "setuptools-74.0.0-py3-none-any.whl", hash = "sha256:0274581a0037b638b9fc1c6883cc71c0210865aaa76073f7882376b641b84e8f"},
-    {file = "setuptools-74.0.0.tar.gz", hash = "sha256:a85e96b8be2b906f3e3e789adec6a9323abf79758ecfa3065bd740d81158b11e"},
+    {file = "setuptools-75.1.0-py3-none-any.whl", hash = "sha256:35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"},
+    {file = "setuptools-75.1.0.tar.gz", hash = "sha256:d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538"},
 ]
 
 [package.extras]
 check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1)", "ruff (>=0.5.2)"]
-core = ["importlib-metadata (>=6)", "importlib-resources (>=5.10.2)", "jaraco.text (>=3.7)", "more-itertools (>=8.8)", "packaging (>=24)", "platformdirs (>=2.6.2)", "tomli (>=2.0.1)", "wheel (>=0.43.0)"]
+core = ["importlib-metadata (>=6)", "importlib-resources (>=5.10.2)", "jaraco.collections", "jaraco.functools", "jaraco.text (>=3.7)", "more-itertools", "more-itertools (>=8.8)", "packaging", "packaging (>=24)", "platformdirs (>=2.6.2)", "tomli (>=2.0.1)", "wheel (>=0.43.0)"]
 cover = ["pytest-cov"]
 doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "pygments-github-lexers (==0.0.5)", "pyproject-hooks (!=1.1)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-favicon", "sphinx-inline-tabs", "sphinx-lint", "sphinx-notfound-page (>=1,<2)", "sphinx-reredirects", "sphinxcontrib-towncrier", "towncrier (<24.7)"]
 enabler = ["pytest-enabler (>=2.2)"]
@@ -2193,17 +2193,17 @@ test = ["cython (>=3.0)", "defusedxml (>=0.7.1)", "pytest (>=8.0)", "setuptools 
 
 [[package]]
 name = "sphinx-autobuild"
-version = "2024.4.16"
+version = "2024.9.19"
 description = "Rebuild Sphinx documentation on changes, with hot reloading in the browser."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "sphinx_autobuild-2024.4.16-py3-none-any.whl", hash = "sha256:f2522779d30fcbf0253e09714f274ce8c608cb6ebcd67922b1c54de59faba702"},
-    {file = "sphinx_autobuild-2024.4.16.tar.gz", hash = "sha256:1c0ed37a1970eed197f9c5a66d65759e7c4e4cba7b5a5d77940752bf1a59f2c7"},
+    {file = "sphinx_autobuild-2024.9.19-py3-none-any.whl", hash = "sha256:57d974eebfc6461ff0fd136e78bf7a9c057d543d5166d318a45599898019b82c"},
+    {file = "sphinx_autobuild-2024.9.19.tar.gz", hash = "sha256:2dd4863d174e533c1cd075eb5dfc90ad9a21734af7efd25569bf228b405e08ef"},
 ]
 
 [package.dependencies]
-colorama = "*"
+colorama = ">=0.4.6"
 sphinx = "*"
 starlette = ">=0.35"
 uvicorn = ">=0.25"
@@ -2211,7 +2211,7 @@ watchfiles = ">=0.20"
 websockets = ">=11"
 
 [package.extras]
-test = ["pytest (>=6)"]
+test = ["httpx", "pytest (>=6)"]
 
 [[package]]
 name = "sphinx-basic-ng"
