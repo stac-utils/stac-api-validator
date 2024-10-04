@@ -1,8 +1,10 @@
 name: Tests
 
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   tests:
@@ -96,6 +98,8 @@ jobs:
         with:
           name: coverage-data
           path: ".coverage.*"
+          if-no-files-found: error
+          include-hidden-files: true
 
       - name: Upload documentation
         if: matrix.session == 'docs-build'
@@ -148,4 +152,4 @@ jobs:
           nox --session=coverage -- xml
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v4.5.0
+        uses: codecov/codecov-action@v4.6.0
