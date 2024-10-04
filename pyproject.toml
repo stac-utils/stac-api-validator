@@ -17,7 +17,7 @@ Changelog = "https://github.com/stac-utils/stac-api-validator/releases"
 python = "^3.10"
 click = "^8.1.3"
 certifi = "^2024.2.2"
-pystac-client = "^0.7.5"
+pystac-client = ">=0.7.5,<0.9.0"
 requests = "^2.31.0"
 pystac = { extras = ["orjson"], version = "^1.8.3" }
 jsonschema = "^4.16.0"
@@ -26,7 +26,7 @@ Shapely = ">=1.8.4"
 more_itertools = ">=8.14,<11.0"
 stac-check = "^1.3.1"
 stac-validator = "^3.2.0"
-deepdiff = ">=6.2.3,<8.0.0"
+deepdiff = ">=6.2.3,<9.0.0"
 
 [tool.poetry.dev-dependencies]
 Pygments = ">=2.10.0"

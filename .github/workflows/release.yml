@@ -9,6 +9,11 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment:
+      name: release
+      url: https://pypi.org/p/stac-api-validator
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
@@ -56,18 +61,13 @@ jobs:
 
       - name: Publish package on PyPI
         if: steps.check-version.outputs.tag
-        uses: pypa/gh-action-pypi-publish@v1.9.0
-        with:
-          user: ${{ secrets.PYPI_STACUTILS_USERNAME }}
-          password: ${{ secrets.PYPI_STACUTILS_PASSWORD}}
+        uses: pypa/gh-action-pypi-publish@v1.10.2
 
       - name: Publish package on TestPyPI
         if: "! steps.check-version.outputs.tag"
-        uses: pypa/gh-action-pypi-publish@v1.9.0
+        uses: pypa/gh-action-pypi-publish@v1.10.2
         with:
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
+          repository-url: https://test.pypi.org/legacy/
 
       - name: Publish the release notes
         uses: release-drafter/release-drafter@v6.0.0
