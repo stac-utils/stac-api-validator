@@ -119,7 +119,7 @@ Options:
                                   [required]
   --auth-bearer-token TEXT        Authorization Bearer token value to append
                                   to all requests.
-  --auth-query-parameter TEXT     Query pararmeter key and value to pass for
+  --auth-query-parameter TEXT     Query parameter key and value to pass for
                                   authorization, e.g., 'key=xyz'.
   --help                          Show this message and exit.
 ```
