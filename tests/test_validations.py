@@ -47,7 +47,7 @@ def sample_item() -> Generator[pystac.Item, None, None]:
 @pytest.fixture
 def expected_headers() -> Generator[Dict[str, str], None, None]:
     yield {
-        "User-Agent": "python-requests/2.28.2",
+        "User-Agent": "python-requests/2.32.3",
         "Accept-Encoding": "gzip, deflate",
         "Accept": "*/*",
         "Connection": "keep-alive",

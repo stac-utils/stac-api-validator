@@ -28,7 +28,7 @@ def test_retrieve_called_with_auth_headers(
         )
 
     expected_headers = {
-        "User-Agent": "python-requests/2.28.2",
+        "User-Agent": "python-requests/2.32.3",
         "Accept-Encoding": "gzip, deflate",
         "Accept": "*/*",
         "Connection": "keep-alive",
