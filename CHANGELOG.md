@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2024-10-07
+
+- Allow generic auth headers ([#392](https://github.com/stac-utils/stac-api-validator/pull/392))
+
 ## [0.6.2] - 2024-04-29
 
 ### Fixed
