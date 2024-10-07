@@ -131,6 +131,12 @@ from stac_api_validator.validations import validate_api
     "--transaction-collection",
     help="The name of the collection to use for Transaction Extension tests.",
 )
+@click.option(
+    "-H",
+    "--headers",
+    multiple=True,
+    help="Headers to attach to the main request and dependent pystac requests, curl syntax",
+)
 def main(
     log_level: str,
     root_url: str,
@@ -155,11 +161,21 @@ def main(
     query_in_field: Optional[str] = None,
     query_in_values: Optional[str] = None,
     transaction_collection: Optional[str] = None,
+    headers: Optional[List[str]] = None,
 ) -> int:
     """STAC API Validator."""
     logging.basicConfig(stream=sys.stdout, level=log_level)
 
     try:
+        processed_headers = {}
+        if headers:
+            processed_headers.update(
+                {
+                    key.strip(): value.strip()
+                    for key, value in (header.split(":") for header in headers)
+                }
+            )
+
         (warnings, errors) = validate_api(
             root_url=root_url,
             ccs_to_validate=conformance_classes,
@@ -185,6 +201,7 @@ def main(
                 query_in_values,
             ),
             transaction_collection=transaction_collection,
+            headers=processed_headers,
         )
     except Exception as e:
         click.secho(
