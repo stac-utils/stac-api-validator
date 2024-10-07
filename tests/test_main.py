@@ -20,7 +20,7 @@ def test_main_fails(runner: CliRunner) -> None:
 
 
 def test_retrieve_called_with_auth_headers(
-    request: pytest.FixtureRequest, runner: CliRunner
+    request: pytest.FixtureRequest, runner: CliRunner, requests_version: str
 ) -> None:
     if request.config.getoption("typeguard_packages"):
         pytest.skip(
@@ -28,7 +28,7 @@ def test_retrieve_called_with_auth_headers(
         )
 
     expected_headers = {
-        "User-Agent": "python-requests/2.32.3",
+        "User-Agent": f"python-requests/{requests_version}",
         "Accept-Encoding": "gzip, deflate",
         "Accept": "*/*",
         "Connection": "keep-alive",
