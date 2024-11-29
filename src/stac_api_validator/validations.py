@@ -3199,23 +3199,26 @@ def validate_item_search_ids(
         r_session=r_session,
     )
 
-    items = body.get("features")  # type: ignore
-    if items and len(items) >= 2:
-        _validate_search_ids_with_ids(
-            search_url, [items[0].get("id")], methods, errors, r_session
-        )
-        _validate_search_ids_with_ids(
-            search_url,
-            [items[0].get("id"), items[1].get("id")],
-            methods,
-            errors,
-            r_session,
-        )
-        _validate_search_ids_with_ids(
-            search_url, [i["id"] for i in items], methods, errors, r_session
-        )
+    if not body:
+        errors += f"[{Context.ITEM_SEARCH}] GET Search body was empty"
     else:
-        warnings += f"[{Context.ITEM_SEARCH}] GET Search with no parameters returned < 2 results"
+        items = body.get("features")  # type: ignore
+        if items and len(items) >= 2:
+            _validate_search_ids_with_ids(
+                search_url, [items[0].get("id")], methods, errors, r_session
+            )
+            _validate_search_ids_with_ids(
+                search_url,
+                [items[0].get("id"), items[1].get("id")],
+                methods,
+                errors,
+                r_session,
+            )
+            _validate_search_ids_with_ids(
+                search_url, [i["id"] for i in items], methods, errors, r_session
+            )
+        else:
+            warnings += f"[{Context.ITEM_SEARCH}] GET Search with no parameters returned < 2 results"
 
 
 def validate_item_search_ids_does_not_override_all_other_params(
@@ -3236,7 +3239,7 @@ def validate_item_search_ids_does_not_override_all_other_params(
         content_type=geojson_mt,
         r_session=r_session,
     )
-    if body.get("features"):  # type: ignore
+    if body and body.get("features"):  # type: ignore
         _validate_search_ids_with_ids_no_override(
             search_url,
             body["features"][0],
