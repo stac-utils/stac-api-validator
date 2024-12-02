@@ -301,7 +301,7 @@ def is_geojson_type(maybe_type: Optional[str]) -> bool:
 
 def get_catalog(data_dict: Dict[str, Any], r_session: Session) -> Catalog:
     stac_io = StacIO.default()
-    if r_session.headers and r_session.headers.get("Authorization"):
+    if r_session.headers:
         stac_io.headers = r_session.headers  # noqa, type: ignore
         stac_io.headers["Accept-Encoding"] = "*"
     catalog = Catalog.from_dict(data_dict)
@@ -3238,7 +3238,11 @@ def validate_item_search_ids_does_not_override_all_other_params(
     )
     if body.get("features"):  # type: ignore
         _validate_search_ids_with_ids_no_override(
-            search_url, body["features"][0], methods, errors, r_session  # type: ignore
+            search_url,
+            body["features"][0],
+            methods,
+            errors,
+            r_session,  # type: ignore
         )
     else:
         warnings += (
