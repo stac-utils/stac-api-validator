@@ -4,12 +4,12 @@ argcomplete==3.5.0
     # via nox
 build==1.2.2
     # via poetry
-cachecontrol==0.14.0
+cachecontrol[filecache]==0.14.0
     # via poetry
 certifi==2024.8.30
     # via requests
 cffi==1.17.1
-    # via xattr
+    # via cryptography
 charset-normalizer==3.3.2
     # via requests
 cleo==2.1.0
@@ -17,12 +17,12 @@ cleo==2.1.0
 colorlog==6.8.2
     # via nox
 crashtest==0.4.1
-    # via
-    #   cleo
-    #   poetry
+    # via cleo
+cryptography==44.0.0
+    # via secretstorage
 distlib==0.3.8
     # via virtualenv
-dulwich==0.21.7
+dulwich==0.22.7
     # via poetry
 fastjsonschema==2.20.0
     # via poetry
@@ -32,52 +32,48 @@ filelock==3.16.1
     #   virtualenv
 idna==3.10
     # via requests
-importlib-metadata==8.5.0
-    # via keyring
 installer==0.7.0
     # via poetry
 jaraco-classes==3.4.0
     # via keyring
-keyring==24.3.1
+jaraco-context==6.0.1
+    # via keyring
+jaraco-functools==4.1.0
+    # via keyring
+jeepney==0.8.0
+    # via
+    #   keyring
+    #   secretstorage
+keyring==25.6.0
     # via poetry
 more-itertools==10.5.0
-    # via jaraco-classes
+    # via
+    #   jaraco-classes
+    #   jaraco-functools
 msgpack==1.1.0
     # via cachecontrol
 nox==2024.4.15
     # via
-    #   -r .github/workflows/constraints.in
+    #   -r constraints.in
     #   nox-poetry
 nox-poetry==1.0.3
-    # via -r .github/workflows/constraints.in
+    # via -r constraints.in
 packaging==24.1
     # via
     #   build
     #   nox
     #   nox-poetry
     #   poetry
-pexpect==4.9.0
-    # via poetry
-pip==24.2
-    # via -r .github/workflows/constraints.in
-pkginfo==1.11.1
+pkginfo==1.12.0
     # via poetry
 platformdirs==4.3.6
     # via
     #   poetry
     #   virtualenv
-poetry==1.8.3
-    # via
-    #   -r .github/workflows/constraints.in
-    #   poetry-plugin-export
-poetry-core==1.9.0
-    # via
-    #   poetry
-    #   poetry-plugin-export
-poetry-plugin-export==1.8.0
+poetry==2.0.0
+    # via -r constraints.in
+poetry-core==2.0.0
     # via poetry
-ptyprocess==0.7.0
-    # via pexpect
 pycparser==2.22
     # via cffi
 pyproject-hooks==1.2.0
@@ -93,13 +89,10 @@ requests==2.32.3
     #   requests-toolbelt
 requests-toolbelt==1.0.0
     # via poetry
+secretstorage==3.3.3
+    # via keyring
 shellingham==1.5.4
     # via poetry
-tomli==2.0.2
-    # via
-    #   build
-    #   nox
-    #   poetry
 tomlkit==0.13.2
     # via
     #   nox-poetry
@@ -112,10 +105,6 @@ urllib3==2.2.3
     #   requests
 virtualenv==20.26.6
     # via
-    #   -r .github/workflows/constraints.in
+    #   -r constraints.in
     #   nox
     #   poetry
-xattr==1.1.0
-    # via poetry
-zipp==3.20.2
-    # via importlib-metadata
