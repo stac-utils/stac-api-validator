@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "stac-api-validator"
-version = "0.6.3"
+version = "0.6.4"
 description = "STAC API Validator"
 authors = ["Phil Varner <phil@philvarner.com>"]
 license = "Apache-2.0"

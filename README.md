@@ -100,7 +100,7 @@ The current validity status of several popular STAC API implementations can be f
 
 Usage:
 
-```
+```text
 Usage: stac-api-validator [OPTIONS]
 
   STAC API Validator.
@@ -132,7 +132,7 @@ the specified collection.
 
 Example:
 
-```
+```shell
 stac-api-validator \
     --root-url https://planetarycomputer.microsoft.com/api/stac/v1/ \
     --conformance core \
@@ -144,7 +144,7 @@ stac-api-validator \
 
 Example output:
 
-```
+```text
 Validating https://cmr.earthdata.nasa.gov/stac/LARC_ASDC ...
 STAC API - Core conformance class found.
 STAC API - Item Search conformance class found.
@@ -160,7 +160,7 @@ errors:
 
 Example with authorization using parameters:
 
-```
+```shell
 stac-api-validator --root-url https://api.radiant.earth/mlhub/v1 --conformance core --auth-query-parameter 'key=xxx'
 ```
 
@@ -174,7 +174,7 @@ validate conformance.
 
 Full instructions are available at the link above, but the simplest way to run this is with:
 
-```
+```shell
 docker run -p 8081:8080 ogccite/ets-ogcapi-features10
 ```
 
