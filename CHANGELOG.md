@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2025-01-17
+
+### Added
+
+- Ability to configure whether to open assets ([#595](https://github.com/stac-utils/stac-api-validator/pull/595))
+
+### Fixed
+
+- HTTP headers to **stac-validator** ([#595](https://github.com/stac-utils/stac-api-validator/pull/595))
+
 ## [0.6.3] - 2024-10-07
+
+### Added
 
 - Allow generic auth headers ([#392](https://github.com/stac-utils/stac-api-validator/pull/392))
 
@@ -165,7 +177,9 @@ Release is primarily to publish to Read the Docs as a version.
 
 - Fixed issue with item-search validation relying on collections behavior
 
-[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.2...main
+[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.4...main
+[0.6.4]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.3..v0.6.4
+[0.6.3]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.2..v0.6.3
 [0.6.2]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.2
 [0.6.1]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.1
 [0.6.0]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.0
