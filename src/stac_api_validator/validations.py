@@ -331,6 +331,8 @@ def stac_validate(
     errors: Errors,
     context: Context,
     method: Method = Method.GET,
+    open_assets_urls: bool = True,
+    headers: Optional[dict] = None,
 ) -> None:
     if not body:
         errors += f"[{context}] : {method} {url} body was empty when running stac-validate and stac-check"
@@ -350,8 +352,14 @@ def stac_validate(
                 errors += f"[{context}] : {method} {url} '{body.get('id')}' failed pystac hydration: {e}"
 
             if _type in ["Collection", "Feature"]:
+                logger.debug(f"stac-validator validation: {url}")
                 if not (
-                    stac_validator := StacValidate(links=True, assets=True)
+                    stac_validator := StacValidate(
+                        links=True,
+                        assets=True,
+                        assets_open_urls=open_assets_urls,
+                        headers=headers or {},
+                    )
                 ).validate_dict(body):
                     errors += f"[{context}] : {method} {url} failed stac-validator validation: {stac_validator.message}"
 
@@ -365,9 +373,12 @@ def stac_check(
     warnings: Warnings,
     context: Context,
     method: Method = Method.GET,
+    open_assets_urls: bool = True,
+    headers: Optional[dict] = None,
 ) -> None:
     try:
-        linter = Linter(url)
+        logger.debug(f"stac-check validation: {url}")
+        linter = Linter(url, assets_open_urls=open_assets_urls, headers=headers or {})
         if not linter.valid_stac:
             errors += f"[{context}] : {method} {url} is not a valid STAC object: {linter.error_msg}"
         if msgs := linter.best_practices_msg[1:]:  # first msg is a header, so skip
@@ -548,6 +559,7 @@ def validate_api(
     query_config: QueryConfig,
     transaction_collection: Optional[str],
     headers: Optional[Dict[str, str]],
+    open_assets_urls: bool = True,
 ) -> Tuple[Warnings, Errors]:
     warnings = Warnings()
     errors = Errors()
@@ -598,13 +610,17 @@ def validate_api(
 
     if "collections" in ccs_to_validate:
         logger.info("Validating STAC API - Collections conformance class.")
-        validate_collections(landing_page_body, collection, errors, warnings, r_session)
+        validate_collections(
+            landing_page_body, collection, errors, warnings, r_session, open_assets_urls
+        )
 
     conforms_to = landing_page_body.get("conformsTo", [])
 
     if "features" in ccs_to_validate:
         logger.info("Validating STAC API - Features conformance class.")
-        validate_collections(landing_page_body, collection, errors, warnings, r_session)
+        validate_collections(
+            landing_page_body, collection, errors, warnings, r_session, open_assets_urls
+        )
         validate_features(
             landing_page_body,
             conforms_to,
@@ -613,7 +629,8 @@ def validate_api(
             warnings,
             errors,
             r_session,
-            validate_pagination=validate_pagination,
+            validate_pagination,
+            open_assets_urls,
         )
 
     if "transaction" in ccs_to_validate:
@@ -664,6 +681,7 @@ def validate_api(
             conformance_classes=ccs_to_validate,
             r_session=r_session,
             validate_pagination=validate_pagination,
+            open_assets_urls=open_assets_urls,
         )
 
     if "item-search#fields" in ccs_to_validate:
@@ -963,6 +981,7 @@ def validate_collections(
     errors: Errors,
     warnings: Warnings,
     r_session: Session,
+    open_assets_urls: bool = True,
 ) -> None:
     if not (data_link := link_by_rel(root_body["links"], "data")):
         errors += f"[{Context.COLLECTIONS}] /: Link[rel=data] must href /collections"
@@ -1019,7 +1038,15 @@ def validate_collections(
                 )
             else:
                 for body in collections_list:
-                    stac_validate(collections_url, body, errors, Context.COLLECTIONS)
+                    stac_validate(
+                        collections_url,
+                        body,
+                        errors,
+                        Context.COLLECTIONS,
+                        Method.GET,
+                        open_assets_urls,
+                        r_session.headers,
+                    )
 
             collection_url = f"{data_link['href']}/{collection}"
             _, body, resp_headers = retrieve(
@@ -1047,8 +1074,24 @@ def validate_collections(
                 if not link_by_rel(body.get("links", []), "parent"):
                     errors += f"[{Context.COLLECTIONS}] : {collection_url} does not have parent link"
 
-                stac_validate(collection_url, body, errors, Context.COLLECTIONS)
-                stac_check(collection_url, errors, warnings, Context.COLLECTIONS)
+                stac_validate(
+                    collection_url,
+                    body,
+                    errors,
+                    Context.COLLECTIONS,
+                    Method.GET,
+                    open_assets_urls,
+                    r_session.headers,
+                )
+                stac_check(
+                    collection_url,
+                    errors,
+                    warnings,
+                    Context.COLLECTIONS,
+                    Method.GET,
+                    open_assets_urls,
+                    r_session.headers,
+                )
 
         # todo: collection pagination
 
@@ -1062,6 +1105,7 @@ def validate_features(
     errors: Errors,
     r_session: Session,
     validate_pagination: bool,
+    open_assets_urls: bool = True,
 ) -> None:
     if not geometry:
         errors += f"[{Context.FEATURES}] Geometry parameter required for running Features validations."
@@ -1132,7 +1176,15 @@ def validate_features(
         if not body:
             errors += f"[{Context.FEATURES}] GET {collection_items_url} returned an empty body"
         else:
-            stac_validate(collection_items_url, body, errors, Context.FEATURES)
+            stac_validate(
+                collection_items_url,
+                body,
+                errors,
+                Context.FEATURES,
+                Method.GET,
+                open_assets_urls,
+                r_session.headers,
+            )
 
             item_url = link_by_rel(body.get("features", [])[0]["links"], "self")[
                 "href"
@@ -1147,8 +1199,24 @@ def validate_features(
                 r_session=r_session,
             )
 
-            stac_validate(item_url, body, errors, Context.FEATURES)
-            stac_check(item_url, errors, warnings, Context.FEATURES)
+            stac_validate(
+                item_url,
+                body,
+                errors,
+                Context.FEATURES,
+                Method.GET,
+                open_assets_urls,
+                r_session.headers,
+            )
+            stac_check(
+                item_url,
+                errors,
+                warnings,
+                Context.FEATURES,
+                Method.GET,
+                open_assets_urls,
+                r_session.headers,
+            )
 
     # Validate Features non-existent item
     if not (collections_link := link_by_rel(root_links, "data")):
@@ -1195,7 +1263,15 @@ def validate_features(
                     if not link_by_rel(body.get("links", []), "root"):
                         errors += f"[{Context.FEATURES}] GET {collection_items_url} does not have root link"
 
-                    stac_validate(collection_items_url, body, errors, Context.FEATURES)
+                    stac_validate(
+                        collection_items_url,
+                        body,
+                        errors,
+                        Context.FEATURES,
+                        Method.GET,
+                        open_assets_urls,
+                        r_session.headers,
+                    )
 
                     item = next(iter(body.get("features", [])), None)
 
@@ -1233,8 +1309,24 @@ def validate_features(
                                 if not link_by_rel(body.get("links", []), "parent"):
                                     errors += f"[{Context.FEATURES}] GET {item_url} does not have parent link"
 
-                                stac_validate(item_url, body, errors, Context.FEATURES)
-                                stac_check(item_url, errors, warnings, Context.FEATURES)
+                                stac_validate(
+                                    item_url,
+                                    body,
+                                    errors,
+                                    Context.FEATURES,
+                                    Method.GET,
+                                    open_assets_urls,
+                                    r_session.headers,
+                                )
+                                stac_check(
+                                    item_url,
+                                    errors,
+                                    warnings,
+                                    Context.FEATURES,
+                                    Method.GET,
+                                    open_assets_urls,
+                                    r_session.headers,
+                                )
 
     if validate_pagination:
         # Items pagination validation
@@ -1270,6 +1362,7 @@ def validate_item_search(
     conformance_classes: List[str],
     r_session: Session,
     validate_pagination: bool,
+    open_assets_urls: bool = True,
 ) -> None:
     links = root_body.get("links")
 
@@ -1317,7 +1410,14 @@ def validate_item_search(
     )
 
     if body:
-        stac_validate(search_url, body, errors, Context.ITEM_SEARCH)
+        stac_validate(
+            search_url,
+            body,
+            errors,
+            Context.ITEM_SEARCH,
+            open_assets_urls,
+            r_session.headers,
+        )
 
     validate_item_search_limit(search_url, methods, errors, r_session)
     validate_item_search_bbox_xor_intersects(search_url, methods, errors, r_session)
