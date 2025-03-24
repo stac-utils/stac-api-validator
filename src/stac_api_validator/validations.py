@@ -3235,12 +3235,13 @@ def _validate_search_ids_with_ids_no_override(
     errors: Errors,
     r_session: Session,
 ) -> None:
-    bbox = item["bbox"]
+    bbox = item.get("bbox")
     get_params = {
         "ids": item["id"],
         "collections": item["collection"],
-        "bbox": f"{bbox[2] + 1},{bbox[3] + 1},{bbox[2] + 2},{bbox[3] + 2}",
     }
+    if bbox is not None:
+        get_params["bbox"] = f"{bbox[2] + 1},{bbox[3] + 1},{bbox[2] + 2},{bbox[3] + 2}"
 
     if Method.GET in methods:
         _, body, _ = retrieve(
@@ -3263,8 +3264,9 @@ def _validate_search_ids_with_ids_no_override(
         post_params = {
             "ids": [item["id"]],
             "collections": [item["collection"]],
-            "bbox": [bbox[2] + 1, bbox[3] + 1, bbox[2] + 2, bbox[3] + 2],
         }
+        if bbox is not None:
+            post_params["bbox"] = [bbox[2] + 1, bbox[3] + 1, bbox[2] + 2, bbox[3] + 2]
 
         _, body, _ = retrieve(
             Method.POST,
