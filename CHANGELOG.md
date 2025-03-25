@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2025-03-25
+
+### Fixed
+
+- Allow items without a bbox ([#639](https://github.com/stac-utils/stac-api-validator/pull/639))
+
 ## [0.6.4] - 2025-01-17
 
 ### Added
@@ -177,7 +183,8 @@ Release is primarily to publish to Read the Docs as a version.
 
 - Fixed issue with item-search validation relying on collections behavior
 
-[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.4...main
+[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.5...main
+[0.6.5]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.4..v0.6.5
 [0.6.4]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.3..v0.6.4
 [0.6.3]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.2..v0.6.3
 [0.6.2]: https://github.com/stac-utils/stac-api-validator/tree/v0.6.2
