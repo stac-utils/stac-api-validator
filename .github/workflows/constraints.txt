@@ -2,14 +2,16 @@
 #    uv pip compile .github/workflows/constraints.in
 argcomplete==3.5.0
     # via nox
+attrs==25.3.0
+    # via nox
 build==1.2.2
     # via poetry
-cachecontrol==0.14.0
+cachecontrol[filecache]==0.14.0
     # via poetry
 certifi==2024.8.30
     # via requests
 cffi==1.17.1
-    # via xattr
+    # via cryptography
 charset-normalizer==3.3.2
     # via requests
 cleo==2.1.0
@@ -20,6 +22,10 @@ crashtest==0.4.1
     # via
     #   cleo
     #   poetry
+cryptography==44.0.3
+    # via secretstorage
+dependency-groups==1.3.1
+    # via nox
 distlib==0.3.8
     # via virtualenv
 dulwich==0.21.7
@@ -33,33 +39,39 @@ filelock==3.16.1
 idna==3.10
     # via requests
 importlib-metadata==8.5.0
-    # via keyring
+    # via
+    #   build
+    #   keyring
+    #   poetry
 installer==0.7.0
     # via poetry
 jaraco-classes==3.4.0
     # via keyring
+jeepney==0.9.0
+    # via
+    #   keyring
+    #   secretstorage
 keyring==24.3.1
     # via poetry
 more-itertools==10.5.0
     # via jaraco-classes
 msgpack==1.1.0
     # via cachecontrol
-nox==2024.4.15
+nox==2025.5.1
     # via
-    #   -r .github/workflows/constraints.in
+    #   -r constraints.in
     #   nox-poetry
 nox-poetry==1.0.3
-    # via -r .github/workflows/constraints.in
+    # via -r constraints.in
 packaging==24.1
     # via
     #   build
+    #   dependency-groups
     #   nox
     #   nox-poetry
     #   poetry
 pexpect==4.9.0
     # via poetry
-pip==24.2
-    # via -r .github/workflows/constraints.in
 pkginfo==1.11.1
     # via poetry
 platformdirs==4.3.6
@@ -68,7 +80,7 @@ platformdirs==4.3.6
     #   virtualenv
 poetry==1.8.3
     # via
-    #   -r .github/workflows/constraints.in
+    #   -r constraints.in
     #   poetry-plugin-export
 poetry-core==1.9.0
     # via
@@ -93,11 +105,14 @@ requests==2.32.3
     #   requests-toolbelt
 requests-toolbelt==1.0.0
     # via poetry
+secretstorage==3.3.3
+    # via keyring
 shellingham==1.5.4
     # via poetry
 tomli==2.0.2
     # via
     #   build
+    #   dependency-groups
     #   nox
     #   poetry
 tomlkit==0.13.2
@@ -112,10 +127,8 @@ urllib3==2.2.3
     #   requests
 virtualenv==20.26.6
     # via
-    #   -r .github/workflows/constraints.in
+    #   -r constraints.in
     #   nox
     #   poetry
-xattr==1.1.0
-    # via poetry
 zipp==3.20.2
     # via importlib-metadata
