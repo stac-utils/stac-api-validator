@@ -376,14 +376,14 @@ files = [
 
 [[package]]
 name = "click"
-version = "8.1.8"
+version = "8.2.0"
 description = "Composable command line interface toolkit"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "click-8.1.8-py3-none-any.whl", hash = "sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2"},
-    {file = "click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a"},
+    {file = "click-8.2.0-py3-none-any.whl", hash = "sha256:6b303f0b2aa85f1cb4e5303078fadcbcd4e476f114fab9b5007005711839325c"},
+    {file = "click-8.2.0.tar.gz", hash = "sha256:f5452aeddd9988eefa20f90f05ab66f17fce1ee2a36907fd30b05bbb5953814d"},
 ]
 
 [package.dependencies]
@@ -555,22 +555,27 @@ files = [
 
 [[package]]
 name = "deepdiff"
-version = "8.4.2"
+version = "8.5.0"
 description = "Deep Difference and Search of any Python object/data. Recreate objects by adding adding deltas to each other."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "deepdiff-8.4.2-py3-none-any.whl", hash = "sha256:7e39e5b26f3747c54f9d0e8b9b29daab670c3100166b77cc0185d5793121b099"},
-    {file = "deepdiff-8.4.2.tar.gz", hash = "sha256:5c741c0867ebc7fcb83950ad5ed958369c17f424e14dee32a11c56073f4ee92a"},
+    {file = "deepdiff-8.5.0-py3-none-any.whl", hash = "sha256:d4599db637f36a1c285f5fdfc2cd8d38bde8d8be8636b65ab5e425b67c54df26"},
+    {file = "deepdiff-8.5.0.tar.gz", hash = "sha256:a4dd3529fa8d4cd5b9cbb6e3ea9c95997eaa919ba37dac3966c1b8f872dc1cd1"},
 ]
 
 [package.dependencies]
-orderly-set = ">=5.3.0,<6"
+orderly-set = ">=5.4.1,<6"
 
 [package.extras]
-cli = ["click (==8.1.8)", "pyyaml (==6.0.2)"]
+cli = ["click (>=8.1.0,<8.2.0)", "pyyaml (>=6.0.0,<6.1.0)"]
+coverage = ["coverage (>=7.6.0,<7.7.0)"]
+dev = ["bump2version (>=1.0.0,<1.1.0)", "ipdb (>=0.13.0,<0.14.0)", "jsonpickle (>=4.0.0,<4.1.0)", "nox (==2025.5.1)", "numpy (>=2.0,<3.0) ; python_version < \"3.10\"", "numpy (>=2.2.0,<2.3.0) ; python_version >= \"3.10\"", "orjson (>=3.10.0,<3.11.0)", "pandas (>=2.2.0,<2.3.0)", "polars (>=1.21.0,<1.22.0)", "python-dateutil (>=2.9.0,<2.10.0)", "tomli (>=2.2.0,<2.3.0)", "tomli-w (>=1.2.0,<1.3.0)"]
+docs = ["Sphinx (>=6.2.0,<6.3.0)", "sphinx-sitemap (>=2.6.0,<2.7.0)", "sphinxemoji (>=0.3.0,<0.4.0)"]
 optimize = ["orjson"]
+static = ["flake8 (>=7.1.0,<7.2.0)", "flake8-pyproject (>=1.2.3,<1.3.0)", "pydantic (>=2.10.0,<2.11.0)"]
+test = ["pytest (>=8.3.0,<8.4.0)", "pytest-benchmark (>=5.1.0,<5.2.0)", "pytest-cov (>=6.0.0,<6.1.0)", "python-dotenv (>=1.0.0,<1.1.0)"]
 
 [[package]]
 name = "distlib"
@@ -620,16 +625,19 @@ poetry = ["poetry"]
 
 [[package]]
 name = "exceptiongroup"
-version = "1.2.2"
+version = "1.3.0"
 description = "Backport of PEP 654 (exception groups)"
 optional = false
 python-versions = ">=3.7"
 groups = ["dev"]
 markers = "python_version < \"3.11\""
 files = [
-    {file = "exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b"},
-    {file = "exceptiongroup-1.2.2.tar.gz", hash = "sha256:47c2edf7c6738fafb49fd34290706d1a1a2f4d1c6df275526b62cbb4aa5393cc"},
+    {file = "exceptiongroup-1.3.0-py3-none-any.whl", hash = "sha256:4d111e6e0c13d0644cad6ddaa7ed0261a0b36971f6d23e7ec9b4b9097da78a10"},
+    {file = "exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88"},
 ]
+
+[package.dependencies]
+typing-extensions = {version = ">=4.6.0", markers = "python_version < \"3.13\""}
 
 [package.extras]
 test = ["pytest (>=6)"]
@@ -1329,14 +1337,14 @@ files = [
 
 [[package]]
 name = "orderly-set"
-version = "5.4.0"
+version = "5.4.1"
 description = "Orderly set"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "orderly_set-5.4.0-py3-none-any.whl", hash = "sha256:f0192a7f9ae3385b587b71688353fae491d1ca45878496eb71ea118be1623639"},
-    {file = "orderly_set-5.4.0.tar.gz", hash = "sha256:c8ff5ba824abe4eebcbbdd3f646ff3648ad0dd52239319d90056d8d30b6cccdd"},
+    {file = "orderly_set-5.4.1-py3-none-any.whl", hash = "sha256:b5e21d21680bd9ef456885db800c5cb4f76a03879880c0175e1b077fb166fd83"},
+    {file = "orderly_set-5.4.1.tar.gz", hash = "sha256:a1fb5a4fdc5e234e9e8d8e5c1bbdbc4540f4dfe50d12bf17c8bc5dbf1c9c878d"},
 ]
 
 [[package]]
@@ -1447,14 +1455,14 @@ files = [
 
 [[package]]
 name = "pep8-naming"
-version = "0.15.0"
+version = "0.15.1"
 description = "Check PEP-8 naming conventions, plugin for flake8"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "pep8_naming-0.15.0-py3-none-any.whl", hash = "sha256:2ce36937ff0421d871a634f4a0c2af06f994fe22c9055ea9813ca72d562754da"},
-    {file = "pep8_naming-0.15.0.tar.gz", hash = "sha256:a637ee5144f7585c800b1fc6eeb996fa35a2ef0f2690880a9e1b29cb9f6e8359"},
+    {file = "pep8_naming-0.15.1-py3-none-any.whl", hash = "sha256:eb63925e7fd9e028c7f7ee7b1e413ec03d1ee5de0e627012102ee0222c273c86"},
+    {file = "pep8_naming-0.15.1.tar.gz", hash = "sha256:f6f4a499aba2deeda93c1f26ccc02f3da32b035c8b2db9696b730ef2c9639d29"},
 ]
 
 [package.dependencies]
@@ -1462,14 +1470,14 @@ flake8 = ">=5.0.0"
 
 [[package]]
 name = "platformdirs"
-version = "4.3.7"
+version = "4.3.8"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "platformdirs-4.3.7-py3-none-any.whl", hash = "sha256:a03875334331946f13c549dbd8f4bac7a13a50a895a0eb1e8c6a8ace80d40a94"},
-    {file = "platformdirs-4.3.7.tar.gz", hash = "sha256:eb437d586b6a0986388f0d6f74aa0cde27b48d0e3d66843640bfb6bdcdb6e351"},
+    {file = "platformdirs-4.3.8-py3-none-any.whl", hash = "sha256:ff7059bb7eb1179e2685604f4aaf157cfd9535242bd23742eadc3c13542139b4"},
+    {file = "platformdirs-4.3.8.tar.gz", hash = "sha256:3d512d96e16bcb959a814c9f348431070822a6496326a4be0911c40b5a74c2bc"},
 ]
 
 [package.extras]
@@ -2377,14 +2385,14 @@ typing-extensions = ">=4.7.1"
 
 [[package]]
 name = "setuptools"
-version = "80.3.1"
+version = "80.4.0"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "setuptools-80.3.1-py3-none-any.whl", hash = "sha256:ea8e00d7992054c4c592aeb892f6ad51fe1b4d90cc6947cc45c45717c40ec537"},
-    {file = "setuptools-80.3.1.tar.gz", hash = "sha256:31e2c58dbb67c99c289f51c16d899afedae292b978f8051efaf6262d8212f927"},
+    {file = "setuptools-80.4.0-py3-none-any.whl", hash = "sha256:6cdc8cb9a7d590b237dbe4493614a9b75d0559b888047c1f67d49ba50fc3edb2"},
+    {file = "setuptools-80.4.0.tar.gz", hash = "sha256:5a78f61820bc088c8e4add52932ae6b8cf423da2aff268c23f813cfbb13b4006"},
 ]
 
 [package.extras]
@@ -2916,14 +2924,14 @@ standard = ["colorama (>=0.4) ; sys_platform == \"win32\"", "httptools (>=0.6.3)
 
 [[package]]
 name = "virtualenv"
-version = "20.30.0"
+version = "20.31.2"
 description = "Virtual Python Environment builder"
 optional = false
 python-versions = ">=3.8"
 groups = ["dev"]
 files = [
-    {file = "virtualenv-20.30.0-py3-none-any.whl", hash = "sha256:e34302959180fca3af42d1800df014b35019490b119eba981af27f2fa486e5d6"},
-    {file = "virtualenv-20.30.0.tar.gz", hash = "sha256:800863162bcaa5450a6e4d721049730e7f2dae07720e0902b0e4040bd6f9ada8"},
+    {file = "virtualenv-20.31.2-py3-none-any.whl", hash = "sha256:36efd0d9650ee985f0cad72065001e66d49a6f24eb44d98980f630686243cf11"},
+    {file = "virtualenv-20.31.2.tar.gz", hash = "sha256:e10c0a9d02835e592521be48b332b6caee6887f332c111aa79a09b9e79efc2af"},
 ]
 
 [package.dependencies]
