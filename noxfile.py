@@ -24,8 +24,8 @@ except ImportError:
 
 
 package = "stac_api_validator"
-python_versions = ["3.10"]
-nox.needs_version = ">= 2021.6.6"
+python_versions = ["3.11", "3.12", "3.13"]
+nox.needs_version = ">= 2025.5.1"
 nox.options.sessions = (
     "pre-commit",
     "safety",

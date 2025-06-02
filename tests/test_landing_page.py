@@ -189,7 +189,7 @@ def test_perfect_core_landing_page(perfect_core_landing_page: Dict[str, Any]) ->
 
 
 def test_perfect_core_landing_page_with_extension(
-    perfect_core_landing_page: Dict[str, Any]
+    perfect_core_landing_page: Dict[str, Any],
 ) -> None:
     errors = Errors()
     warnings = Warnings()
