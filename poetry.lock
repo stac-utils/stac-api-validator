@@ -1830,26 +1830,27 @@ requests = ">=2.28.2"
 
 [[package]]
 name = "pytest"
-version = "8.3.5"
+version = "8.4.0"
 description = "pytest: simple powerful testing with Python"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "pytest-8.3.5-py3-none-any.whl", hash = "sha256:c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820"},
-    {file = "pytest-8.3.5.tar.gz", hash = "sha256:f4efe70cc14e511565ac476b57c279e12a855b11f48f212af1080ef2263d3845"},
+    {file = "pytest-8.4.0-py3-none-any.whl", hash = "sha256:f40f825768ad76c0977cbacdf1fd37c6f7a468e460ea6a0636078f8972d4517e"},
+    {file = "pytest-8.4.0.tar.gz", hash = "sha256:14d920b48472ea0dbf68e45b96cd1ffda4705f33307dcc86c676c1b5104838a6"},
 ]
 
 [package.dependencies]
-colorama = {version = "*", markers = "sys_platform == \"win32\""}
-exceptiongroup = {version = ">=1.0.0rc8", markers = "python_version < \"3.11\""}
-iniconfig = "*"
-packaging = "*"
+colorama = {version = ">=0.4", markers = "sys_platform == \"win32\""}
+exceptiongroup = {version = ">=1", markers = "python_version < \"3.11\""}
+iniconfig = ">=1"
+packaging = ">=20"
 pluggy = ">=1.5,<2"
+pygments = ">=2.7.2"
 tomli = {version = ">=1", markers = "python_version < \"3.11\""}
 
 [package.extras]
-dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
+dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "requests", "setuptools", "xmlschema"]
 
 [[package]]
 name = "python-dateutil"
@@ -2283,14 +2284,14 @@ files = [
 
 [[package]]
 name = "ruamel-yaml"
-version = "0.18.12"
+version = "0.18.14"
 description = "ruamel.yaml is a YAML parser/emitter that supports roundtrip preservation of comments, seq/map flow style, and map key order"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 groups = ["dev"]
 files = [
-    {file = "ruamel.yaml-0.18.12-py3-none-any.whl", hash = "sha256:790ba4c48b6a6e6b12b532a7308779eb12d2aaab3a80fdb8389216f28ea2b287"},
-    {file = "ruamel.yaml-0.18.12.tar.gz", hash = "sha256:5a38fd5ce39d223bebb9e3a6779e86b9427a03fb0bf9f270060f8b149cffe5e2"},
+    {file = "ruamel.yaml-0.18.14-py3-none-any.whl", hash = "sha256:710ff198bb53da66718c7db27eec4fbcc9aa6ca7204e4c1df2f282b6fe5eb6b2"},
+    {file = "ruamel.yaml-0.18.14.tar.gz", hash = "sha256:7227b76aaec364df15936730efbf7d72b30c0b79b1d578bbb8e3dcb2d81f52b7"},
 ]
 
 [package.dependencies]
@@ -2746,14 +2747,14 @@ test = ["pytest"]
 
 [[package]]
 name = "stac-check"
-version = "1.6.0"
+version = "1.7.0"
 description = "Linting and validation tool for STAC assets"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "stac_check-1.6.0-py3-none-any.whl", hash = "sha256:38c3f70baab278bf18bdfb50910f4a67fa3ffc8156cd03947de97b4e7507ce49"},
-    {file = "stac_check-1.6.0.tar.gz", hash = "sha256:e323fe9c7437c2931ebc433d73cf033244d37537f51ee10eb9f8053a390ed58e"},
+    {file = "stac_check-1.7.0-py3-none-any.whl", hash = "sha256:6d5096712628ad97c0a72472169ea5429a70acedfbfc2d1a89b85e542ca3a82f"},
+    {file = "stac_check-1.7.0.tar.gz", hash = "sha256:17aac35539632217e01ddb8b866e54ec28be86a73e3a371de486e2322331564b"},
 ]
 
 [package.dependencies]
@@ -2762,7 +2763,7 @@ jsonschema = ">=4.23.0"
 python-dotenv = "*"
 PyYAML = "*"
 requests = ">=2.32.3"
-stac-validator = ">=3.6.0"
+stac-validator = {version = ">=3.7.0", extras = ["pydantic"]}
 
 [package.extras]
 dev = ["pytest", "requests-mock", "types-setuptools"]
@@ -2791,22 +2792,23 @@ validation = ["jsonschema (>=4.19.1)", "requests (>=2.31.0)"]
 
 [[package]]
 name = "stac-validator"
-version = "3.7.0"
+version = "3.8.1"
 description = "A package to validate STAC files"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "stac_validator-3.7.0-py3-none-any.whl", hash = "sha256:003ba3a2e9473a910b95b58cde29826c21cca49973a1ed1de0c72264835ccdac"},
-    {file = "stac_validator-3.7.0.tar.gz", hash = "sha256:54bbd828c4689d1d11f08c7968fdf28407d819e8571f0912e8935cc2c38f55e2"},
+    {file = "stac_validator-3.8.1-py3-none-any.whl", hash = "sha256:e5be1e54a07466d481ae877ab2b1cc69a1823fa98b9aa8dfa5b2f6084b04975f"},
+    {file = "stac_validator-3.8.1.tar.gz", hash = "sha256:cf62502a5b202387d33013ee4e190ca9105ab59d220c8a429ba2446eea2ac427"},
 ]
 
 [package.dependencies]
 click = ">=8.1.8"
 jsonschema = ">=4.23.0"
+pyYAML = ">=6.0.1"
 referencing = ">=0.35.1"
 requests = ">=2.32.3"
-stac-pydantic = ">=3.3.0"
+stac-pydantic = {version = ">=3.3.0", optional = true, markers = "extra == \"pydantic\""}
 
 [package.extras]
 dev = ["pytest", "requests-mock", "types-setuptools"]
@@ -2887,22 +2889,18 @@ files = [
 
 [[package]]
 name = "typeguard"
-version = "4.4.2"
+version = "4.4.3"
 description = "Run-time type checker for Python"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "typeguard-4.4.2-py3-none-any.whl", hash = "sha256:77a78f11f09777aeae7fa08585f33b5f4ef0e7335af40005b0c422ed398ff48c"},
-    {file = "typeguard-4.4.2.tar.gz", hash = "sha256:a6f1065813e32ef365bc3b3f503af8a96f9dd4e0033a02c28c4a4983de8c6c49"},
+    {file = "typeguard-4.4.3-py3-none-any.whl", hash = "sha256:7d8b4a3d280257fd1aa29023f22de64e29334bda0b172ff1040f05682223795e"},
+    {file = "typeguard-4.4.3.tar.gz", hash = "sha256:be72b9c85f322c20459b29060c5c099cd733d5886c4ee14297795e62b0c0d59b"},
 ]
 
 [package.dependencies]
-typing_extensions = ">=4.10.0"
-
-[package.extras]
-doc = ["Sphinx (>=7)", "packaging", "sphinx-autodoc-typehints (>=1.2.0)", "sphinx-rtd-theme (>=1.3.0)"]
-test = ["coverage[toml] (>=7)", "mypy (>=1.2.0) ; platform_python_implementation != \"PyPy\"", "pytest (>=7)"]
+typing_extensions = ">=4.14.0"
 
 [[package]]
 name = "typer"
@@ -2924,14 +2922,14 @@ typing-extensions = ">=3.7.4.3"
 
 [[package]]
 name = "typing-extensions"
-version = "4.13.2"
-description = "Backported and Experimental Type Hints for Python 3.8+"
+version = "4.14.0"
+description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "typing_extensions-4.13.2-py3-none-any.whl", hash = "sha256:a439e7c04b49fec3e5d3e2beaa21755cadbbdc391694e28ccdd36ca4a1408f8c"},
-    {file = "typing_extensions-4.13.2.tar.gz", hash = "sha256:e6c81219bd689f51865d9e372991c540bda33a0379d5573cddb9a3a23f7caaef"},
+    {file = "typing_extensions-4.14.0-py3-none-any.whl", hash = "sha256:a1514509136dd0b477638fc68d6a91497af5076466ad0fa6c338e44e359944af"},
+    {file = "typing_extensions-4.14.0.tar.gz", hash = "sha256:8676b788e32f02ab42d9e7c61324048ae4c6d844a399eebace3d4979d75ceef4"},
 ]
 
 [[package]]
