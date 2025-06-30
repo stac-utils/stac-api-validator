@@ -1827,14 +1827,14 @@ six = ">=1.5"
 
 [[package]]
 name = "python-dotenv"
-version = "1.1.0"
+version = "1.1.1"
 description = "Read key-value pairs from a .env file and set them as environment variables"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "python_dotenv-1.1.0-py3-none-any.whl", hash = "sha256:d7c01d9e2293916c18baf562d95698754b0dbbb5e74d457c45d4f6561fb9d55d"},
-    {file = "python_dotenv-1.1.0.tar.gz", hash = "sha256:41f90bc6f5f177fb41f53e87666db362025010eb28f60a01c9143bfa33a2b2d5"},
+    {file = "python_dotenv-1.1.1-py3-none-any.whl", hash = "sha256:31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc"},
+    {file = "python_dotenv-1.1.1.tar.gz", hash = "sha256:a8a6399716257f45be6a007360200409fce5cda2661e3dec71d23dc15f6189ab"},
 ]
 
 [package.extras]
@@ -2716,14 +2716,14 @@ pydantic = ["stac-validator[pydantic] (>=3.9.1,<3.10.0)"]
 
 [[package]]
 name = "stac-validator"
-version = "3.9.2"
+version = "3.9.3"
 description = "A package to validate STAC files"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "stac_validator-3.9.2-py3-none-any.whl", hash = "sha256:3274636ebbb396474471525db21551e5e096e4ba475bce162883e15426e08f36"},
-    {file = "stac_validator-3.9.2.tar.gz", hash = "sha256:1073a790d87ce37f7b27ebe4b4e02a570ce179474a0923784800ac632300e13f"},
+    {file = "stac_validator-3.9.3-py3-none-any.whl", hash = "sha256:2412646856a9032db73f82e8289bc0dcea3e91c18d8f7e41e9d0d82447a876b8"},
+    {file = "stac_validator-3.9.3.tar.gz", hash = "sha256:c8b1adcac914ea2ceb7a991ceaf0dd4dbeed9ad6f082816ab9069b996a51fa2e"},
 ]
 
 [package.dependencies]
@@ -2927,14 +2927,14 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "uvicorn"
-version = "0.34.3"
+version = "0.35.0"
 description = "The lightning-fast ASGI server."
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "uvicorn-0.34.3-py3-none-any.whl", hash = "sha256:16246631db62bdfbf069b0645177d6e8a77ba950cfedbfd093acef9444e4d885"},
-    {file = "uvicorn-0.34.3.tar.gz", hash = "sha256:35919a9a979d7a59334b6b10e05d77c1d0d574c50e0fc98b8b1a0f165708b55a"},
+    {file = "uvicorn-0.35.0-py3-none-any.whl", hash = "sha256:197535216b25ff9b785e29a0b79199f55222193d47f820816e7da751e9bc8d4a"},
+    {file = "uvicorn-0.35.0.tar.gz", hash = "sha256:bc662f087f7cf2ce11a1d7fd70b90c9f98ef2e2831556dd078d131b96cc94a01"},
 ]
 
 [package.dependencies]
