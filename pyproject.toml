@@ -9,49 +9,53 @@ homepage = "https://github.com/stac-utils/stac-api-validator"
 repository = "https://github.com/stac-utils/stac-api-validator"
 documentation = "https://stac-api-validator.readthedocs.io"
 classifiers = ["Development Status :: 4 - Beta"]
+requires-poetry = ">=2.0"
 
 [tool.poetry.urls]
 Changelog = "https://github.com/stac-utils/stac-api-validator/releases"
 
 [tool.poetry.dependencies]
-python = "^3.10"
-click = "^8.1.3"
-certifi = ">=2024.2.2,<2026.0.0"
-pystac-client = ">=0.7.5,<0.9.0"
-requests = "^2.31.0"
-pystac = { extras = ["orjson"], version = "^1.8.3" }
-jsonschema = "^4.16.0"
-PyYAML = "^6.0.1"
-Shapely = ">=1.8.4"
-more_itertools = ">=8.14,<11.0"
-stac-check = "^1.5.0"
-stac-validator = "^3.5.0"
-deepdiff = ">=6.2.3,<9.0.0"
+python = ">=3.11,<3.14"
+click = ">=8.0.2"
+certifi = ">=2025.7.14,<2026.0.0"
+pystac-client = ">=0.8.6,<0.9.0"
+requests = "^2.32.4"
+pystac = { extras = ["orjson"], version = "^1.13.0" }
+jsonschema = "^4.24.1"
+PyYAML = "^6.0.2"
+Shapely = ">=2.1.1"
+more_itertools = ">=10.7.0,<11.0"
+stac-check = "^1.11.0"
+stac-validator = "^3.9.3"
+deepdiff = ">=8.5.0,<9.0.0"
 
-[tool.poetry.dev-dependencies]
-Pygments = ">=2.10.0"
-black = ">=22.8.0"
-coverage = { extras = ["toml"], version = ">=6.2" }
+[tool.poetry.group.dev.dependencies]
+Pygments = ">=2.19.2"
+black = ">=25.1.0"
+coverage = { extras = ["toml"], version = ">=7.9.2" }
 darglint = ">=1.8.1"
-flake8 = ">=4.0.1"
-flake8-bugbear = ">=21.9.2"
-flake8-docstrings = ">=1.6.0"
-flake8-rst-docstrings = ">=0.2.5"
-furo = ">=2021.11.12"
-isort = ">=5.10.1"
-mypy = ">=0.981"
-pep8-naming = ">=0.12.1"
-pre-commit = ">=2.16.0"
-pre-commit-hooks = ">=4.1.0"
-pytest = ">=6.2.5"
-pyupgrade = ">=2.29.1"
-safety = ">=1.10.3"
-sphinx = ">=4.3.2"
-sphinx-autobuild = ">=2021.3.14"
-sphinx-click = ">=3.0.2"
-typeguard = ">=2.13.3"
-xdoctest = { extras = ["colors"], version = ">=0.15.10" }
-myst-parser = { version = ">=0.16.1" }
+flake8 = ">=7.3.0"
+flake8-bugbear = ">=24.12.12"
+flake8-docstrings = ">=1.7.0"
+flake8-rst-docstrings = ">=0.3.1"
+furo = ">=2024.8.6"
+isort = ">=6.0.1"
+mypy = ">=1.17.0"
+pep8-naming = ">=0.15.1"
+pre-commit = ">=4.2.0"
+pre-commit-hooks = ">=5.0.0"
+pytest = ">=8.4.1"
+pyupgrade = ">=3.20.0"
+safety = ">=3.6.0"
+sphinx = ">=8.2.3"
+sphinx-autobuild = ">=2024.10.3"
+sphinx-click = ">=6.0.0"
+typeguard = ">=4.4.4"
+xdoctest = { extras = ["colors"], version = ">=1.2.0" }
+myst-parser = { version = ">=4.0.1" }
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.9"  # needed for nox-poetry with poetry 2
 
 [tool.poetry.scripts]
 stac-api-validator = "stac_api_validator.__main__:main"
@@ -92,5 +96,5 @@ module = [
 ignore_missing_imports = true
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=2.0.0"]
 build-backend = "poetry.core.masonry.api"

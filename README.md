@@ -33,7 +33,7 @@ See the [stable](https://stac-api-validator.readthedocs.io/en/stable/) or
 
 ## Installation
 
-STAC API Validator requires Python 3.10.
+STAC API Validator requires Python 3.11.
 
 You can install _STAC API Validator_ via [pip] from [PyPI]:
 
