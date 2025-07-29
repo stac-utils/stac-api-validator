@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "stac-api-validator"
-version = "0.6.5"
+version = "0.6.6"
 description = "STAC API Validator"
 authors = ["Phil Varner <phil@philvarner.com>"]
 license = "Apache-2.0"
@@ -55,7 +55,7 @@ xdoctest = { extras = ["colors"], version = ">=1.2.0" }
 myst-parser = { version = ">=4.0.1" }
 
 [tool.poetry.requires-plugins]
-poetry-plugin-export = ">=1.9"  # needed for nox-poetry with poetry 2
+poetry-plugin-export = ">=1.9" # needed for nox-poetry with poetry 2
 
 [tool.poetry.scripts]
 stac-api-validator = "stac_api_validator.__main__:main"
