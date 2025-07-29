@@ -25,8 +25,8 @@ jsonschema = "^4.25.0"
 PyYAML = "^6.0.2"
 Shapely = ">=2.1.1"
 more_itertools = ">=10.7.0,<11.0"
-stac-check = "^1.11.0"
-stac-validator = "^3.9.3"
+stac-check = "^1.11.1"
+stac-validator = "^3.10.1"
 deepdiff = ">=8.5.0,<9.0.0"
 
 [tool.poetry.group.dev.dependencies]
