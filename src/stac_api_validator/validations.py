@@ -2799,7 +2799,7 @@ def validate_item_pagination(
 
     if use_pystac_client and collection is not None:
         try:
-            client = Client.open(root_url)
+            client = Client.open(root_url, headers=r_session.headers)
             search = client.search(
                 method="GET", collections=[collection], max_items=max_items, limit=5
             )
@@ -2872,7 +2872,7 @@ def validate_item_pagination(
         if use_pystac_client and collection is not None:
             max_items = 100
             try:
-                client = Client.open(root_url)
+                client = Client.open(root_url, headers=r_session.headers)
                 search = client.search(
                     method="POST",
                     collections=[collection],
