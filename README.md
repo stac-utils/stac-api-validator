@@ -66,9 +66,10 @@ The conformance class validations to run are selected with the `--conformance` p
 can be used more than once to specify multiple conformance classes to validate. The `STAC API - Core` conformance
 class will always be validated, even if not specified.
 
-If `item-search`, `collections`, and/or `features` are specified, the `--collection` and `--geometry` parameters must also
-be specified. The `--collection` parameter specifies the name of a collection to use for some of the validations.
-The `--geometry` should specify an AOI over which there are between 100 and 20,000 results for the collection (more
+If `item-search`, `collections`, and/or `features` are specified, the `--collection` parameter must also
+be set. It specifies the name of a collection to use for some of the validations.
+The `--geometry` parameter should also be set to perform intersection tests.
+It should specify an AOI over which there are between 100 and 20,000 results for the collection (more
 results means longer time to run).
 
 ## Features
@@ -127,7 +128,7 @@ Options:
 Conformance classes item-search, features, and collections require the `--collection` parameter with the id of a
 collection to run some tests on.
 
-Conformance class `item-search` requires `--geometry` with a GeoJSON geometry that returns some items for
+Conformance class `item-search` supports `--geometry` with a GeoJSON geometry that returns some items for
 the specified collection.
 
 Example:
