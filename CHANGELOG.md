@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Support stac-check config_file ([#687](https://github.com/stac-utils/stac-api-validator/pull/687))
+
 ## [0.6.6] - 2025-07-29
 
 Dependency updates.

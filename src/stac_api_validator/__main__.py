@@ -137,6 +137,10 @@ from stac_api_validator.validations import validate_api
     multiple=True,
     help="Headers to attach to the main request and dependent pystac requests, curl syntax",
 )
+@click.option(
+    "--stac-check-config",
+    help="Path to a YAML stac-check configuration file",
+)
 def main(
     log_level: str,
     root_url: str,
@@ -162,6 +166,7 @@ def main(
     query_in_values: Optional[str] = None,
     transaction_collection: Optional[str] = None,
     headers: Optional[List[str]] = None,
+    stac_check_config: Optional[str] = None,
 ) -> int:
     """STAC API Validator."""
     logging.basicConfig(stream=sys.stdout, level=log_level)
@@ -202,6 +207,7 @@ def main(
             ),
             transaction_collection=transaction_collection,
             headers=processed_headers,
+            stac_check_config=stac_check_config,
         )
     except Exception as e:
         click.secho(

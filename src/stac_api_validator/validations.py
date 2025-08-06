@@ -375,10 +375,16 @@ def stac_check(
     method: Method = Method.GET,
     open_assets_urls: bool = True,
     headers: Optional[dict] = None,
+    config_file: Optional[str] = None,
 ) -> None:
     try:
         logger.debug(f"stac-check validation: {url}")
-        linter = Linter(url, assets_open_urls=open_assets_urls, headers=headers or {})
+        linter = Linter(
+            url,
+            config_file=config_file,
+            assets_open_urls=open_assets_urls,
+            headers=headers or {},
+        )
         if not linter.valid_stac:
             errors += f"[{context}] : {method} {url} is not a valid STAC object: {linter.error_msg}"
         if msgs := linter.best_practices_msg[1:]:  # first msg is a header, so skip
@@ -560,6 +566,7 @@ def validate_api(
     transaction_collection: Optional[str],
     headers: Optional[Dict[str, str]],
     open_assets_urls: bool = True,
+    stac_check_config: Optional[str] = None,
 ) -> Tuple[Warnings, Errors]:
     warnings = Warnings()
     errors = Errors()
@@ -611,7 +618,13 @@ def validate_api(
     if "collections" in ccs_to_validate:
         logger.info("Validating STAC API - Collections conformance class.")
         validate_collections(
-            landing_page_body, collection, errors, warnings, r_session, open_assets_urls
+            landing_page_body,
+            collection,
+            errors,
+            warnings,
+            r_session,
+            open_assets_urls,
+            stac_check_config,
         )
 
     conforms_to = landing_page_body.get("conformsTo", [])
@@ -619,7 +632,13 @@ def validate_api(
     if "features" in ccs_to_validate:
         logger.info("Validating STAC API - Features conformance class.")
         validate_collections(
-            landing_page_body, collection, errors, warnings, r_session, open_assets_urls
+            landing_page_body,
+            collection,
+            errors,
+            warnings,
+            r_session,
+            open_assets_urls,
+            stac_check_config,
         )
         validate_features(
             landing_page_body,
@@ -631,6 +650,7 @@ def validate_api(
             r_session,
             validate_pagination,
             open_assets_urls,
+            stac_check_config,
         )
 
     if "transaction" in ccs_to_validate:
@@ -982,6 +1002,7 @@ def validate_collections(
     warnings: Warnings,
     r_session: Session,
     open_assets_urls: bool = True,
+    stac_check_config: Optional[str] = None,
 ) -> None:
     if not (data_link := link_by_rel(root_body["links"], "data")):
         errors += f"[{Context.COLLECTIONS}] /: Link[rel=data] must href /collections"
@@ -1091,6 +1112,7 @@ def validate_collections(
                     Method.GET,
                     open_assets_urls,
                     r_session.headers,
+                    stac_check_config,
                 )
 
         # todo: collection pagination
@@ -1106,6 +1128,7 @@ def validate_features(
     r_session: Session,
     validate_pagination: bool,
     open_assets_urls: bool = True,
+    stac_check_config: Optional[str] = None,
 ) -> None:
     if not geometry:
         errors += f"[{Context.FEATURES}] Geometry parameter required for running Features validations."
@@ -1216,6 +1239,7 @@ def validate_features(
                 Method.GET,
                 open_assets_urls,
                 r_session.headers,
+                stac_check_config,
             )
 
     # Validate Features non-existent item
@@ -1326,6 +1350,7 @@ def validate_features(
                                     Method.GET,
                                     open_assets_urls,
                                     r_session.headers,
+                                    stac_check_config,
                                 )
 
     if validate_pagination:

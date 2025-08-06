@@ -45,6 +45,13 @@ def sample_item() -> Generator[pystac.Item, None, None]:
 
 
 @pytest.fixture
+def stac_check_config() -> Generator[str, None, None]:
+    current_path = pathlib.Path(os.path.dirname(os.path.abspath(__file__)))
+
+    yield current_path / "resources" / "stac-check-config.yaml"
+
+
+@pytest.fixture
 def expected_headers(requests_version: str) -> Generator[Dict[str, str], None, None]:
     yield {
         "User-Agent": f"python-requests/{requests_version}",
@@ -91,6 +98,7 @@ def test_validate_api(
     request: pytest.FixtureRequest,
     r_session: requests.Session,
     expected_headers: Dict[str, str],
+    stac_check_config: str,
 ) -> None:
     if request.config.getoption("typeguard_packages"):
         pytest.skip(
@@ -114,6 +122,7 @@ def test_validate_api(
             query_config=None,
             transaction_collection=None,
             headers=headers,
+            stac_check_config=stac_check_config,
         )
         assert retrieve_mock.call_count == 1
         r_session = retrieve_mock.call_args.args[-1]
