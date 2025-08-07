@@ -1106,9 +1106,6 @@ def validate_features(
     validate_pagination: bool,
     open_assets_urls: bool = True,
 ) -> None:
-    if not geometry:
-        warnings += f"[{Context.FEATURES}] Geometry parameter required for running Features validations."
-
     if not collection:
         errors += f"[{Context.FEATURES}] Collection parameter required for running Features validations."
         return
