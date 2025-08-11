@@ -537,10 +537,9 @@ def validate_core_landing_page_body(
             )
             return False
         if geometry is None:
-            logger.fatal(
-                " Item Search configured for validation, but `--geometry` parameter not specified"
+            logger.warning(
+                " Item Search configured for validation, but `--geometry` parameter not specified. Intersection tests will not be run"
             )
-            return False
 
     if "children" in conformance_classes and not any(
         cc_children_regex.fullmatch(x) for x in conforms_to
@@ -697,7 +696,7 @@ def validate_api(
             conforms_to=conforms_to,
             warnings=warnings,
             errors=errors,
-            geometry=geometry,  # type:ignore
+            geometry=geometry,
             conformance_classes=ccs_to_validate,
             r_session=r_session,
             validate_pagination=validate_pagination,
@@ -1130,10 +1129,6 @@ def validate_features(
     open_assets_urls: bool = True,
     stac_check_config: Optional[str] = None,
 ) -> None:
-    if not geometry:
-        errors += f"[{Context.FEATURES}] Geometry parameter required for running Features validations."
-        return
-
     if not collection:
         errors += f"[{Context.FEATURES}] Collection parameter required for running Features validations."
         return
@@ -1383,7 +1378,7 @@ def validate_item_search(
     conforms_to: List[str],
     warnings: Warnings,
     errors: Errors,
-    geometry: str,
+    geometry: Optional[str],
     conformance_classes: List[str],
     r_session: Session,
     validate_pagination: bool,
@@ -1455,14 +1450,15 @@ def validate_item_search(
     validate_item_search_collections(
         search_url, collections_url, methods, errors, r_session
     )
-    validate_item_search_intersects(
-        search_url=search_url,
-        collection=collection,
-        methods=methods,
-        errors=errors,
-        geometry=geometry,
-        r_session=r_session,
-    )
+    if geometry is not None:
+        validate_item_search_intersects(
+            search_url=search_url,
+            collection=collection,
+            methods=methods,
+            errors=errors,
+            geometry=geometry,
+            r_session=r_session,
+        )
 
     if validate_pagination:
         validate_item_pagination(
@@ -2772,7 +2768,7 @@ def validate_item_pagination(
     root_url: str,
     search_url: str,
     collection: Optional[str],
-    geometry: str,
+    geometry: Optional[str],
     methods: Set[Method],
     errors: Errors,
     use_pystac_client: bool,
@@ -2913,14 +2909,15 @@ def validate_item_pagination(
                 if len(items) > len({item["id"] for item in items}):
                     errors += f"[{context}] POST pagination - duplicate items returned from paginating items"
 
-                search = client.search(
-                    method="POST", collections=[collection], intersects=geometry
-                )
-                if len(list(take(20000, search.items_as_dicts()))) == 20000:
-                    errors += (
-                        f"[{context}] POST pagination - paged through 20,000 results. This could mean the last page "
-                        "of results references itself, or your collection and geometry combination has too many results."
+                if geometry is not None:
+                    search = client.search(
+                        method="POST", collections=[collection], intersects=geometry
                     )
+                    if len(list(take(20000, search.items_as_dicts()))) == 20000:
+                        errors += (
+                            f"[{context}] POST pagination - paged through 20,000 results. This could mean the last page "
+                            "of results references itself, or your collection and geometry combination has too many results."
+                        )
             except Exception as e:
                 errors += f"pystac-client threw exception while testing pagination {e}"
         elif collection is not None:
