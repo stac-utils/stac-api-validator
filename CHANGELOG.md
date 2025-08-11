@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.7] - 2025-08-11
+
 - Support stac-check config_file ([#687](https://github.com/stac-utils/stac-api-validator/pull/687))
 
 ## [0.6.6] - 2025-07-29
@@ -189,7 +191,8 @@ Release is primarily to publish to Read the Docs as a version.
 
 - Fixed issue with item-search validation relying on collections behavior
 
-[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.6...main
+[unreleased]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.7...main
+[0.6.7]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.6..v0.6.7
 [0.6.6]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.5..v0.6.6
 [0.6.5]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.4..v0.6.5
 [0.6.4]: https://github.com/stac-utils/stac-api-validator/compare/v0.6.3..v0.6.4
