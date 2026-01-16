@@ -55,7 +55,7 @@ def stac_check_config() -> Generator[str, None, None]:
 def expected_headers(requests_version: str) -> Generator[Dict[str, str], None, None]:
     yield {
         "User-Agent": f"python-requests/{requests_version}",
-        "Accept-Encoding": "gzip, deflate",
+        "Accept-Encoding": "gzip, deflate, zstd",
         "Accept": "*/*",
         "Connection": "keep-alive",
         "Authorization": "api-key fake-api-key-value",

@@ -29,7 +29,7 @@ def test_retrieve_called_with_auth_headers(
 
     expected_headers = {
         "User-Agent": f"python-requests/{requests_version}",
-        "Accept-Encoding": "gzip, deflate",
+        "Accept-Encoding": "gzip, deflate, zstd",
         "Accept": "*/*",
         "Connection": "keep-alive",
         "Authorization": "api-key fake-api-key-value",
