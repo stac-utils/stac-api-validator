@@ -8,79 +8,85 @@ import re
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
-from typing import Dict
-from typing import Iterator
-from typing import List
-from typing import Mapping
-from typing import Optional
-from typing import Pattern
-from typing import Set
-from typing import Tuple
-from typing import Union
+from typing import (
+    Any,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Pattern,
+    Set,
+    Tuple,
+    Union,
+)
 
 import pystac
 import yaml
 from deepdiff import DeepDiff
 from more_itertools import take
-from pystac import Catalog
-from pystac import Collection
-from pystac import Item
-from pystac import ItemCollection
-from pystac import StacIO
-from pystac import STACValidationError
+from pystac import (
+    Catalog,
+    Collection,
+    Item,
+    ItemCollection,
+    StacIO,
+    STACValidationError,
+)
 from pystac_client import Client
-from requests import Request
-from requests import Session
+from requests import Request, Session
 from shapely.geometry import shape
 from stac_check.lint import Linter
 from stac_validator.stac_validator import StacValidate
 
-from stac_api_validator.geometries import geometry_collection
-from stac_api_validator.geometries import linestring
-from stac_api_validator.geometries import multilinestring
-from stac_api_validator.geometries import multipoint
-from stac_api_validator.geometries import multipolygon
-from stac_api_validator.geometries import point
-from stac_api_validator.geometries import polygon
-from stac_api_validator.geometries import polygon_with_hole
+from stac_api_validator.geometries import (
+    geometry_collection,
+    linestring,
+    multilinestring,
+    multipoint,
+    multipolygon,
+    point,
+    polygon,
+    polygon_with_hole,
+)
 
-from .filters import cql2_json_and
-from .filters import cql2_json_between
-from .filters import cql2_json_common_1
-from .filters import cql2_json_ex_2
-from .filters import cql2_json_ex_3
-from .filters import cql2_json_ex_4
-from .filters import cql2_json_ex_6
-from .filters import cql2_json_ex_8
-from .filters import cql2_json_ex_9
-from .filters import cql2_json_like
-from .filters import cql2_json_not
-from .filters import cql2_json_not_between
-from .filters import cql2_json_not_like
-from .filters import cql2_json_numeric_comparisons
-from .filters import cql2_json_or
-from .filters import cql2_json_s_intersects
-from .filters import cql2_json_string_comparisons
-from .filters import cql2_json_timestamp_comparisons
-from .filters import cql2_text_and
-from .filters import cql2_text_between
-from .filters import cql2_text_ex_2
-from .filters import cql2_text_ex_3
-from .filters import cql2_text_ex_4
-from .filters import cql2_text_ex_6
-from .filters import cql2_text_ex_8
-from .filters import cql2_text_ex_9
-from .filters import cql2_text_like
-from .filters import cql2_text_not
-from .filters import cql2_text_not_between
-from .filters import cql2_text_not_like
-from .filters import cql2_text_numeric_comparisons
-from .filters import cql2_text_or
-from .filters import cql2_text_s_intersects
-from .filters import cql2_text_string_comparisons
-from .filters import cql2_text_timestamp_comparisons
-
+from .filters import (
+    cql2_json_and,
+    cql2_json_between,
+    cql2_json_common_1,
+    cql2_json_ex_2,
+    cql2_json_ex_3,
+    cql2_json_ex_4,
+    cql2_json_ex_6,
+    cql2_json_ex_8,
+    cql2_json_ex_9,
+    cql2_json_like,
+    cql2_json_not,
+    cql2_json_not_between,
+    cql2_json_not_like,
+    cql2_json_numeric_comparisons,
+    cql2_json_or,
+    cql2_json_s_intersects,
+    cql2_json_string_comparisons,
+    cql2_json_timestamp_comparisons,
+    cql2_text_and,
+    cql2_text_between,
+    cql2_text_ex_2,
+    cql2_text_ex_3,
+    cql2_text_ex_4,
+    cql2_text_ex_6,
+    cql2_text_ex_8,
+    cql2_text_ex_9,
+    cql2_text_like,
+    cql2_text_not,
+    cql2_text_not_between,
+    cql2_text_not_like,
+    cql2_text_numeric_comparisons,
+    cql2_text_or,
+    cql2_text_s_intersects,
+    cql2_text_string_comparisons,
+    cql2_text_timestamp_comparisons,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -302,7 +308,7 @@ def is_geojson_type(maybe_type: Optional[str]) -> bool:
 def get_catalog(data_dict: Dict[str, Any], r_session: Session) -> Catalog:
     stac_io = StacIO.default()
     if r_session.headers:
-        stac_io.headers = r_session.headers  # noqa, type: ignore
+        stac_io.headers = r_session.headers  # type: ignore
         stac_io.headers["Accept-Encoding"] = "*"
     catalog = Catalog.from_dict(data_dict)
     catalog._stac_io = stac_io
@@ -1177,7 +1183,7 @@ def validate_features(
             warnings += f"[{Context.FEATURES}] Landing Page conforms to and conformance conformsTo must be the same"
 
     # This is likely a mistake, but most apis can't undo it for backwards-compat reasons, so only warn
-    if not (link_by_rel(root_links, "collections") is None):
+    if link_by_rel(root_links, "collections") is not None:
         warnings += f"[{Context.FEATURES}] /: Link[rel=collections] is a non-standard relation. Use Link[rel=data instead]"
 
     # todo: validate items exists in the collection
@@ -1204,9 +1210,7 @@ def validate_features(
                 r_session.headers,
             )
 
-            item_url = link_by_rel(body.get("features", [])[0]["links"], "self")[
-                "href"
-            ]  # type:ignore
+            item_url = link_by_rel(body.get("features", [])[0]["links"], "self")["href"]  # type:ignore
 
             _, body, _ = retrieve(
                 Method.GET,
