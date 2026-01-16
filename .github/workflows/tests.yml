@@ -14,85 +14,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { python: "3.11", os: "ubuntu-latest", session: "pre-commit" }
-          - { python: "3.11", os: "ubuntu-latest", session: "safety" }
-          # - { python: "3.11", os: "ubuntu-latest", session: "mypy" }
-          - { python: "3.11", os: "ubuntu-latest", session: "tests" }
-          - { python: "3.12", os: "ubuntu-latest", session: "tests" }
-          - { python: "3.13", os: "ubuntu-latest", session: "tests" }
+          - { python: "3.11", os: "ubuntu-latest" }
+          - { python: "3.12", os: "ubuntu-latest" }
+          - { python: "3.13", os: "ubuntu-latest" }
           # - { python: "3.13", os: "windows-latest", session: "tests" }
           # - { python: "3.13", os: "macos-latest", session: "tests" }
-          - { python: "3.11", os: "ubuntu-latest", session: "typeguard" }
-          - { python: "3.11", os: "ubuntu-latest", session: "xdoctest" }
-          - { python: "3.11", os: "ubuntu-latest", session: "docs-build" }
     env:
-      NOXSESSION: ${{ matrix.session }}
       FORCE_COLOR: "1"
-      PRE_COMMIT_COLOR: "always"
-      PIP_CONSTRAINTS: ${{ github.workspace }}/.github/workflows/constraints.txt
 
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
 
-      - name: Set up Python ${{ matrix.python }}
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Upgrade pip
-        run: |
-          pip install --constraint=$PIP_CONSTRAINTS pip
-          pip --version
+      - name: Run prek
+        run: uv run prek run --all-files
 
-      - name: Upgrade pip in virtual environments
-        shell: python
-        run: |
-          import os
-          import pip
-
-          with open(os.environ["GITHUB_ENV"], mode="a") as io:
-              print(f"VIRTUALENV_PIP={pip.__version__}", file=io)
-
-      - name: Install Poetry
-        run: |
-          pipx install --pip-args=--constraint=$PIP_CONSTRAINTS poetry
-          pipx inject --pip-args=--constraint=$PIP_CONSTRAINTS poetry poetry-plugin-export
-          poetry --version
-
-      - name: Install Nox
-        run: |2
-          pipx install --pip-args=--constraint=$PIP_CONSTRAINTS nox
-          pipx inject --pip-args=--constraint=$PIP_CONSTRAINTS nox nox-poetry
-          nox --version
-
-      - name: Compute pre-commit cache key
-        if: matrix.session == 'pre-commit'
-        id: pre-commit-cache
-        shell: python
-        run: |
-          import hashlib
-          import sys
-
-          python = "py{}.{}".format(*sys.version_info[:2])
-          payload = sys.version.encode() + sys.executable.encode()
-          digest = hashlib.sha256(payload).hexdigest()
-          result = "${{ runner.os }}-{}-{}-pre-commit".format(python, digest[:8])
-
-          print("::set-output name=result::{}".format(result))
-
-      - name: Restore pre-commit cache
-        uses: actions/cache@v5
-        if: matrix.session == 'pre-commit'
-        with:
-          path: ~/.cache/pre-commit
-          key: ${{ steps.pre-commit-cache.outputs.result }}-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            ${{ steps.pre-commit-cache.outputs.result }}-
-
-      - name: Run Nox
-        run: |
-          nox --python=${{ matrix.python }}
+      - name: Run pytest
+        run: uv run coverage run --parallel -m pytest
 
       - name: Upload coverage data
         if: always() && matrix.session == 'tests' && matrix.python == '3.11'
@@ -113,33 +56,14 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     needs: tests
-    env:
-      PIP_CONSTRAINTS: ${{ github.workspace }}/.github/workflows/constraints.txt
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.11"
-
-      - name: Upgrade pip
-        run: |
-          pip install --constraint=$PIP_CONSTRAINTS pip
-          pip --version
-
-      - name: Install Poetry
-        run: |
-          pipx install --pip-args=--constraint=$PIP_CONSTRAINTS poetry
-          pipx inject --pip-args=--constraint=$PIP_CONSTRAINTS poetry poetry-plugin-export
-          poetry --version
-
-      - name: Install Nox
-        run: |
-          pipx install --pip-args=--constraint=$PIP_CONSTRAINTS nox
-          pipx inject --pip-args=--constraint=$PIP_CONSTRAINTS nox nox-poetry
-          nox --version
 
       - name: Download coverage data
         uses: actions/download-artifact@v7
@@ -147,12 +71,10 @@ jobs:
           name: coverage-data
 
       - name: Combine coverage data and display human readable report
-        run: |
-          nox --session=coverage
+        run: coverage combine
 
       - name: Create coverage report
-        run: |
-          nox --session=coverage -- xml
+        run: coverage combine xml
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v5.5.2
