@@ -17,26 +17,19 @@ jobs:
           - { python: "3.11", os: "ubuntu-latest" }
           - { python: "3.12", os: "ubuntu-latest" }
           - { python: "3.13", os: "ubuntu-latest" }
-          # - { python: "3.13", os: "windows-latest", session: "tests" }
-          # - { python: "3.13", os: "macos-latest", session: "tests" }
-    env:
-      FORCE_COLOR: "1"
-
+          - { python: "3.13", os: "windows-latest" }
+          - { python: "3.13", os: "macos-latest" }
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
-
       - name: Run prek
         run: uv run prek run --all-files
-
       - name: Run pytest
         run: uv run coverage run --parallel -m pytest
-
       - name: Upload coverage data
         if: always() && matrix.python == '3.11'
         uses: "actions/upload-artifact@v6"
@@ -52,23 +45,18 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.11"
-
       - name: Download coverage data
         uses: actions/download-artifact@v7
         with:
           name: coverage-data
-
       - name: Combine coverage data and display human readable report
-        run: coverage combine
-
+        run: uv run coverage combine
       - name: Create coverage report
-        run: coverage combine xml
-
+        run: uv run coverage combine xml
       - name: Upload coverage report
         uses: codecov/codecov-action@v5.5.2
 
@@ -78,15 +66,12 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v6
-
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.11"
-
       - name: Build docs
-        run: sphinx-build docs docs/_build
-
+        run: uv run sphinx-build docs docs/_build
       - name: Upload documentation
         uses: actions/upload-artifact@v6
         with:
