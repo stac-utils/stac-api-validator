@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8](https://github.com/stac-utils/stac-api-validator/compare/v0.6.7...v0.6.8) (2026-02-20)
+
+
+### Bug Fixes
+
+* issue a warning when validate_collections is called without collection ([#761](https://github.com/stac-utils/stac-api-validator/issues/761)) ([bafdf12](https://github.com/stac-utils/stac-api-validator/commit/bafdf127b709a422f3b44ba63a250e629fd99911))
+
 ## [Unreleased]
 
 ## [0.6.7] - 2025-08-11

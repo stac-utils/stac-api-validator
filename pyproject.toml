@@ -1,6 +1,6 @@
 [project]
 name = "stac-api-validator"
-version = "0.6.7"
+version = "0.6.8"
 description = "STAC API Validator"
 authors = [{ name = "Phil Varner", email = "phil@philvarner.com" }]
 license = "Apache-2.0"
