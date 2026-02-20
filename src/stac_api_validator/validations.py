@@ -1074,6 +1074,10 @@ def validate_collections(
                         r_session.headers,
                     )
 
+            if not collection:
+                warnings += f"[{Context.COLLECTIONS}] Collection parameter required for running all Collections validation"
+                return
+
             collection_url = f"{data_link['href']}/{collection}"
             _, body, resp_headers = retrieve(
                 Method.GET,
