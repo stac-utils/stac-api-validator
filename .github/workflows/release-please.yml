@@ -13,6 +13,7 @@ name: release-please
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    if: ${{ github.repository }} == 'stac-utils/stac-api-validator'
     steps:
       - uses: actions/create-github-app-token@v2
         id: generate-token
