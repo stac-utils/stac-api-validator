@@ -3,6 +3,7 @@
 import unittest.mock
 
 import pytest
+import sys
 from click.testing import CliRunner
 
 from stac_api_validator import __main__
@@ -29,7 +30,9 @@ def test_retrieve_called_with_auth_headers(
 
     expected_headers = {
         "User-Agent": f"python-requests/{requests_version}",
-        "Accept-Encoding": "gzip, deflate",
+        "Accept-Encoding": "gzip, deflate, zstd"
+        if sys.version_info >= (3, 14)
+        else "gzip, deflate",
         "Accept": "*/*",
         "Connection": "keep-alive",
         "Authorization": "api-key fake-api-key-value",
