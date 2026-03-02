@@ -2189,7 +2189,6 @@ def validate_fields(
         field: str,
         errors: Errors,
         warnings: Warnings,
-        disallow_extra: bool = True,
     ):
         if not body or not (item := first_item(body)):
             errors += f"[{context}] : response had no items in response for {desc}"
@@ -2203,10 +2202,6 @@ def validate_fields(
 
             if value:
                 errors += f"[{context}] : {desc} response contained '{field}', but should have been excluded"
-
-            if disallow_extra:
-                if len(item) < 5:
-                    errors += f"[{context}] : {desc} response contained fewer than 5 fields {list(item.keys())}"
 
     if Method.GET in search_method_to_url:
         _, body, _ = retrieve(
@@ -2388,7 +2383,7 @@ def validate_fields(
             r_session=r_session,
         )
         desc = f"GET fields='{field}'"
-        validate_exclude_field(desc, body, "geometry", errors, warnings, False)
+        validate_exclude_field(desc, body, "geometry", errors, warnings)
         validate_include_field(
             desc, body, fields_nested_property, errors, warnings, True
         )
