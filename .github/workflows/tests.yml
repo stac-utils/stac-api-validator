@@ -33,7 +33,7 @@ jobs:
         run: uv run coverage run --parallel -m pytest
       - name: Upload coverage data
         if: always() && matrix.python == '3.11'
-        uses: "actions/upload-artifact@v6"
+        uses: "actions/upload-artifact@v7"
         with:
           name: coverage-data
           path: ".coverage.*"
@@ -74,7 +74,7 @@ jobs:
       - name: Build docs
         run: uv run sphinx-build docs docs/_build
       - name: Upload documentation
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: docs
           path: docs/_build
