@@ -3753,7 +3753,7 @@ def validate_sort(
             body={
                 "sortby": sortby_json,
                 "limit": limit,
-                "collections": collection,
+                "collections": [collection],
             },
             errors=errors,
             context=context,
@@ -3804,7 +3804,7 @@ def validate_sort(
             body={
                 "sortby": sortby_json,
                 "limit": limit,
-                "collections": collection,
+                "collections": [collection],
             },
             errors=errors,
             context=context,
